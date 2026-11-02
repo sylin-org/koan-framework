@@ -47,6 +47,10 @@ public static class Origin
     };
 }
 
+/// <summary>The tier of a request the server itself made for a caller at another edge, as a tool call is a request to its route
+/// (ARCH-0141): its connection says nothing of where the call came from. Only server code sets a feature.</summary>
+public sealed record OriginFeature(OriginTier Tier);
+
 /// <summary>
 /// SEC-0004 — stamps the server-trusted <see cref="Origin.ClaimType"/> claim onto a principal at the transport
 /// edge. ALWAYS strips any pre-existing (potentially client-forged) <c>koan:origin</c> claim first, then adds the
@@ -77,6 +81,19 @@ public static class OriginStamp
         identities.Add(carrier);
 
         return new ClaimsPrincipal(identities);
+    }
+
+    /// <summary>The tier a principal is stamped with, or null when it carries no stamp.</summary>
+    public static OriginTier? TierOf(ClaimsPrincipal principal)
+    {
+        if (!IsStamped(principal)) return null;
+        var carrier = principal.Identities.First(identity => string.Equals(identity.Label, CarrierLabel, StringComparison.Ordinal));
+        return carrier.FindFirst(Origin.ClaimType)?.Value switch
+        {
+            Origin.Local => OriginTier.Local,
+            Origin.Internal => OriginTier.Internal,
+            _ => OriginTier.Remote,
+        };
     }
 
     /// <summary>True when a principal carries the framework's origin stamp: the carrier identity <see cref="Apply"/>

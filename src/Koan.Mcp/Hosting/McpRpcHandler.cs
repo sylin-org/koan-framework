@@ -101,8 +101,8 @@ public sealed class McpRpcHandler
     public static ClaimsPrincipal StdioPrincipal()
         => Koan.Web.Authorization.OriginStamp.Apply(new ClaimsPrincipal(), Koan.Web.Authorization.OriginTier.Local);
 
-    // SEC-0017: what a raw JSON-RPC (STDIO) caller is listed: the exposed tools, with each entity tool kept only when
-    // the STDIO principal may call it (SEC-0011). Custom verbs keep their exposure-only listing, as their call does.
+    // SEC-0017: what a raw JSON-RPC (STDIO) caller is listed: the exposed tools, with each kept only when the STDIO
+    // principal may call it (SEC-0011, ARCH-0141).
     [JsonRpcMethod("tools/list")]
     public async Task<ToolsListResponse> ListTools(CancellationToken cancellationToken)
     {
@@ -112,9 +112,11 @@ public sealed class McpRpcHandler
         var listed = new List<ToolDescriptor>(exposed.Tools.Count);
         foreach (var tool in exposed.Tools)
         {
-            if (!_registry.TryGetTool(tool.Name, out var registration, out var definition)
-                || await visibility.Allows(registration.EntityType, definition.Operation, cancellationToken).ConfigureAwait(false))
-                listed.Add(tool);
+            var callable = _registry.TryGetTool(tool.Name, out var registration, out var definition)
+                ? await visibility.Allows(registration.EntityType, definition.Operation, cancellationToken).ConfigureAwait(false)
+                : _customTools is null || !_customTools.TryGet(tool.Name, out var custom)
+                  || await visibility.Allows(custom.Method, custom.GateAction, cancellationToken).ConfigureAwait(false);
+            if (callable) listed.Add(tool);
         }
         return new ToolsListResponse { Tools = listed.ToArray(), Next = exposed.Next };
     }
@@ -149,8 +151,9 @@ public sealed class McpRpcHandler
             {
                 // P3.2: a verb on a config-disabled operational toolset is absent from the surface (global gate —
                 // applies on STDIO + remote, unlike the per-caller visibility filter). The grant is enforced separately.
-                toolsList.AddRange(CustomToolProjection
-                    .Visible(_customTools, _serverOptions.Value, user: null)
+                toolsList.AddRange(_customTools.Tools
+                    .Where(tool => tool.OperationalToolsetKey is not { Length: > 0 } key || _serverOptions.Value.IsOperationalToolsetEnabled(key))
+                    .OrderBy(tool => tool.Name, StringComparer.OrdinalIgnoreCase)
                     .Select(ToolDescriptor.FromCustom));
             }
         }
@@ -228,6 +231,15 @@ public sealed class McpRpcHandler
                 };
             }
 
+            // A route tool answers to the gate as its route does, in the request; a verb with no route, here (ARCH-0141).
+            if (customTool.Route is null)
+            {
+                await using var gateScope = _services.CreateAsyncScope();
+                var denied = await Koan.Web.Authorization.EntityAuthorization.Decide(gateScope.ServiceProvider.GetService<Koan.Web.Authorization.IAuthorize>(),
+                    Koan.Web.Endpoints.EntityRequestContextBuilder.NonHttpPrincipal(user), customTool.GateAction, customTool.Method, ct: cancellationToken);
+                if (denied is not null) return Refused(denied is Koan.Web.Hooks.AuthorizeDecision.Challenge ? "Sign in to do this." : "This isn't open to you.", "gated");
+            }
+
             // AN11 (A10) — a custom verb's effects live in imperative code the framework cannot inspect. A
             // dry-run must NOT invoke it; it returns an honest PARTIAL rehearsal naming the limit (never a
             // silently/falsely-complete — or, worse, actually-executing — "dry-run").
@@ -236,11 +248,20 @@ public sealed class McpRpcHandler
                 return BuildCustomPartialRehearsal(customTool);
             }
 
+            if (customTool.Route is not null)
+            {
+                return await _services.GetRequiredService<Koan.Mcp.CustomTools.RouteToolInvoker>().Invoke(customTool, parameters.Arguments, user, cancellationToken);
+            }
+
             try
             {
                 await using var scope = _services.CreateAsyncScope();
                 var token = await _customInvoker.Invoke(customTool, parameters.Arguments, scope.ServiceProvider, user, cancellationToken);
                 return BuildCustomResult(token);
+            }
+            catch (Koan.Data.Core.Commands.Refusal refusal)
+            {
+                return Refused(refusal.Reason.Text, "invalid");
             }
             catch (Exception ex)
             {
@@ -257,6 +278,13 @@ public sealed class McpRpcHandler
         var result = await _executor.Execute(parameters.Name, parameters.Arguments, cancellationToken, user);
         return ToCallToolResult(parameters.Name, result);
     }
+
+    private static CallToolResult Refused(string text, string kind) => new()
+    {
+        IsError = true,
+        Content = new List<McpContent> { new McpContent { Type = "text", Text = text } },
+        Meta = new JObject { ["errorCode"] = kind }
+    };
 
     private static CallToolResult BuildCustomResult(JToken result)
     {
@@ -838,9 +866,8 @@ public sealed class McpRpcHandler
 
         public static ToolDescriptor From(McpEntityRegistration registration, McpToolDefinition tool)
         {
-            // SEC-0004 Phase 3.3b: entity tools no longer advertise a flat scope list — their access authority is
-            // the data-layer [Access] gate (enforced on call, projected per-row via Slice C's can:[]), not a
-            // transport-edge scope filter. Custom verbs still carry requiredScopes (see FromCustom).
+            // SEC-0004 Phase 3.3b: tools advertise no flat scope list — their access authority is the data-layer
+            // [Access] gate (enforced on call, projected per-row via Slice C's can:[]), not a transport-edge filter.
             var metadata = new JObject
             {
                 ["entity"] = registration.DisplayName,
@@ -866,12 +893,12 @@ public sealed class McpRpcHandler
             var metadata = new JObject
             {
                 ["custom"] = true,
-                ["isMutation"] = tool.IsMutation,
-                ["requiredScopes"] = new JArray(tool.RequiredScopes.Select(scope => JValue.CreateString(scope)))
+                ["isMutation"] = tool.IsMutation
             };
 
-            // AN4: custom verbs gain NOTHING automatically — only the explicit [McpReadOnly]/[McpDestructive]/
-            // [McpIdempotent] markers are emitted (the dangerous hand-written verbs are the ones to mark).
+            // AN4: a verb with no route gains NOTHING automatically — only the explicit [McpReadOnly]/[McpDestructive]/
+            // [McpIdempotent] markers are emitted (the dangerous hand-written verbs are the ones to mark). A route also
+            // says what its HTTP method promises.
             return new ToolDescriptor
             {
                 Name = tool.Name,

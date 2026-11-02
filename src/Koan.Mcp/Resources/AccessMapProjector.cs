@@ -82,11 +82,12 @@ public sealed class AccessMapProjector
         };
     }
 
-    // Custom [McpTool] verbs ride a flat scope policy (not the entity DNF gate) — normalize into the same vocabulary.
-    private static string DescribeCustom(McpCustomTool tool)
-        => tool.RequiredScopes.Count == 0
-            ? "anonymous"
-            : "requires " + string.Join(" and ", tool.RequiredScopes.Select(s => "scope:" + s));
+    // A custom verb answers to the same gate as an entity, read off its own declarations (ARCH-0141).
+    private string DescribeCustom(McpCustomTool tool)
+    {
+        var gate = _gateCache.GetOrCompile(tool.Method).For(tool.GateAction);
+        return gate.IsOpen ? "anonymous" : Normalize(AccessGateEvaluator.Describe(gate));
+    }
 
     // Render the origin claim grant the way the mental model reads (claim:koan:origin=local -> origin:local).
     private static string Normalize(string described)

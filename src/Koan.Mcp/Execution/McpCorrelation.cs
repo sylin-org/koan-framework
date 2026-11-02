@@ -7,7 +7,7 @@ namespace Koan.Mcp.Execution;
 /// <see cref="Koan.Core.StringId"/>) when the caller supplies none.
 ///
 /// THE INVARIANT — continuity ≠ authority: the pin is NEVER consulted for permission. Authorization is
-/// per-request against the principal (<see cref="McpToolAccessPolicy"/> takes only the principal, never a
+/// per-request against the principal (the gate takes only the principal, never a
 /// correlation/session id). Accepting a pin in place of a grant would be session fixation.
 /// </summary>
 internal static class McpCorrelation

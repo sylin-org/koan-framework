@@ -66,7 +66,7 @@ internal static class DevTokenEndpoint
         }
 
         // Dev-only testing knobs: ?scope=<space-delimited> and ?roles=<space/comma-delimited> mint exactly those
-        // into the token (as-is, no held-filter) so a scope-gated [McpTool] / [Access(has:scope:x)] path is
+        // into the token (as-is, no held-filter) so a scope-gated [Access(has:scope:x)] path is
         // exercisable with a one-line curl. Absent → the session's own scopes/roles.
         var scopeOverride = ParseList(ctx.Request.Query["scope"].ToString());
         var rolesOverride = ParseList(ctx.Request.Query["roles"].ToString());

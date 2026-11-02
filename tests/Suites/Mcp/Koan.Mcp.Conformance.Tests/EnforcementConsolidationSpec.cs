@@ -3,6 +3,7 @@ using System.Linq;
 using System.Security.Claims;
 using System.Threading.Tasks;
 using Koan.Mcp;
+using Koan.Mcp.TestKit;
 using Koan.Mcp.Execution;
 using Koan.Web.Authorization;
 using Koan.Web.Endpoints;
@@ -12,12 +13,9 @@ using Newtonsoft.Json.Linq;
 namespace Koan.Mcp.Conformance.Tests;
 
 /// <summary>
-/// SEC-0004 Phase 3.3b — MCP enforcement is split by tool kind, with NO per-transport duplication. An ENTITY
-/// tool's authority is the data-layer <c>[Access]</c> gate (the same gate REST enforces, advertised over MCP via
-/// <see cref="McpEntityGate"/> and enforced on call inside <c>CallToolFor</c>); a CUSTOM <c>[McpTool]</c> verb's
-/// authority is the shared <see cref="McpToolAccessPolicy"/> scope filter (custom verbs have no entity/row, so
-/// they keep the transport-edge check). STDIO is local-trust by design (the raw handler is unfiltered). These
-/// specs pin all three: the custom-verb policy matrix, the entity gate's coarse decision, and STDIO local-trust.
+/// SEC-0004, ARCH-0141 — MCP enforcement has one authority, with NO per-transport duplication: the gate. An ENTITY
+/// tool asks it for the entity's type, a custom verb for its method, and STDIO asks as its one principal, anonymous and
+/// <c>origin:local</c> (SEC-0017). A value that cannot bind to a custom verb is refused, naming it.
 /// </summary>
 public sealed class EnforcementConsolidationSpec : IClassFixture<ConformanceFixture>
 {
@@ -25,41 +23,47 @@ public sealed class EnforcementConsolidationSpec : IClassFixture<ConformanceFixt
 
     public EnforcementConsolidationSpec(ConformanceFixture fx) => _fx = fx;
 
-    // ---- Custom-verb authority: the policy matrix ------------------------------------------------
+    // ---- Custom-verb authority: the one gate ------------------------------------------------------
 
     [Fact]
-    public void Custom_verb_policy_denies_an_unauthenticated_caller_when_auth_required()
+    public async Task A_custom_verb_answers_to_the_gate_on_a_call_and_in_a_list()
     {
-        McpToolAccessPolicy.IsPermitted(Anon(), requiresAuth: true, Array.Empty<string>()).Should().BeFalse();
-        McpToolAccessPolicy.IsPermitted(User(), requiresAuth: true, Array.Empty<string>()).Should().BeTrue();
-        McpToolAccessPolicy.IsPermitted(Anon(), requiresAuth: false, Array.Empty<string>()).Should().BeTrue();
+        var allowed = await _fx.CallToolAsAsync("gadget_admin", new JObject(), User("gadget:admin"));
+        McpHarnessFixtureBase.IsError(allowed).Should().BeFalse(allowed.ToString());
+
+        foreach (var caller in new[] { User("other"), Anon() })
+        {
+            var denied = await _fx.CallToolAsAsync("gadget_admin", new JObject(), caller);
+            McpHarnessFixtureBase.IsError(denied).Should().BeTrue(denied.ToString());
+            denied["meta"]!["errorCode"]!.Value<string>().Should().Be("gated");
+        }
+
+        (await _fx.CallToolAsync("gadget_admin", new JObject()))["isError"]!.Value<bool>().Should().BeTrue("STDIO asks as anyone does");
+        (await _fx.ListToolsAsync()).OfType<JObject>().Select(t => t["name"]?.Value<string>()).Should().NotContain("gadget_admin")
+            .And.Contain("gadget_ping");
     }
 
     [Fact]
-    public void Custom_verb_required_scopes_are_enforced()
+    public async Task A_value_that_cannot_bind_to_a_custom_verb_is_refused_with_its_name()
     {
-        McpToolAccessPolicy.IsPermitted(User("vault:read"), requiresAuth: false, new[] { "vault:read" }).Should().BeTrue();
-        McpToolAccessPolicy.IsPermitted(User("other"), requiresAuth: false, new[] { "vault:read" }).Should().BeFalse();
-        McpToolAccessPolicy.IsPermitted(Anon(), requiresAuth: false, new[] { "vault:read" }).Should().BeFalse(
-            "an anonymous caller presents no scopes");
-        McpToolAccessPolicy.UserHasScopes(User("a", "b"), new[] { "a" }).Should().BeTrue();
-        McpToolAccessPolicy.UserHasScopes(User("a"), new[] { "a", "b" }).Should().BeFalse("all required scopes must be held");
+        var unreadable = await _fx.CallToolAsync("gadget_count", new JObject { ["count"] = "many" });
+        McpHarnessFixtureBase.IsError(unreadable).Should().BeTrue(unreadable.ToString());
+        McpHarnessFixtureBase.ContentText(unreadable).Should().StartWith("count:");
+        unreadable["meta"]!["errorCode"]!.Value<string>().Should().Be("invalid");
+
+        var missing = await _fx.CallToolAsync("gadget_count", new JObject { ["step"] = 2 });
+        McpHarnessFixtureBase.IsError(missing).Should().BeTrue(missing.ToString());
+        McpHarnessFixtureBase.ContentText(missing).Should().StartWith("count:");
+
+        var good = await _fx.CallToolAsync("gadget_count", new JObject { ["count"] = 3 });
+        McpHarnessFixtureBase.ContentText(good).Should().Be("4", "an optional argument left out takes its default");
     }
 
-    // ---- Entity-tool authority: the data-layer [Access] gate + STDIO local-trust tripwire ---------
+    // ---- Entity-tool authority: the data-layer [Access] gate ------------------------------------
 
     [Fact]
-    public async Task Raw_handler_is_unfiltered_so_STDIO_is_local_trust()
+    public void The_entity_gate_denies_an_anonymous_caller_a_scoped_tool()
     {
-        // The raw McpRpcHandler (what STDIO binds) lists the scoped vault tool with NO principal — it does not
-        // filter. That is the local-trust invariant: stdin/stdout = the local process owner.
-        var tools = await _fx.ListToolsAsync();
-        var vaultTool = tools.OfType<JObject>()
-            .FirstOrDefault(t => (t["name"]?.Value<string>() ?? "").StartsWith("vault", StringComparison.OrdinalIgnoreCase));
-        vaultTool.Should().NotBeNull("the raw handler lists the scoped vault tool unfiltered (local-trust)");
-
-        // ...AND the entity [Access] gate WOULD deny an anonymous remote caller that same tool — proving the gate
-        // is the entity-tool authority the remote edge advertises/enforces against, and STDIO bypasses it.
         var registry = _fx.Services.GetRequiredService<McpEntityRegistry>();
         var gateCache = _fx.Services.GetRequiredService<IAccessGateCache>();
         registry.TryGetRegistration("vault", out var registration).Should().BeTrue();

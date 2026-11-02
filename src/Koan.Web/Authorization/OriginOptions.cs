@@ -43,7 +43,7 @@ public sealed class OriginOptions
 public static class OriginResolver
 {
     public static OriginTier FromHttpContext(HttpContext httpContext, OriginOptions options)
-        => FromIp(httpContext?.Connection?.RemoteIpAddress, options);
+        => httpContext?.Features.Get<OriginFeature>()?.Tier ?? FromIp(httpContext?.Connection?.RemoteIpAddress, options);
 
     public static OriginTier FromIp(IPAddress? ip, OriginOptions options)
         => (options ?? OriginOptions.Empty).IsInternal(ip) ? OriginTier.Internal : OriginTier.Remote;

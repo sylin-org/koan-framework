@@ -4,6 +4,7 @@ using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Koan.Data.Core.Commands;
 using Koan.Mcp.Execution;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -90,20 +91,12 @@ public sealed class McpCustomToolInvoker
             catch (Exception ex) when (!fields.HasRestrictions &&
                 (ex is JsonException or FormatException or InvalidCastException or ArgumentException or OverflowException))
             {
-                // A supplied value that cannot bind to the target type falls through to the default (lenient
-                // binding, by design). F2 burn-down: the catch is narrowed to conversion failures so an UNEXPECTED
-                // exception is no longer swallowed under the same fallthrough.
+                throw new Refusal($"{parameter.Name}: '{node.ToString(Formatting.None)}' cannot be read as {parameter.Type.Name}.");
             }
         }
 
-        if (parameter.DefaultValue is not null)
-        {
-            return parameter.DefaultValue;
-        }
-
-        return parameter.Type.IsValueType && Nullable.GetUnderlyingType(parameter.Type) is null
-            ? Activator.CreateInstance(parameter.Type)
-            : null;
+        if (!parameter.IsOptional) throw new Refusal($"{parameter.Name}: a value is required.");
+        return parameter.DefaultValue;
     }
 
     private static object? GetTaskResult(Task task)

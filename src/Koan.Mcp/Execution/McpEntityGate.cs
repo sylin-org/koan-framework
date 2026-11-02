@@ -13,8 +13,7 @@ namespace Koan.Mcp.Execution;
 /// transport edge no longer carries its own scope check. This probe lets the catalog / <c>tools/list</c> ASK
 /// the SAME gate — via the shared singleton <see cref="IAccessGateCache"/> the floor provider consumes — whether
 /// a verb is even coarsely reachable, so visibility never advertises what the gate will then deny (the
-/// visibility≠enforcement divergence the AN3/WEB-0068 lesson warns against). It replaces the entity-tool half of
-/// <see cref="McpToolAccessPolicy"/> (which now governs custom <c>[McpTool]</c> verbs only).
+/// visibility≠enforcement divergence the AN3/WEB-0068 lesson warns against).
 ///
 /// This is COARSE (no row): an <c>owner</c> term degrades to <c>authenticated</c> exactly as the floor provider
 /// and the Slice C projection's coarse seam do — the per-row refinement happens at the data layer on the actual

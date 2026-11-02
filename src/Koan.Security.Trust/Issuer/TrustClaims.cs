@@ -20,7 +20,7 @@ public sealed class TrustClaims
     /// <summary>
     /// OAuth scopes granted to this credential — the authorization grant. Emitted as the RFC 9068 §2.2.3
     /// <c>scope</c> claim (one space-delimited value), which is what the SEC-0004 <c>[Access(has:scope:x)]</c>
-    /// gate and the custom <c>[McpTool(RequiredScopes)]</c> policy read. (Unlike <see cref="Permissions"/>, scopes
+    /// gate reads. (Unlike <see cref="Permissions"/>, scopes
     /// DO carry authorization effect — they are the grant.)
     /// </summary>
     public IReadOnlyCollection<string> Scopes { get; init; } = [];

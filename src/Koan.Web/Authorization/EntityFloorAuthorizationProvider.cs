@@ -1,4 +1,5 @@
 using System;
+using System.Reflection;
 using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
@@ -37,12 +38,16 @@ public sealed class EntityFloorAuthorizationProvider : IAuthorizationProvider
 
     public async Task<AuthorizeDecision?> EvaluateAsync(AuthorizeRequest request, CancellationToken ct = default)
     {
-        if (request.Resource is not Type entityType)
+        // The gate understands an entity's type and a custom verb's method (ARCH-0141), whose grants are its class's.
+        var (gate, entityType) = request.Resource switch
         {
-            return null; // the gate only understands entity-typed resources
-        }
+            Type type => (_cache.GetOrCompile(type), type),
+            MethodInfo { DeclaringType: { } declaring } verb => (_cache.GetOrCompile(verb), declaring),
+            _ => (null, null),
+        };
+        if (gate is null || entityType is null) return null;
 
-        var actionGate = _cache.GetOrCompile(entityType).For(request.Action);
+        var actionGate = gate.For(request.Action);
         if (actionGate.IsOpen)
         {
             return null; // open action → defer (allow-by-default preserved)

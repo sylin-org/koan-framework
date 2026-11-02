@@ -13,7 +13,7 @@ namespace Koan.Web.Authorization;
 /// Multiple scopes are AND-combined (all required). Stack the attribute or pass several names:
 /// <c>[RequireScope("orders:read", "orders:write")]</c> ≡ <c>[RequireScope("orders:read")] [RequireScope("orders:write")]</c>.
 /// </remarks>
-[AttributeUsage(AttributeTargets.Class, AllowMultiple = true, Inherited = true)]
+[AttributeUsage(AttributeTargets.Class | AttributeTargets.Method, AllowMultiple = true, Inherited = true)]
 public sealed class RequireScopeAttribute : Attribute
 {
     public RequireScopeAttribute(params string[] scopes)

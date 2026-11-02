@@ -187,7 +187,7 @@ curl -i -H "Authorization: Bearer <token>" -H "Accept: application/json, text/ev
   -X POST "http://localhost:5000/mcp" \
   -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"curl","version":"1"}}}'
 
-# request arbitrary scopes/roles to exercise a scope-gated [McpTool] / [Access(has:scope:x)] path:
+# request arbitrary scopes/roles to exercise a scope-gated [Access(has:scope:x)] / [RequireScope] path:
 curl -b cookies.txt "http://localhost:5000/oauth/dev-token?scope=orders:read%20orders:fulfill&roles=admin"
 ```
 
@@ -211,7 +211,7 @@ This is the fast path to exercise the authenticated `/mcp` edge end-to-end witho
 ## The security model in one breath
 
 - **Asymmetric signing.** Tokens are ES256, signed by a framework-managed key the verifier never holds ("whoever can verify must not be able to forge"). The key is auto-generated, **persisted encrypted-at-rest, auto-rotated** with JWKS overlap; a **fail-closed boot guard** refuses to start a production AS on an ephemeral key. (Development uses an ephemeral per-process key unless the application names a key ring folder, `Koan:Web:KeyRingDirectory`, in which case the keys persist there too and a local install's tokens outlive a restart.)
-- **Down-scope only.** A token's roles come from the user's **session**, never the request. Scopes are consented as-requested; the request can never widen authority. Granted scopes ride the RFC 9068 `scope` claim — the authorization grant the `[Access(has:scope:x)]` gate and custom `[McpTool(RequiredScopes)]` read (not the inert `Koan.permission`).
+- **Down-scope only.** A token's roles come from the user's **session**, never the request. Scopes are consented as-requested; the request can never widen authority. Granted scopes ride the RFC 9068 `scope` claim — the authorization grant the `[Access(has:scope:x)]` gate reads (not the inert `Koan.permission`).
 - **Audience-bound (RFC 8707).** Every token is bound to a specific resource and validated `aud == this resource` at the edge.
 - **Revocable.** Refresh is backed by a SEC-0005 `AgentGrant` — the user (or an admin) can revoke it fleet-wide, and the next refresh fails closed. Each approval is its own grant, stating when it was issued (`IssuedAt`) and to which client (`ClientId`, and the `ClientName` the client registered, unverified), so a page lists a person's live approvals newest first with `AgentGrant.Approvals(personId, take)` and revokes one with `Remove()`: that connection stops refreshing, the client's next connection asks the person again, and the person's other approvals keep working. Grants issued before Koan recorded these answer null for them, are not listed, and never keep consent remembered.
 

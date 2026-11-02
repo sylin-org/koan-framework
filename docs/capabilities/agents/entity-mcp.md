@@ -42,7 +42,7 @@ mirroring the model or writing CRUD tool handlers.
 | Decision | First posture | When to widen |
 |---|---|---|
 | Read or write | expose read-only operations first | add mutations only after deciding what the agent may do unattended |
-| Entity operation or custom workflow | reuse generated Entity operations | use `[McpTool]` only for a named business action beyond them |
+| Entity operation or custom workflow | reuse generated Entity operations | mark the action `[Tool]` for a named business action that has a route, and use `[McpTool]` only for one with none |
 | Local or remote | STDIO when the client owns the local process | Streamable HTTP only when a network client must connect — it is secure opt-in: `Koan:Mcp:EnableStreamableHttpTransport=true` (default `/mcp`) |
 | Human inspection | facts and caller-visible resources first | add Explorer when operators need governed try-it |
 

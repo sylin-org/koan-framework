@@ -1,3 +1,4 @@
+using Koan.Web.Authorization;
 using System.Security.Claims;
 using System.Threading.Tasks;
 using Koan.Mcp.Execution;
@@ -43,10 +44,10 @@ public sealed class CorrelationPinSpec : IClassFixture<ConformanceFixture>
     [Fact]
     public void Continuity_is_not_authority()
     {
-        // The pin is NOT an input to the access decision — McpToolAccessPolicy takes only the principal.
+        // The pin is NOT an input to the access decision: the gate takes only the principal.
         // An anonymous caller is denied a scoped capability; supplying any correlation id / pin changes
         // nothing (accepting a pin in place of a grant would be session fixation).
-        McpToolAccessPolicy.IsPermitted(new ClaimsPrincipal(new ClaimsIdentity()), requiresAuth: false, new[] { "vault:read" })
+        AccessGateEvaluator.HasScope(new ClaimsPrincipal(new ClaimsIdentity()), "vault:read")
             .Should().BeFalse("authority is per-request against the principal, never the pin");
     }
 }

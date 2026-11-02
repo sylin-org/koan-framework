@@ -106,6 +106,10 @@ fields may remain in static schemas as a superset; discovery does not grant fiel
 Supplied typed custom-tool arguments are also whole values and require permission to write every
 protected member before binding, including constructor-bound members.
 
+A verb that already answers at a route needs no second definition: mark the action or its controller `[Tool]`, from `Koan.Web`, and a tool call is a request to it,
+with the same input, gate, refusals and effect ([ARCH-0141](../../docs/decisions/ARCH-0141-one-verb-a-route-that-is-also-a-tool.md)). `[McpTool]` is for a verb with no route. Either answers to the one gate:
+`[Access]` or `[RequireScope]` on the method or its class, and a value that cannot bind is refused with its name.
+
 Set `IsMutation = true` on a mutating `[McpTool]`. Its input schema advertises `dry_run`; because
 arbitrary imperative effects are not inspectable, `dry_run: true` returns a non-executing partial
 rehearsal that names that boundary. Generated Entity mutations return framework-owned prospective

@@ -224,6 +224,8 @@
       href: ARCH-0139-registry-driven-services-register-after-discovery.md
     - name: ARCH-0140 Recording an unchanged fact takes no lock, and Koan starts before any hosted service whatever the registration order
       href: ARCH-0140-core-hot-paths-take-no-lock-and-start-in-any-order.md
+    - name: ARCH-0141 One verb is one route, and a tool call is a request to it
+      href: ARCH-0141-one-verb-a-route-that-is-also-a-tool.md
 - name: Core (CORE)
   items:
     - name: CORE-0072 Source-generated registries

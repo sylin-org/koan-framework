@@ -135,23 +135,13 @@ public sealed class McpRpcDispatcher
             return CreateError(envelope.Id, -32602, "Missing tool name.");
         }
 
-        var isEntityTool = _registry.TryGetTool(toolName, out _, out _);
-        Koan.Mcp.CustomTools.McpCustomTool? customTool = null;
-        var isCustomTool = !isEntityTool && _customTools.TryGet(toolName, out customTool);
-        if (!isEntityTool && !isCustomTool)
+        if (!_registry.TryGetTool(toolName, out _, out _) && !_customTools.TryGet(toolName, out _))
         {
             return CreateError(envelope.Id, -32601, $"Tool '{toolName}' is not registered.");
         }
 
-        // SEC-0004 Phase 3.3b: an ENTITY tool's authority is the data-layer [Access] gate, enforced inside
-        // CallToolFor with the threaded principal — a denial rides back as meta.shortCircuit (the MCP mirror of
-        // REST 403/401), NOT a transport-edge -32604. So the edge no longer pre-checks entity tools; it still
-        // gates a CUSTOM verb here (custom verbs have no entity/no row, so no data-layer gate yet).
-        if (isCustomTool && !HasAccessCustom(customTool!, principal))
-        {
-            return CreateError(envelope.Id, -32604, "Forbidden.");
-        }
-
+        // SEC-0004, ARCH-0141: a tool's authority is the one gate, enforced inside CallToolFor with the threaded
+        // principal, so a denial is a failed call and not a transport-edge error.
         JObject? arguments = null;
         if (parameters.TryGetValue("arguments", StringComparison.OrdinalIgnoreCase, out var argsNode) && argsNode is JObject argsObj)
         {
@@ -179,9 +169,9 @@ public sealed class McpRpcDispatcher
         return Wrap(envelope.Id, JToken.FromObject(handler.ReadResourceFor(uri, principal), JsonSerializer.Create(SerializerSettings)));
     }
 
-    // SEC-0011: tools/list must not advertise what the call will deny. An ENTITY tool is visible iff the authorization
-    // ladder the endpoint enforces (grants, added providers, the default decision) allows the principal. A CUSTOM verb
-    // consults McpToolAccessPolicy (its scope filter). The principal is never null at a remote edge.
+    // SEC-0011: tools/list must not advertise what the call will deny. A tool is visible iff the authorization ladder its
+    // call enforces (grants, added providers, the default decision) allows the principal, which for a custom verb is asked
+    // with no resource at hand (ARCH-0141). The principal is never null at a remote edge.
     private async Task<bool> IsToolVisible(McpRpcHandler.ToolDescriptor tool, ClaimsPrincipal principal,
         McpVerbVisibility visibility, CancellationToken cancellationToken)
     {
@@ -192,14 +182,11 @@ public sealed class McpRpcDispatcher
 
         if (_customTools.TryGet(tool.Name, out var custom))
         {
-            return HasAccessCustom(custom, principal);
+            return await CustomToolProjection.IsVisible(custom, _options.CurrentValue, visibility, cancellationToken);
         }
 
         return false;
     }
-
-    private bool HasAccessCustom(Koan.Mcp.CustomTools.McpCustomTool tool, ClaimsPrincipal principal)
-        => CustomToolProjection.IsVisible(tool, _options.CurrentValue, principal);
 
     private JObject Wrap(JToken? id, JToken? result)
         => result is null

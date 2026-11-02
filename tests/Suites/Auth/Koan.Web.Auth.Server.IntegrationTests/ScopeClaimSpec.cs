@@ -4,15 +4,14 @@ using System.Security.Claims;
 using System.Text.Json;
 using System.Threading;
 using AwesomeAssertions;
-using Koan.Mcp.Execution;
+using Koan.Web.Authorization;
 using Xunit;
 
 namespace Koan.Web.Auth.Server.IntegrationTests;
 
 /// <summary>
 /// SEC-0006 — granted OAuth scopes must reach the claim the access gates read. A consented scope used to land in
-/// the inert <c>Koan.permission</c> claim, but both the SEC-0004 <c>[Access(has:scope:x)]</c> gate and the custom
-/// <c>[McpTool(RequiredScopes)]</c> policy (<see cref="McpToolAccessPolicy"/>) read the RFC 9068 <c>scope</c> claim
+/// the inert <c>Koan.permission</c> claim, but the SEC-0004 <c>[Access(has:scope:x)]</c> gate reads the RFC 9068 <c>scope</c> claim
 /// — so a scope-gated verb could never be satisfied by an AS-issued token. This proves the AS-issued token now
 /// satisfies that gate, and that the dev-token can request arbitrary scopes for a local test loop.
 /// </summary>
@@ -41,10 +40,10 @@ public sealed class ScopeClaimSpec : IClassFixture<McpAuthRampFixture>
         var jwt = new JwtSecurityTokenHandler().ReadJwtToken(token);
         var principal = new ClaimsPrincipal(new ClaimsIdentity(jwt.Claims, "test"));
 
-        // #1 — the granted scope now reaches the custom-[McpTool] gate (it was inert in Koan.permission before).
-        McpToolAccessPolicy.UserHasScopes(principal, new[] { "orders:fulfill" }).Should().BeTrue();
-        McpToolAccessPolicy.UserHasScopes(principal, new[] { "orders:read", "orders:fulfill" }).Should().BeTrue();
+        // #1: the granted scope now reaches the gate (it was inert in Koan.permission before).
+        AccessGateEvaluator.HasScope(principal, "orders:fulfill").Should().BeTrue();
+        AccessGateEvaluator.HasScope(principal, "orders:read").Should().BeTrue();
         // A scope that was NOT granted is denied.
-        McpToolAccessPolicy.UserHasScopes(principal, new[] { "admin:purge" }).Should().BeFalse();
+        AccessGateEvaluator.HasScope(principal, "admin:purge").Should().BeFalse();
     }
 }

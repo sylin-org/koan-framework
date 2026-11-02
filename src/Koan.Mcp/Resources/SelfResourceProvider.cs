@@ -82,7 +82,7 @@ public sealed class SelfResourceProvider : IMcpResourceProvider
         var app = KoanEnv.CurrentSnapshot.Application;
         using var visibility = Koan.Mcp.Execution.McpVerbVisibility.For(_scopes, _gateCache, user);
         var visible = EntityProjection.Visible(_registry, _gateCache, visibility, user).GetAwaiter().GetResult();
-        var visibleCustomTools = CustomToolProjection.Visible(_customTools, _options.Value, user);
+        var visibleCustomTools = CustomToolProjection.Visible(_customTools, _options.Value, visibility).GetAwaiter().GetResult();
 
         var entities = new JArray(visible.Select(v => new JObject
         {

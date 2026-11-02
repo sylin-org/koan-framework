@@ -87,7 +87,8 @@ public static class AccessGateEvaluator
         _ => false,
     };
 
-    private static bool HasScope(ClaimsPrincipal user, string scope)
+    /// <summary>Whether the principal presents <paramref name="scope"/> among its space-delimited scope claims.</summary>
+    public static bool HasScope(ClaimsPrincipal user, string scope)
     {
         foreach (var claimType in ScopeClaimTypes)
         {

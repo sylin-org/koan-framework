@@ -1,6 +1,7 @@
 using Koan.Data.Abstractions.Annotations;
 using Koan.Data.Core.Model;
 using Koan.Mcp;
+using Koan.Web.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Koan.Web.Controllers;
 
@@ -34,11 +35,12 @@ public static class ConformanceTools
     [McpDestructive]
     public static string GadgetPurge(string confirm) => $"purged:{confirm}";
 
-    [McpTool(
-        Name = "gadget_admin",
-        Description = "Performs a scope-protected gadget operation.",
-        RequiredScopes = ["gadget:admin"])]
+    [McpTool(Name = "gadget_admin", Description = "Performs a scope-protected gadget operation.")]
+    [RequireScope("gadget:admin")]
     public static string GadgetAdmin() => "admin";
+
+    [McpTool(Name = "gadget_count", Description = "Counts to a number of gadgets.")]
+    public static int GadgetCount(int count, int step = 1) => count + step;
 
     [McpTool(Name = "gadget_shape", Description = "Returns a structured gadget result.")]
     public static GadgetShape GadgetShape(GadgetShape request)

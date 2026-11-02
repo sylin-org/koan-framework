@@ -95,7 +95,7 @@ public sealed class McpSurfaceProjector
         }
 
         var customTools = new JArray();
-        foreach (var tool in toolsExposed ? CustomToolProjection.Visible(_customTools, _serverOptions.Value, user) : [])
+        foreach (var tool in toolsExposed ? CustomToolProjection.Visible(_customTools, _serverOptions.Value, visibility).GetAwaiter().GetResult() : [])
         {
             customTools.Add(ToolJson(McpRpcHandler.ToolDescriptor.FromCustom(tool)));
         }

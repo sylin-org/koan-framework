@@ -31,7 +31,7 @@ public static class JwtClaimFactory
         if (!string.IsNullOrWhiteSpace(c.Email)) claims.Add(new Claim(JwtRegisteredClaimNames.Email, c.Email));
         foreach (var role in c.Roles) claims.Add(new Claim(ClaimTypes.Role, role));
         // RFC 9068 §2.2.3 — granted scopes are a single space-delimited `scope` claim (the authorization grant
-        // that [Access(has:scope:x)] and [McpTool(RequiredScopes)] read).
+        // that [Access(has:scope:x)] and [RequireScope] read).
         if (c.Scopes.Count > 0) claims.Add(new Claim(ScopeClaimType, string.Join(' ', c.Scopes)));
         foreach (var permission in c.Permissions) claims.Add(new Claim(PermissionClaimType, permission));
         if (c.Extra is not null)

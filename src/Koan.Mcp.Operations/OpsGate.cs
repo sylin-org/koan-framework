@@ -19,7 +19,7 @@ internal sealed class McpOpsDeniedException : Exception
 /// P3.2 — the shared runtime gate for operational MCP verbs: the <c>@ops:{key}</c> grant requirement, the
 /// confirm-or-dry-run contract for destructive verbs, and the <see cref="AgentAction"/> audit on every mutation.
 /// Reuses SEC-0005's grant + audit entities directly (no parallel machinery). The config-visibility gate is enforced
-/// upstream by <c>McpToolAccessPolicy</c> via <c>[McpOperationalToolset]</c> — this gate is the runtime authority.
+/// upstream via <c>[McpOperationalToolset]</c> — this gate is the runtime authority.
 /// </summary>
 internal static class OpsGate
 {

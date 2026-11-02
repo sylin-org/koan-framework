@@ -1,8 +1,10 @@
 using System;
+using System.Reflection;
 using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
 using Koan.Web.Hooks;
+using Microsoft.AspNetCore.Http;
 
 namespace Koan.Web.Authorization;
 
@@ -32,4 +34,31 @@ public static class EntityAuthorization
         }, ct).ConfigureAwait(false);
         return decision is AuthorizeDecision.Allow ? null : decision;
     }
+
+    /// <summary>
+    /// The one decision of a custom verb, on every surface (ARCH-0141). The application's own
+    /// <see cref="IAuthorizationProvider"/> can answer for <paramref name="verb"/>: a listing asks with no
+    /// <paramref name="resource"/>, and a call says what it addresses.
+    /// </summary>
+    public static async Task<AuthorizeDecision?> Decide(IAuthorize? authorize, ClaimsPrincipal subject, string action,
+        MethodInfo verb, IReadOnlyDictionary<string, object?>? resource = null, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(subject);
+        ArgumentNullException.ThrowIfNull(verb);
+        if (authorize is null) return null;
+        var decision = await authorize.AuthorizeAsync(new AuthorizeRequest
+        {
+            Subject = subject,
+            Action = action,
+            Resource = verb,
+            Context = resource,
+        }, ct).ConfigureAwait(false);
+        return decision is AuthorizeDecision.Allow ? null : decision;
+    }
+
+    /// <summary>The action an HTTP method performs: a read, a removal, or otherwise a write.</summary>
+    public static string ActionOf(string httpMethod)
+        => HttpMethods.IsGet(httpMethod) || HttpMethods.IsHead(httpMethod) ? EntityAuthorizeActions.Read
+            : HttpMethods.IsDelete(httpMethod) ? EntityAuthorizeActions.Remove
+            : EntityAuthorizeActions.Write;
 }

@@ -136,7 +136,7 @@ not cold-run · `not assessed` = capability-map label · `shipped?` = source exi
 | Capability | Expression | Depth | Evidence |
 |---|---|---|---|
 | Entity MCP projection | `[McpEntity(Name="Todo")] public sealed class Todo : Entity<Todo>;` | advertisement=enforcement; forbidden ops absent per caller | blind-run |
-| Business tools + hints | `[McpTool]` · `[McpReadOnly]`/`[McpDestructive]`/`[McpIdempotent]` · `[McpDescription]`/`[McpIgnore]` | hints, not enforcement | assessed |
+| Business tools + hints | `[Tool]` (Koan.Web, ARCH-0141) · `[McpTool]` · `[McpReadOnly]`/`[McpDestructive]`/`[McpIdempotent]` · `[McpDescription]`/`[McpIgnore]` | hints, not enforcement | assessed |
 | Self-description resources | `koan://self` · `koan://entities` · `koan://facts` | caller-scoped discovery | blind-run (facts) |
 | Transports | STDIO default; Streamable HTTP deliberate | access/input/correlation preserved on failure | assessed |
 | Explorer/operations consoles | `Koan.Mcp.Explorer` · `Koan.Mcp.Operations` | — | shipped? |

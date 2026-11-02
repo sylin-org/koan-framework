@@ -8,7 +8,7 @@ namespace Koan.Mcp.Conformance.Tests;
 
 /// <summary>
 /// SEC-0004 Phase 3.3b — the MCP coarse-gate probe (<see cref="McpEntityGate"/>) is the entity-tool visibility
-/// authority that replaced the per-transport <c>McpToolAccessPolicy</c> entity check. These unit specs pin the
+/// authority of an entity tool on every transport. These unit specs pin the
 /// two load-bearing behaviors: the 12-op → read/write/remove mapping mirrors the endpoint service's enforcement,
 /// and a null principal is STDIO local-trust (unfiltered) while a concrete remote caller is gated per action.
 /// </summary>

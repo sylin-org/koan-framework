@@ -20,6 +20,9 @@ public interface IAccessGateCache
 
     /// <summary>Principal-independent read/write gates declared on a property.</summary>
     AccessGate GetOrCompile(PropertyInfo property);
+
+    /// <summary>The gate of a custom verb: what it declares itself, otherwise what its class declares (ARCH-0141).</summary>
+    AccessGate GetOrCompile(MethodInfo verb);
 }
 
 /// <summary>
@@ -36,6 +39,7 @@ public sealed class AccessGateCache : IAccessGateCache
 
     private readonly ConcurrentDictionary<Type, AccessGate> _cache = new();
     private readonly ConcurrentDictionary<PropertyInfo, AccessGate> _members = new();
+    private readonly ConcurrentDictionary<MethodInfo, AccessGate> _verbs = new();
     private readonly ILogger<AccessGateCache>? _logger;
     private readonly Func<Type, Type?>? _realizationFor;
 
@@ -48,6 +52,17 @@ public sealed class AccessGateCache : IAccessGateCache
     public AccessGate GetOrCompile(Type entityType) => _cache.GetOrAdd(entityType, Compile1);
 
     public AccessGate GetOrCompile(PropertyInfo property) => _members.GetOrAdd(property, Compile);
+
+    public AccessGate GetOrCompile(MethodInfo verb) => _verbs.GetOrAdd(verb, Compile);
+
+    /// <summary>Compile a custom verb's declarations, or its class's when it has none of its own. A verb has no row, so an
+    /// <c>owner</c> term means what it means at the coarse gate.</summary>
+    public static AccessGate Compile(MethodInfo verb)
+    {
+        var own = verb.IsDefined(typeof(AccessAttribute), false) || verb.IsDefined(typeof(AuthorizeAttribute), false)
+                  || verb.IsDefined(typeof(RequireScopeAttribute), false) || verb.IsDefined(typeof(AllowAnonymousAttribute), false);
+        return Compile(own || verb.DeclaringType is null ? verb : verb.DeclaringType, realizationGate: null);
+    }
 
     /// <summary>Compile a property declaration. Field removal and row ownership have no member meaning.</summary>
     public static AccessGate Compile(PropertyInfo property)
@@ -102,7 +117,7 @@ public sealed class AccessGateCache : IAccessGateCache
 
     /// <summary>Compile with precedence: realization gate (highest) &gt; explicit <c>[Access]</c> (and its <c>all</c>)
     /// &gt; lowered legacy floor &gt; open.</summary>
-    internal static AccessGate Compile(Type entityType, AccessGate? realizationGate)
+    internal static AccessGate Compile(MemberInfo entityType, AccessGate? realizationGate)
     {
         var access = entityType.GetCustomAttribute<AccessAttribute>(inherit: true);
         var explicitGate = access is null
@@ -143,7 +158,7 @@ public sealed class AccessGateCache : IAccessGateCache
     // applied to read+write+remove — exactly reproducing EntityFloorAuthorizationProvider's prior decision matrix.
     // SEC-0012: an [Authorize] the gate cannot express (a named policy other than scope:<x>, or authentication
     // schemes) is refused, never lowered to "any authenticated principal".
-    internal static AccessGate? LowerLegacyFloor(Type entityType)
+    internal static AccessGate? LowerLegacyFloor(MemberInfo entityType)
     {
         // [AllowAnonymous] opens the entity outright (mirrors ASP.NET precedence): an Anyone BAG (not an open
         // action) so the evaluator returns a concrete Allow even when unauthenticated.
@@ -191,7 +206,7 @@ public sealed class AccessGateCache : IAccessGateCache
     // The scope a [Authorize(Policy = "scope:<x>")] names, or null for an attribute without a policy. Any other
     // policy, and any AuthenticationSchemes, is a requirement only ASP.NET could evaluate, and nothing evaluates
     // entity attributes as endpoint metadata, so it would silently become "authenticated" on REST and MCP.
-    private static string? PolicyScope(Type entityType, AuthorizeAttribute authorize)
+    private static string? PolicyScope(MemberInfo entityType, AuthorizeAttribute authorize)
     {
         if (!string.IsNullOrWhiteSpace(authorize.AuthenticationSchemes))
             throw Unexpressible(entityType, $"AuthenticationSchemes = \"{authorize.AuthenticationSchemes}\"");
@@ -203,7 +218,7 @@ public sealed class AccessGateCache : IAccessGateCache
         throw Unexpressible(entityType, $"Policy = \"{policy}\"");
     }
 
-    private static AccessGateException Unexpressible(Type entityType, string declared)
+    private static AccessGateException Unexpressible(MemberInfo entityType, string declared)
         => new($"[Authorize({declared})] on {entityType.Name} cannot be enforced by the entity gate: REST and MCP would " +
                "admit any authenticated caller. Declare the requirement with [Access(...)] (for example " +
                "[Access(all: \"is:admin\")]), [RequireScope(...)], [Authorize(Policy = \"scope:<scope>\")], or an " +

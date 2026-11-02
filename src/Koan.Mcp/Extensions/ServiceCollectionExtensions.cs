@@ -34,6 +34,9 @@ internal static class McpServiceRegistration
         services.TryAddSingleton<McpEntityRegistry>();
         services.TryAddSingleton<Koan.Mcp.CustomTools.McpCustomToolRegistry>();
         services.TryAddSingleton<Koan.Mcp.CustomTools.McpCustomToolInvoker>();
+        services.TryAddSingleton<Koan.Mcp.CustomTools.RouteToolInvoker>();
+        services.AddHttpContextAccessor();
+        services.AddHostedService<Koan.Mcp.CustomTools.McpToolNameCheck>();
         services.TryAddSingleton<RequestTranslator>();
         services.TryAddSingleton<ResponseTranslator>();
         services.TryAddSingleton<EndpointToolExecutor>();

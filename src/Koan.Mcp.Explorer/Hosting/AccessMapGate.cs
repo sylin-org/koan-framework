@@ -1,5 +1,5 @@
 using System.Security.Claims;
-using Koan.Mcp.Execution;
+using Koan.Web.Authorization;
 
 namespace Koan.Mcp.Explorer.Hosting;
 
@@ -15,7 +15,7 @@ public static class AccessMapGate
         if (isDevelopment) return true;
         if (user?.Identity?.IsAuthenticated != true) return false;
         if (!string.IsNullOrWhiteSpace(options.AdminRole) && user.IsInRole(options.AdminRole!)) return true;
-        if (!string.IsNullOrWhiteSpace(options.AdminScope) && McpToolAccessPolicy.UserHasScopes(user, new[] { options.AdminScope! })) return true;
+        if (!string.IsNullOrWhiteSpace(options.AdminScope) && AccessGateEvaluator.HasScope(user, options.AdminScope!)) return true;
         return false;
     }
 }

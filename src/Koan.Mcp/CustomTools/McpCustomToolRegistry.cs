@@ -6,6 +6,8 @@ using System.Reflection;
 using System.Security.Claims;
 using System.Threading;
 using Koan.Core.Hosting.Bootstrap;
+using Koan.Web.Authorization;
+using Microsoft.AspNetCore.Mvc.Infrastructure;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json.Linq;
 
@@ -13,19 +15,23 @@ namespace Koan.Mcp.CustomTools;
 
 /// <summary>
 /// Discovers public static methods decorated with <see cref="McpToolAttribute"/> across loaded
-/// assemblies and exposes them as custom MCP tools (verbs that are not entity CRUD operations).
-/// Discovery is lazy + thread-safe and uses the same assembly source as the entity registry, so
-/// lazily-loaded capability assemblies are included.
+/// assemblies, and the routes <c>[Tool]</c> makes tools, and exposes them as custom MCP tools (verbs
+/// that are not entity CRUD operations). Discovery is lazy + thread-safe and uses the same assembly
+/// source as the entity registry, so lazily-loaded capability assemblies are included.
 /// </summary>
 public sealed class McpCustomToolRegistry
 {
     private readonly ILogger<McpCustomToolRegistry> _logger;
+    private readonly IActionDescriptorCollectionProvider? _actions;
     private readonly object _sync = new();
     private IReadOnlyList<McpCustomTool>? _tools;
     private IReadOnlyDictionary<string, McpCustomTool>? _index;
 
-    public McpCustomToolRegistry(ILogger<McpCustomToolRegistry> logger)
-        => _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    public McpCustomToolRegistry(ILogger<McpCustomToolRegistry> logger, IActionDescriptorCollectionProvider? actions = null)
+    {
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _actions = actions;
+    }
 
     /// <summary>All discovered custom tools.</summary>
     public IReadOnlyList<McpCustomTool> Tools
@@ -58,8 +64,7 @@ public sealed class McpCustomToolRegistry
             var index = new Dictionary<string, McpCustomTool>(StringComparer.OrdinalIgnoreCase);
             foreach (var tool in tools)
             {
-                if (!index.ContainsKey(tool.Name)) index[tool.Name] = tool;
-                else _logger.LogWarning("Duplicate [McpTool] name '{Name}'; keeping the first occurrence.", tool.Name);
+                index.TryAdd(tool.Name, tool); // McpToolNameCheck stops the host at start over a duplicate.
             }
 
             _tools = tools;
@@ -112,6 +117,8 @@ public sealed class McpCustomToolRegistry
                 }
             }
         }
+
+        if (_actions is not null) result.AddRange(RouteTools.Discover(_actions));
 
         _logger.LogDebug("Discovered {Count} custom MCP tool(s).", result.Count);
         return result;
@@ -166,23 +173,29 @@ public sealed class McpCustomToolRegistry
         };
         if (required.Count > 0) schema["required"] = required;
 
-        return new McpCustomTool
-        {
-            Name = name,
-            Description = attribute.Description,
-            InputSchema = schema,
-            RequiredScopes = attribute.RequiredScopes ?? Array.Empty<string>(),
-            IsMutation = attribute.IsMutation,
-            // AN4: opt-in spec annotations from the method markers (unmarked stays null → omitted).
-            ReadOnly = method.GetCustomAttribute<McpReadOnlyAttribute>() is not null ? true : null,
-            Destructive = method.GetCustomAttribute<McpDestructiveAttribute>() is not null ? true : null,
-            Idempotent = method.GetCustomAttribute<McpIdempotentAttribute>() is not null ? true : null,
-            // P3.2 — a verb on an [McpOperationalToolset]-marked Toolset is config-gated by that toolset's key.
-            OperationalToolsetKey = method.DeclaringType?.GetCustomAttribute<McpOperationalToolsetAttribute>()?.Key,
-            Method = method,
-            Parameters = parameters
-        };
+        return Assemble(name, attribute.Description, schema, method, attribute.IsMutation, parameters: parameters,
+            gateAction: attribute.IsMutation ? EntityAuthorizeActions.Write : EntityAuthorizeActions.Read);
     }
+
+    /// <summary>A tool from what its definition says. AN4's spec annotations are opt-in markers on the method; a route
+    /// also says what its HTTP method promises. A verb on an [McpOperationalToolset]-marked Toolset is config-gated by that
+    /// toolset's key (P3.2).</summary>
+    internal static McpCustomTool Assemble(string name, string? description, JObject schema, MethodInfo method, bool isMutation, string gateAction,
+        bool? readOnly = null, bool? destructive = null, RouteTool? route = null, IReadOnlyList<McpCustomToolParameter>? parameters = null) => new()
+    {
+        Name = name,
+        Description = description,
+        InputSchema = schema,
+        IsMutation = isMutation,
+        GateAction = gateAction,
+        ReadOnly = method.GetCustomAttribute<McpReadOnlyAttribute>() is not null ? true : readOnly,
+        Destructive = method.GetCustomAttribute<McpDestructiveAttribute>() is not null ? true : destructive,
+        Idempotent = method.GetCustomAttribute<McpIdempotentAttribute>() is not null ? true : null,
+        OperationalToolsetKey = method.DeclaringType?.GetCustomAttribute<McpOperationalToolsetAttribute>()?.Key,
+        Method = method,
+        Parameters = parameters ?? [],
+        Route = route,
+    };
 
     private static string? ParameterDescription(ParameterInfo parameter)
     {
@@ -200,7 +213,7 @@ public sealed class McpCustomToolRegistry
         return McpCustomToolParameterSource.Arguments;
     }
 
-    private static JObject BuildParameterSchema(Type type)
+    internal static JObject BuildParameterSchema(Type type)
     {
         var t = Nullable.GetUnderlyingType(type) ?? type;
 

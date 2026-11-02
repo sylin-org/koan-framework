@@ -1,4 +1,3 @@
-using System.Security.Claims;
 using Koan.Mcp.CustomTools;
 using Koan.Mcp.Execution;
 using Koan.Mcp.Options;
@@ -10,31 +9,25 @@ namespace Koan.Mcp.Resources;
 /// </summary>
 internal static class CustomToolProjection
 {
-    public static IReadOnlyList<McpCustomTool> Visible(
+    public static async Task<IReadOnlyList<McpCustomTool>> Visible(
         McpCustomToolRegistry registry,
         McpServerOptions options,
-        ClaimsPrincipal? user) =>
-        registry.Tools
-            .Where(tool => IsVisible(tool, options, user))
-            .OrderBy(tool => tool.Name, StringComparer.OrdinalIgnoreCase)
-            .ToArray();
+        McpVerbVisibility visibility,
+        CancellationToken ct = default)
+    {
+        var visible = new List<McpCustomTool>();
+        foreach (var tool in registry.Tools.OrderBy(tool => tool.Name, StringComparer.OrdinalIgnoreCase))
+            if (await IsVisible(tool, options, visibility, ct).ConfigureAwait(false)) visible.Add(tool);
+        return visible;
+    }
 
-    public static bool IsVisible(
-        McpCustomTool tool,
-        McpServerOptions options,
-        ClaimsPrincipal? user)
+    /// <summary>A verb on a config-disabled operational toolset is absent for everyone; otherwise the one gate answers, with no
+    /// resource at hand, so a verb only a resource can decide stays listed (ARCH-0141).</summary>
+    public static async Task<bool> IsVisible(McpCustomTool tool, McpServerOptions options, McpVerbVisibility visibility, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(tool);
         ArgumentNullException.ThrowIfNull(options);
-
-        // A null principal is the established trusted local-STDIO surface. It bypasses remote
-        // authentication/scope filters, but config-disabled operational toolsets remain absent.
-        if (user is null)
-        {
-            return tool.OperationalToolsetKey is not { Length: > 0 } key
-                || options.IsOperationalToolsetEnabled(key);
-        }
-
-        return McpToolAccessPolicy.IsCustomToolPermitted(user, tool, options);
+        return (tool.OperationalToolsetKey is not { Length: > 0 } key || options.IsOperationalToolsetEnabled(key))
+               && await visibility.Allows(tool.Method, tool.GateAction, ct).ConfigureAwait(false);
     }
 }

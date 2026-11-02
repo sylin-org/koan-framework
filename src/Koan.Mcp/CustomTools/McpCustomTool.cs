@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Reflection;
+using Microsoft.AspNetCore.Mvc.Controllers;
+using Microsoft.AspNetCore.Routing.Patterns;
 using Newtonsoft.Json.Linq;
 
 namespace Koan.Mcp.CustomTools;
@@ -15,8 +17,13 @@ public sealed class McpCustomTool
     public required string Name { get; init; }
     public string? Description { get; init; }
     public required JObject InputSchema { get; init; }
-    public IReadOnlyList<string> RequiredScopes { get; init; } = Array.Empty<string>();
     public bool IsMutation { get; init; }
+
+    /// <summary>What the gate is asked for this verb: read, write or remove (ARCH-0141).</summary>
+    public required string GateAction { get; init; }
+
+    /// <summary>The route this tool is a request to; null for a verb with no route.</summary>
+    internal RouteTool? Route { get; init; }
 
     // AN4 — opt-in spec annotations (null = unmarked → omitted from the wire annotations object).
     public bool? ReadOnly { get; init; }
@@ -31,6 +38,9 @@ public sealed class McpCustomTool
     /// an ordinary custom verb.</summary>
     public string? OperationalToolsetKey { get; init; }
 }
+
+/// <summary>Where a <c>[Tool]</c> action answers: what a call needs to reach it as a request (ARCH-0141).</summary>
+internal sealed record RouteTool(ControllerActionDescriptor Action, string HttpMethod, RoutePattern Pattern, IReadOnlySet<string> QueryFields);
 
 /// <summary>One parameter of a custom tool method and how it is supplied at call time.</summary>
 public sealed class McpCustomToolParameter

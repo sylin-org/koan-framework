@@ -196,10 +196,10 @@ public sealed class McpEntityRegistry
             .FirstOrDefault();
     }
 
-    // ARCH-0092 (§B/§G): registrations come from two sources — explicit EntityToolset<T> realization
-    // classes (the symmetric peer of EntityController) and the terse [McpEntity] attribute. The explicit
-    // class wins when an entity is covered by both (§B precedence); a toolset-only entity uses
-    // bare-[McpEntity] default semantics (a synthesized attribute).
+    // ARCH-0092 (§B/§G): registrations come from explicit realization classes (EntityToolset<T>, and an
+    // EntityController<T> carrying [Tool], ARCH-0141) and the terse [McpEntity] attribute. The explicit class
+    // wins when an entity is covered by both (§B precedence); an entity with only a class uses bare-[McpEntity]
+    // default semantics (a synthesized attribute).
     private static IEnumerable<(Type EntityType, McpEntityAttribute Attribute, Type? ToolsetType)> DiscoverEntitySources()
     {
         var seen = new HashSet<Type>();
@@ -274,7 +274,9 @@ public sealed class McpEntityRegistry
     {
         for (var baseType = toolsetType.BaseType; baseType is not null; baseType = baseType.BaseType)
         {
-            if (baseType.IsGenericType && baseType.GetGenericTypeDefinition() == typeof(EntityToolset<,>))
+            if (baseType.IsGenericType
+                && (baseType.GetGenericTypeDefinition() == typeof(EntityToolset<,>)
+                    || (baseType.GetGenericTypeDefinition() == typeof(Koan.Web.Controllers.EntityController<,>) && toolsetType.IsDefined(typeof(Koan.Web.Attributes.ToolAttribute), inherit: false))))
             {
                 return baseType.GetGenericArguments()[0];
             }

@@ -32,7 +32,7 @@ A Koan app projects itself to an agent as `project(model × grant)` — **one pr
 | 3 Gate | `[Access]` | verbs it lacks the grant for vanish |
 | 4 Own | `EntityAccess<T>` | rows narrow to the caller; each row says what it `can` |
 | 5 Where | `origin:` | local-only verbs (STDIO) separate from remote |
-| 6 Verb | `[McpTool]` | a non-CRUD action |
+| 6 Verb | `[Tool]` · `[McpTool]` | a non-CRUD action, on a route or with none |
 | 7 Compose | *Code Mode* | many steps in one sandboxed call |
 | 8 Govern | `AgentGrant` · `[Audit]` · `[Door]` | lent access, an audit trail, and signposted locks |
 
@@ -185,9 +185,27 @@ Some verbs should depend on *where the call arrived*, not *who* the caller is �
 
 ---
 
-## Rung 6 — A verb that isn't CRUD (`[McpTool]`)
+## Rung 6 — A verb that isn't CRUD (`[Tool]`, `[McpTool]`)
 
-When the operation isn't entity CRUD, expose a public static method.
+When the operation isn't entity CRUD and already answers at a route, say that the route is also a tool. The action stays the only definition: a tool call is a request to it, so input, gate, refusals and effect cannot differ ([ARCH-0141](../decisions/ARCH-0141-one-verb-a-route-that-is-also-a-tool.md)).
+
+```csharp
+public sealed record ArchiveInput([Description("Days a note has been untouched.")] int Days = 90);
+
+public sealed class NoteArchiveController : ControllerBase
+{
+    [HttpPost("/notes/archive")]
+    [Tool(Name = "archive_stale")]                     // or [Tool] alone, for notes_archive_post; on the class, every action
+    [Access(all: "is:editor")]                         // the one gate, on the route, the call and the list
+    [Description("Archive notes untouched for a number of days.")]
+    public async Task<IActionResult> Archive(ArchiveInput input, CancellationToken ct)
+        => this.Answer(await new ArchiveStale(input.Days).Send(ct), count => Ok(new { count }));
+}
+```
+
+`Answer` maps a command's outcome once: invalid 400, absent 404, gated 401 or 403, conflict 409, and the action says what success answers. A value that cannot bind is refused with its field named. With no MCP module the route is all there is.
+
+When a verb has no route on purpose, expose a public static method.
 
 **What you write** —
 
@@ -207,7 +225,7 @@ public static class NoteTools
 
 **What the agent sees** — a new `archive_stale` tool alongside the entity verbs, with the input schema inferred from the parameters (`IServiceProvider`/`CancellationToken` are injected, not advertised) and the `destructiveHint` you marked.
 
-**What happens** — custom verbs gain *nothing* automatically: the framework can't infer that `archive_stale` is dangerous, so you mark it (`[McpReadOnly]`/`[McpDestructive]`/`[McpIdempotent]`). A custom verb's access is the `RequiredScopes` on `[McpTool]` (it has no entity/row, so the entity gate doesn't apply).
+**What happens** — custom verbs gain *nothing* automatically: the framework can't infer that `archive_stale` is dangerous, so you mark it (`[McpReadOnly]`/`[McpDestructive]`/`[McpIdempotent]`). A custom verb's access is the one gate: `[Access]` or `[RequireScope]` on the method or its class, and any `IAuthorizationProvider` asked for the method.
 
 ---
 
@@ -340,7 +358,7 @@ The boot report names availability and effective activation: `mcp.ops: available
   + [Access]           → per-action gate; walled verbs vanish; denial = isError + errorCode
   + EntityAccess<T>    → rows narrow to the owner; each row advertises its can:[]
   + origin:            → where the call came from, distinct from who (STDIO local vs remote)
-  + [McpTool]          → a non-CRUD verb
+  + [Tool] · [McpTool] → a non-CRUD verb, on a route or with none
   + Code Mode          → many steps, one sandboxed call (same gate — not a bypass)
   + AgentGrant         → lend a capability, revocable + expiring
   + [Audit]            → an AgentAction per mutation (reads never audited)
