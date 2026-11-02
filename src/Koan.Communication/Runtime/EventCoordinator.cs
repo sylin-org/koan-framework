@@ -2,6 +2,7 @@ using Koan.Communication.Adapters;
 using Koan.Communication.Semantics;
 using Koan.Core.Json;
 using Koan.Data.Abstractions;
+using Koan.Data.Core;
 
 namespace Koan.Communication.Runtime;
 
@@ -56,6 +57,15 @@ internal sealed class EventCoordinator(
         var ordinal = 0L;
         try
         {
+            // What a write in a scope did has not happened until the scope commits, and a rollback means it never did.
+            if (EntityContext.CurrentTransaction is { } scope)
+            {
+                var copies = await operation.AwaitCommit(source, ct).ConfigureAwait(false);
+                var copied = hasDetails ? detailsPayload!.FromJson<TEvent>() : null;
+                scope.AfterCommit(token => Raise(CommunicationOperation.Copies<TEntity>(copies), copied, hasDetails, channel, token));
+                return new EventAcceptance(operation.Snapshot());
+            }
+
             await foreach (var entity in source.WithCancellation(ct).ConfigureAwait(false))
             {
                 operation.MarkEnumerated();

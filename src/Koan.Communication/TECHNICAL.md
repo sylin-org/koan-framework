@@ -149,13 +149,19 @@ per-route guarantee statement. Logical context is `enforced-or-rejected`; typed 
 is named separately; local/RabbitMQ physical topology remains shared; RabbitMQ does not imply payload
 confidentiality; and remote settlement remains unavailable unless an adapter explicitly proves it.
 
+## In a scope
+
+A `Raise` or `Send` inside `EntityContext.Transaction` or `EntityContext.Hold` publishes nothing. It reads its source and copies it, inside the scope, and
+`ITransactionCoordinator.AfterCommit` publishes the copies once the scope has committed (ARCH-0142). A rollback publishes nothing, the acceptance says `AwaitsCommit`, and a failure of
+the publication is logged, because the commit stands. A process that ends between the commit and the publication loses it.
+
 ## Unsupported scenarios
 
 - provider-specific features outside an adapter's declared lane and assurance;
 - dynamic channel creation, automatic branching, mirroring, or failover;
 - channel-based authorization, confidentiality, or receiver selection;
 - process-local retry, dedupe, dead-letter, replay, or outbox behavior;
-- batch atomicity or transactional coupling to persistence;
+- batch atomicity, or an outbox that survives the process between a commit and its publication;
 - application-authored non-Entity payloads (typed framework signals remain internal);
 - shared-reference semantics; or
 - non-cooperative handler shutdown.

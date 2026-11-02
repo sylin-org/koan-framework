@@ -16,6 +16,7 @@ public sealed class EventAcceptance
         SourceCompleted = snapshot.SourceCompleted;
         SubscriptionGroups = snapshot.TargetGroups;
         SettlementObservable = snapshot.SettlementObservable;
+        AwaitsCommit = snapshot.AwaitsCommit;
         Channel = snapshot.Channel;
         Adapter = snapshot.Adapter;
         Assurance = snapshot.Assurance;
@@ -29,6 +30,8 @@ public sealed class EventAcceptance
     public bool SourceCompleted { get; }
     public int? SubscriptionGroups { get; }
     public bool SettlementObservable { get; }
+    /// <summary>It was raised in a scope, so nothing has been published: it publishes once the scope commits, and a rollback takes it away.</summary>
+    public bool AwaitsCommit { get; }
     public string Channel { get; }
     public string Adapter { get; }
     public string Assurance { get; }
@@ -40,8 +43,10 @@ public sealed class EventAcceptance
         {
             throw new EventException(
                 EventException.FailureKind.SettlementUnavailable,
-                $"Entity Event operation {OperationId} was accepted by '{Adapter}', but that provider does not " +
-                "return remote handler settlement to the publisher. Inspect subscription and provider facts instead.",
+                AwaitsCommit
+                    ? $"Entity Event operation {OperationId} awaits its scope's commit, so it has no handlers to wait for yet."
+                    : $"Entity Event operation {OperationId} was accepted by '{Adapter}', but that provider does not " +
+                      "return remote handler settlement to the publisher. Inspect subscription and provider facts instead.",
                 this);
         }
 

@@ -16,6 +16,7 @@ public sealed class TransportAcceptance
         SourceCompleted = snapshot.SourceCompleted;
         ReceiverGroups = snapshot.TargetGroups;
         SettlementObservable = snapshot.SettlementObservable;
+        AwaitsCommit = snapshot.AwaitsCommit;
         Channel = snapshot.Channel;
         Adapter = snapshot.Adapter;
         Assurance = snapshot.Assurance;
@@ -30,6 +31,8 @@ public sealed class TransportAcceptance
     /// <summary>Known publisher-side receiver groups, or null when the provider cannot observe remote topology.</summary>
     public int? ReceiverGroups { get; }
     public bool SettlementObservable { get; }
+    /// <summary>It was sent in a scope, so nothing has been published: it publishes once the scope commits, and a rollback takes it away.</summary>
+    public bool AwaitsCommit { get; }
     public string Channel { get; }
     public string Adapter { get; }
     public string Assurance { get; }
@@ -41,8 +44,10 @@ public sealed class TransportAcceptance
         {
             throw new TransportException(
                 TransportException.FailureKind.SettlementUnavailable,
-                $"Entity Transport operation {OperationId} was accepted by '{Adapter}', but that provider does not " +
-                "return remote handler settlement to the publisher. Inspect receiver and provider facts instead.",
+                AwaitsCommit
+                    ? $"Entity Transport operation {OperationId} awaits its scope's commit, so it has no receivers to wait for yet."
+                    : $"Entity Transport operation {OperationId} was accepted by '{Adapter}', but that provider does not " +
+                      "return remote handler settlement to the publisher. Inspect receiver and provider facts instead.",
                 this);
         }
 

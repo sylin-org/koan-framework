@@ -2,6 +2,7 @@ using Koan.Communication.Adapters;
 using Koan.Communication.Semantics;
 using Koan.Core.Json;
 using Koan.Data.Abstractions;
+using Koan.Data.Core;
 
 namespace Koan.Communication.Runtime;
 
@@ -30,6 +31,14 @@ internal sealed class TransportCoordinator(
         var ordinal = 0L;
         try
         {
+            // A write in a scope has not landed until the scope commits, and a rollback means it never did.
+            if (EntityContext.CurrentTransaction is { } scope)
+            {
+                var copies = await operation.AwaitCommit(source, ct).ConfigureAwait(false);
+                scope.AfterCommit(token => Send(CommunicationOperation.Copies<TEntity>(copies), channel, token));
+                return new TransportAcceptance(operation.Snapshot());
+            }
+
             await foreach (var entity in source.WithCancellation(ct).ConfigureAwait(false))
             {
                 operation.MarkEnumerated();

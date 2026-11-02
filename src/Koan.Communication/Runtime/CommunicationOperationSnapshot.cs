@@ -8,6 +8,7 @@ internal sealed record CommunicationOperationSnapshot(
     bool SourceCompleted,
     int? TargetGroups,
     bool SettlementObservable,
+    bool AwaitsCommit,
     string Channel,
     string Adapter,
     string Assurance,

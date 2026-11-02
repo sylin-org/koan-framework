@@ -1,3 +1,5 @@
+using Koan.Core.Json;
+
 namespace Koan.Communication.Runtime;
 
 internal sealed class CommunicationOperation
@@ -20,6 +22,7 @@ internal sealed class CommunicationOperation
     private int _settlementObservable = 1;
     private int _sealed;
     private int _sourceCompleted;
+    private int _awaitsCommit;
 
     public CommunicationOperation(CommunicationRouteDecision route)
     {
@@ -35,6 +38,29 @@ internal sealed class CommunicationOperation
     public Guid OperationId { get; }
 
     public void MarkEnumerated() => Interlocked.Increment(ref _enumerated);
+
+    /// <summary>Reads the source now, inside its scope, into copies that a later change to the entities does not reach, and ends this operation as one that
+    /// awaits its scope's commit. The publication is a second operation then, whose failure the scope logs, since the commit stands.</summary>
+    public async Task<IReadOnlyList<string>> AwaitCommit<TEntity>(IAsyncEnumerable<TEntity> source, CancellationToken ct)
+    {
+        var copies = new List<string>();
+        await foreach (var entity in source.WithCancellation(ct).ConfigureAwait(false))
+        {
+            MarkEnumerated();
+            copies.Add(entity!.ToJson());
+        }
+
+        Volatile.Write(ref _settlementObservable, 0);
+        Volatile.Write(ref _awaitsCommit, 1);
+        Seal(true);
+        return copies;
+    }
+
+    public static async IAsyncEnumerable<TEntity> Copies<TEntity>(IReadOnlyList<string> copies)
+    {
+        foreach (var copy in copies) yield return copy.FromJson<TEntity>()!;
+        await Task.CompletedTask.ConfigureAwait(false);
+    }
     public void MarkRejected() => Interlocked.Increment(ref _rejected);
 
     public void ReserveAcceptance(int? targetGroups, bool settlementObservable)
@@ -122,6 +148,7 @@ internal sealed class CommunicationOperation
             Volatile.Read(ref _sourceCompleted) == 1,
             Volatile.Read(ref _targetGroupsKnown) == 1 ? Volatile.Read(ref _targetGroups) : null,
             Volatile.Read(ref _settlementObservable) == 1,
+            Volatile.Read(ref _awaitsCommit) == 1,
             _route.Channel,
             _route.AdapterId,
             _route.Assurance,
