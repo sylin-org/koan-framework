@@ -228,6 +228,8 @@
       href: ARCH-0141-one-verb-a-route-that-is-also-a-tool.md
     - name: ARCH-0142 A table exists before the host says started, a page and an API share one answer, and what a scope wrote is not told until it stands
       href: ARCH-0142-the-realignment-finished.md
+    - name: ARCH-0143 A reason is a kind, a sentence and a word, a refusal is one problem document, and every page is the application's
+      href: ARCH-0143-one-refusal-shape.md
 - name: Core (CORE)
   items:
     - name: CORE-0072 Source-generated registries

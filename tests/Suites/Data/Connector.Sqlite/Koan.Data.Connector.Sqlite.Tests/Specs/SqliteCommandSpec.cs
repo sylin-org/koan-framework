@@ -17,7 +17,7 @@ namespace Koan.Data.Connector.Sqlite.Tests.Specs;
 [Storage(Name = "KOAN_COMMAND_SLIP")]
 public sealed class CommandSlip : Entity<CommandSlip>
 {
-    public const string NeedsBody = "A slip needs a body.";
+    public static readonly Reason NeedsBody = Reason.Invalid("A slip needs a body.");
 
     public static readonly Sequence Numbers = Sequence.Of<CommandSlip>(slip => slip.Number);
 
@@ -419,7 +419,7 @@ public sealed class SqliteCommandSpec(SqliteFixture fixture, ITestOutputHelper o
         {
             await using var host = await Start(Settings(path));
 
-            Reason[] reasons = [Reason.Absent("gone"), Reason.Gated("locked"), Reason.Conflict("taken"), "not a value"];
+            Reason[] reasons = [Reason.Absent("gone"), Reason.Gated("locked"), Reason.Conflict("taken"), Reason.Invalid("not a value")];
             foreach (var reason in reasons)
             {
                 var answer = new Outcome<string>.Refused(reason);
@@ -427,12 +427,11 @@ public sealed class SqliteCommandSpec(SqliteFixture fixture, ITestOutputHelper o
                 (await new WriteSlipAndStub("thrown", () => new Refusal(reason)).Send(Cancellation)).Should().Be(answer);
             }
 
-            // A plain string is an invalid reason, as a literal and as an interpolated one, and a kind is part of what a reason is.
+            // A kind is part of what a reason is.
             reasons[3].Kind.Should().Be(ReasonKind.Invalid);
             reasons[0].Kind.Should().Be(ReasonKind.Absent);
             reasons[1].Kind.Should().Be(ReasonKind.Gated);
             reasons[2].Kind.Should().Be(ReasonKind.Conflict);
-            new Refusal($"not {"a"} value").Reason.Should().Be(reasons[3]);
             Reason.Absent("not a value").Should().NotBe(reasons[3]);
 
             // An entity refusing from below the command, after the command has taken a number.

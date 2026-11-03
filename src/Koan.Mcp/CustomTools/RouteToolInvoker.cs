@@ -1,9 +1,9 @@
 using System.Security.Claims;
 using System.Text;
-using Koan.Data.Core.Commands;
 using Koan.Mcp.Execution;
 using Koan.Mcp.Hosting;
 using Koan.Web.Authorization;
+using Koan.Web.Controllers;
 using Koan.Web.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Extensions;
@@ -35,7 +35,7 @@ internal sealed class RouteToolInvoker(RoutePipeline pipeline, IServiceScopeFact
 
     public async Task<McpRpcHandler.CallToolResult> Invoke(McpCustomTool tool, JObject? arguments, ClaimsPrincipal? user, CancellationToken ct)
     {
-        if (pipeline.Request is not { } serve) return Failed(tool, StatusCodes.Status503ServiceUnavailable, "failed", "This process serves no requests.", null);
+        if (pipeline.Request is not { } serve) return Failed(tool, StatusCodes.Status503ServiceUnavailable, "This process serves no requests.");
         var route = tool.Route ?? throw new ArgumentException($"{tool.Name} has no route.", nameof(tool));
         var fields = (JObject?)arguments?.DeepClone() ?? new JObject();
         fields.Remove(McpDryRun.ArgumentName);
@@ -53,13 +53,13 @@ internal sealed class RouteToolInvoker(RoutePipeline pipeline, IServiceScopeFact
                     var value = Take(fields, parameter.Name) ?? parameter.Default?.ToString();
                     if (value is null)
                     {
-                        if (!parameter.IsOptional) return Failed(tool, StatusCodes.Status400BadRequest, "invalid", $"{parameter.Name}: a value is required.", null);
+                        if (!parameter.IsOptional) return Failed(tool, StatusCodes.Status400BadRequest, $"{parameter.Name}: a value is required.");
                         continue;
                     }
 
                     // HTTP resolves a dot segment before any route sees it, so no action is ever told one.
                     string[] pieces = parameter.IsCatchAll ? value.Split('/') : [value];
-                    if (pieces.Any(piece => piece is "." or "..")) return Failed(tool, StatusCodes.Status404NotFound, "absent", Reason.Absent("").Said, null);
+                    if (pieces.Any(piece => piece is "." or "..")) return Failed(tool, StatusCodes.Status404NotFound, Answers.Nothing);
                     text.Append(string.Join('/', pieces.Select(Uri.EscapeDataString)));
                 }
             }
@@ -78,7 +78,7 @@ internal sealed class RouteToolInvoker(RoutePipeline pipeline, IServiceScopeFact
         JToken? content = route.BodyField is { } whole ? fields.GetValue(whole, StringComparison.OrdinalIgnoreCase) : fields;
         var body = content is null ? [] : Encoding.UTF8.GetBytes(content.ToString(Formatting.None));
         if (route.Action.EndpointMetadata.OfType<IRequestSizeLimitMetadata>().LastOrDefault()?.MaxRequestBodySize is { } limit && body.Length > limit)
-            return Failed(tool, StatusCodes.Status413PayloadTooLarge, "invalid", $"The arguments are larger than the {limit} bytes this takes.", null);
+            return Failed(tool, StatusCodes.Status413PayloadTooLarge, $"The arguments are larger than the {limit} bytes this takes.");
 
         var outer = accessor?.HttpContext;
         var origin = outer is null && baseUrl?.Current is { } current ? new Uri(current) : null;
@@ -124,7 +124,7 @@ internal sealed class RouteToolInvoker(RoutePipeline pipeline, IServiceScopeFact
         catch (Exception failure) when (!ct.IsCancellationRequested)
         {
             logger.LogError(failure, "The route of tool {Tool} failed.", tool.Name);
-            return Failed(tool, StatusCodes.Status500InternalServerError, "failed", "It failed.", null);
+            return Failed(tool, StatusCodes.Status500InternalServerError, "It failed.");
         }
     }
 
@@ -150,7 +150,7 @@ internal sealed class RouteToolInvoker(RoutePipeline pipeline, IServiceScopeFact
         if (status >= StatusCodes.Status400BadRequest)
         {
             var problem = json as JObject;
-            return Failed(tool, status, problem?["kind"]?.Value<string>() ?? KindOf(status), Say(status, problem) ?? (string.IsNullOrWhiteSpace(text) ? $"Refused ({status})." : text), problem);
+            return Failed(tool, status, Say(status, problem) ?? (string.IsNullOrWhiteSpace(text) ? $"Refused ({status})." : text), problem);
         }
 
         var meta = new JObject { ["status"] = status };
@@ -169,7 +169,7 @@ internal sealed class RouteToolInvoker(RoutePipeline pipeline, IServiceScopeFact
     /// <summary>What a refusal says: one sentence for anything absent, each field a value could not bind to, or its detail or title.</summary>
     private static string? Say(int status, JObject? problem)
     {
-        if (status == StatusCodes.Status404NotFound) return Reason.Absent("").Said;
+        if (status == StatusCodes.Status404NotFound) return Answers.Nothing;
         if (problem is null) return null;
         if (problem["errors"] is JObject errors && errors.Count > 0)
             return string.Join(' ', errors.Properties().Select(field => string.IsNullOrEmpty(field.Name)
@@ -185,18 +185,10 @@ internal sealed class RouteToolInvoker(RoutePipeline pipeline, IServiceScopeFact
         catch (JsonException) { return null; }
     }
 
-    private static string KindOf(int status) => status switch
+    /// <summary>A refusal of the tool call, its kind the route's own or else its status's, as a <see cref="Problem"/> has it.</summary>
+    private static McpRpcHandler.CallToolResult Failed(McpCustomTool tool, int status, string text, JObject? problem = null)
     {
-        StatusCodes.Status400BadRequest or StatusCodes.Status413PayloadTooLarge or StatusCodes.Status415UnsupportedMediaType or StatusCodes.Status422UnprocessableEntity => "invalid",
-        StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden => "gated",
-        StatusCodes.Status404NotFound => "absent",
-        StatusCodes.Status409Conflict => "conflict",
-        _ => "failed",
-    };
-
-    private static McpRpcHandler.CallToolResult Failed(McpCustomTool tool, int status, string kind, string text, JObject? problem)
-    {
-        var meta = new JObject { ["errorCode"] = kind, ["status"] = status, ["tool"] = tool.Name };
+        var meta = new JObject { ["errorCode"] = problem?["kind"]?.Value<string>() ?? new Problem(status).Kind, ["status"] = status, ["tool"] = tool.Name };
         if (problem is not null) meta["problem"] = problem;
         return new McpRpcHandler.CallToolResult
         {

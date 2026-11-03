@@ -268,7 +268,7 @@ public sealed class McpRpcHandler
             }
             catch (Koan.Data.Core.Commands.Refusal refusal)
             {
-                return Refused(refusal.Reason.Said, refusal.Reason.Kind.ToString().ToLowerInvariant());
+                return Refused(refusal.Reason.Kind == Koan.Data.Core.Commands.ReasonKind.Absent ? Koan.Web.Controllers.Answers.Nothing : refusal.Reason.Text, refusal.Reason.Kind.ToString().ToLowerInvariant());
             }
             catch (Exception ex)
             {

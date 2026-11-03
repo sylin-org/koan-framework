@@ -65,10 +65,10 @@ public sealed record Reply(string Id, string PlaceId, string TopicId, string? Bo
 {
     public static readonly Reason NoTopic = Reason.Absent("No such Topic.");
     public static readonly Reason NoPlace = Reason.Absent("No such place, and a different sentence.");
-    public static readonly Reason SignIn = Reason.Gated("sign-in", "Sign in to write here.", next: "/sign-in");
+    public static readonly Reason SignIn = Reason.Gated("sign-in", "Sign in to write here.");
     public static readonly Reason Locked = Reason.Gated("locked", "This Topic is locked, so no one replies in it.");
     public static readonly Reason Taken = Reason.Conflict("That id already holds other words.");
-    public const string NeedsBody = "A reply says something.";
+    public static readonly Reason NeedsBody = Reason.Invalid("A reply says something.");
 
     public async Task<Outcome<Post>> Run(CancellationToken ct)
     {
@@ -119,7 +119,7 @@ public sealed record ChangeRole(string ActorId, string PersonId, string Role, bo
     public static readonly Reason NoOne = Reason.Absent("No such person.");
     public static readonly Reason NotYours = Reason.Gated("Only a steward changes a role, and never their own.");
     public static readonly Reason Frozen = Reason.Conflict("This person is frozen.");
-    public const string NotARole = "That role is not one given here.";
+    public static readonly Reason NotARole = Reason.Invalid("That role is not one given here.");
 
     public async Task<Outcome<string>> Run(CancellationToken ct)
     {

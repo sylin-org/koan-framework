@@ -65,7 +65,7 @@ public sealed class EnforcementConsolidationSpec : IClassFixture<ConformanceFixt
         var absent = await _fx.CallToolAsync("gadget_missing", new JObject());
         McpHarnessFixtureBase.IsError(absent).Should().BeTrue(absent.ToString());
         absent["_meta"]!["errorCode"]!.Value<string>().Should().Be("absent");
-        McpHarnessFixtureBase.ContentText(absent).Should().Be(Koan.Data.Core.Commands.Reason.Absent("anything").Said);
+        McpHarnessFixtureBase.ContentText(absent).Should().Be(Koan.Web.Controllers.Answers.Nothing);
     }
 
     // ---- Entity-tool authority: the data-layer [Access] gate ------------------------------------

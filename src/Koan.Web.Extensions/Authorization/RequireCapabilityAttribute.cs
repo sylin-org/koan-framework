@@ -6,6 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Koan.Web.Hooks;
 
 using Koan.Web.Authorization;
+using Koan.Web.Controllers;
 
 namespace Koan.Web.Extensions.Authorization;
 
@@ -43,14 +44,8 @@ public sealed class RequireCapabilityAttribute : Attribute, IAsyncAuthorizationF
         // Capability gates never Challenge (the policy provider returns Allow/Forbid) — treat non-Allow as 403.
         if (decision is not AuthorizeDecision.Allow)
         {
-            context.Result = new ObjectResult(new ProblemDetails
-            {
-                Status = StatusCodes.Status403Forbidden,
-                Title = "Forbidden",
-                Detail = (decision as AuthorizeDecision.Forbid)?.Reason
-                    ?? $"Capability '{_action}' denied by policy for entity '{entityType.Name}'."
-            })
-            { StatusCode = StatusCodes.Status403Forbidden };
+            context.Result = new Problem(StatusCodes.Status403Forbidden, (decision as AuthorizeDecision.Forbid)?.Reason
+                ?? $"Capability '{_action}' denied by policy for entity '{entityType.Name}'.").ToResult();
         }
     }
 

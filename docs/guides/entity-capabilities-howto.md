@@ -1053,10 +1053,10 @@ switch (await new Reply(topicId, "hi").Send(ct))
 
 | A reason | Means |
 |---|---|
-| `"a plain string"` | a value the sender gave cannot be taken |
+| `Reason.Invalid(text)` | a value the sender gave cannot be taken |
 | `Reason.Absent(text)` | what it acts on is not there, for this sender |
 | `Reason.Gated(text)` | this sender may not, or not now |
-| `Reason.Gated(word, text, next, heading)` | the same, with a stable word a client branches on, the address of what one can do now, and what a person reads above the sentence; a route's `this.Answer` carries them as `gate`, `next` and the problem's `title` |
+| `Reason.Gated(word, text)` | the same, with a stable word a client branches on; a route's `this.Answer` carries it as the problem's `gate` |
 | `Reason.Conflict(text)` | it disagrees with what is there |
 
 Declare a reason's kind once, where the reason is defined. Code below the command that has no `Outcome<T>` to return throws `new Refusal(reason)`. `Send`'s token ends the wait and the command, and the outcome

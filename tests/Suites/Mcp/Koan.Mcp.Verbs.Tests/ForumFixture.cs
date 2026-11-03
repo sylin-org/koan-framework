@@ -57,7 +57,7 @@ internal sealed class TestAuth(IOptionsMonitor<AuthenticationSchemeOptions> opti
 }
 
 /// <summary>One answer of one door, for comparing.</summary>
-public sealed record Answer(int Status, string? Kind, string Text, bool Failed, string? Location = null, string? Gate = null, string? Next = null);
+public sealed record Answer(int Status, string? Kind, string Text, bool Failed, string? Location = null, string? Gate = null);
 
 /// <summary>Middleware an application composed outside everything else: a tenant from a header, into a scoped service and <c>Items</c>, and what the
 /// accessor holds when it gets the request back.</summary>
@@ -234,7 +234,7 @@ public class ForumFixture : IAsyncLifetime
         var said = problem["errors"] is JObject errors
             ? string.Join(' ', errors.Properties().Select(field => $"{field.Name}: {string.Join(' ', field.Value.Values<string>())}"))
             : problem["detail"]?.Value<string>() ?? problem["title"]!.Value<string>()!;
-        return new Answer(status, problem["kind"]?.Value<string>(), said, true, null, problem["gate"]?.Value<string>(), problem["next"]?.Value<string>());
+        return new Answer(status, problem["kind"]?.Value<string>(), said, true, null, problem["gate"]?.Value<string>());
     }
 
     /// <summary>A real <c>tools/call</c> over Streamable HTTP, a request of its own.</summary>
@@ -244,7 +244,7 @@ public class ForumFixture : IAsyncLifetime
         var text = result["content"]![0]!["text"]!.Value<string>()!;
         var meta = result["_meta"] as JObject ?? new JObject();
         return new Answer(meta["status"]?.Value<int>() ?? 0, meta["errorCode"]?.Value<string>(), text, result["isError"]?.Value<bool>() == true, meta["location"]?.Value<string>(),
-            result["structuredContent"]?["gate"]?.Value<string>(), result["structuredContent"]?["next"]?.Value<string>());
+            result["structuredContent"]?["gate"]?.Value<string>());
     }
 
     /// <summary>The whole result of a real <c>tools/call</c>.</summary>

@@ -1,4 +1,8 @@
+using Koan.Web.Controllers;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Abstractions;
+using Microsoft.AspNetCore.Routing;
 using Microsoft.Net.Http.Headers;
 
 namespace Koan.Web.Hosting;
@@ -27,10 +31,8 @@ internal static class CrossSiteWrites
         return origin.Length > 0 && !string.Equals(origin, $"{request.Scheme}://{request.Host.Value}", StringComparison.OrdinalIgnoreCase);
     }
 
+    /// <summary>Refused as every Koan door refuses, with a <see cref="Problem"/>, so an application's own page answers a person here too.</summary>
     public static Task Refuse(HttpContext context)
-        => Results.Problem(
-            "A page of another site asked for this, and it is not done for one. Ask from this application's own pages.",
-            statusCode: StatusCodes.Status403Forbidden,
-            title: "Not from here",
-            extensions: new Dictionary<string, object?> { ["kind"] = "gated" }).ExecuteAsync(context);
+        => new Problem(StatusCodes.Status403Forbidden, "A page of another site asked for this, and it is not done for one. Ask from this application's own pages.")
+            .ToResult().ExecuteResultAsync(new ActionContext(context, context.GetRouteData(), new ActionDescriptor()));
 }

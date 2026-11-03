@@ -91,11 +91,11 @@ public sealed class McpCustomToolInvoker
             catch (Exception ex) when (!fields.HasRestrictions &&
                 (ex is JsonException or FormatException or InvalidCastException or ArgumentException or OverflowException))
             {
-                throw new Refusal($"{parameter.Name}: '{node.ToString(Formatting.None)}' cannot be read as {parameter.Type.Name}.");
+                throw new Refusal(Reason.Invalid($"{parameter.Name}: '{node.ToString(Formatting.None)}' cannot be read as {parameter.Type.Name}."));
             }
         }
 
-        if (!parameter.IsOptional) throw new Refusal($"{parameter.Name}: a value is required.");
+        if (!parameter.IsOptional) throw new Refusal(Reason.Invalid($"{parameter.Name}: a value is required."));
         return parameter.DefaultValue;
     }
 

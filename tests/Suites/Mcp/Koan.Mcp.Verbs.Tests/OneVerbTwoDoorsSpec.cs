@@ -56,7 +56,6 @@ public sealed class OneVerbTwoDoorsSpec(ForumFixture forum) : IClassFixture<Foru
         if (route.Text.Length > 0) tool.Text.Should().Be(route.Text);
         tool.Location.Should().Be(route.Location);
         tool.Gate.Should().Be(route.Gate);
-        tool.Next.Should().Be(route.Next);
     }
 
     private async Task<int> PostsWith(string body)
@@ -135,7 +134,6 @@ public sealed class OneVerbTwoDoorsSpec(ForumFixture forum) : IClassFixture<Foru
         there.Status.Should().Be(401);
         there.Kind.Should().Be("gated");
         there.Gate.Should().Be("sign-in");
-        there.Next.Should().Be("/sign-in");
         there.Text.Should().Be(Reply.SignIn.Text);
         (await PostsWith("hello?")).Should().Be(0);
     }

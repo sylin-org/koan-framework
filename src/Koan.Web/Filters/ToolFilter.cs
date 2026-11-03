@@ -29,7 +29,7 @@ internal sealed class ToolFilter : IAsyncAuthorizationFilter, IResourceFilter, I
         // cookie that no longer holds was presented by nobody, and its handler reports no credential (SEC-0037).
         if (http.Features.Get<IAuthenticateResultFeature>()?.AuthenticateResult?.Failure is not null)
         {
-            context.Result = Answers.Denied(http, AuthorizeDecision.Challenged());
+            context.Result = Answers.Denied(AuthorizeDecision.Challenged());
             return;
         }
 
@@ -41,7 +41,7 @@ internal sealed class ToolFilter : IAsyncAuthorizationFilter, IResourceFilter, I
             ((ControllerActionDescriptor)context.ActionDescriptor).MethodInfo,
             http.Request.RouteValues,
             http.RequestAborted);
-        if (decision is not null) context.Result = Answers.Denied(http, decision);
+        if (decision is not null) context.Result = Answers.Denied(decision);
     }
 
     public void OnResourceExecuting(ResourceExecutingContext context)
@@ -58,8 +58,8 @@ internal sealed class ToolFilter : IAsyncAuthorizationFilter, IResourceFilter, I
         // ASP.NET's form provider reports a body past the limit as a model error: its length says which it was.
         var http = context.HttpContext;
         context.Result = http.Request.ContentLength > http.Features.Get<IHttpMaxRequestBodySizeFeature>()?.MaxRequestBodySize
-            ? Answers.TooLarge(http)
-            : Answers.Unbound(http, context.ModelState);
+            ? Answers.TooLarge()
+            : Answers.Unbound(context.ModelState);
     }
 
     public void OnActionExecuted(ActionExecutedContext context) { }
@@ -68,7 +68,7 @@ internal sealed class ToolFilter : IAsyncAuthorizationFilter, IResourceFilter, I
     public void OnException(ExceptionContext context)
     {
         if (context.Exception is not BadHttpRequestException { StatusCode: StatusCodes.Status413PayloadTooLarge }) return;
-        context.Result = Answers.TooLarge(context.HttpContext);
+        context.Result = Answers.TooLarge();
         context.ExceptionHandled = true;
     }
 

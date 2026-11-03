@@ -99,7 +99,6 @@ public sealed class ToolRouteSpec(RestEntityWebFactory fx)
         if (kind == "gated")
         {
             answer.Body.GetProperty("gate").GetString().Should().Be("timed-out");
-            answer.Body.GetProperty("next").GetString().Should().Be("/appeal");
         }
     }
 
@@ -141,10 +140,9 @@ public sealed class ToolRouteController : ControllerBase
     public IActionResult Refused(string kind) => this.Answer<string>(kind switch
     {
         "absent" => new Outcome<string>.Refused(Reason.Absent("A sentence that says too much.")),
-        "gated" => new Outcome<string>.Refused(Reason.Gated("timed-out", "Not for you.", next: "/appeal", heading: "Timed out")),
-        "script" => new Outcome<string>.Refused("<script>alert(1)</script>"),
+        "gated" => new Outcome<string>.Refused(Reason.Gated("timed-out", "Not for you.")),
         "conflict" => new Outcome<string>.Refused(Reason.Conflict("Already there.")),
-        _ => new Outcome<string>.Refused("Not like that."),
+        _ => new Outcome<string>.Refused(Reason.Invalid("Not like that.")),
     }, _ => Ok());
 
     [HttpPost("never")]

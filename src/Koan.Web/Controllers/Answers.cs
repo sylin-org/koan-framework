@@ -9,105 +9,78 @@ using Microsoft.Extensions.Logging;
 
 namespace Koan.Web.Controllers;
 
-/// <summary>A route's one answer to a command's outcome (ARCH-0141). A refusal's kind picks its status once, here, and its answer is a
-/// problem carrying that <c>kind</c>; what success answers stays the action's.
+/// <summary>A route's one answer to a command's outcome (ARCH-0141, ARCH-0143). A refusal's kind picks its status once, here, and its answer
+/// is a <see cref="Problem"/>; what success answers stays the action's, and every page stays the application's.
 /// <list type="table">
 /// <item><term><see cref="ReasonKind.Invalid"/></term><description>400, with the reason.</description></item>
-/// <item><term><see cref="ReasonKind.Absent"/></term><description>404, in one sentence whatever the reason says, so nothing an application words tells a hidden resource from a missing one.</description></item>
-/// <item><term><see cref="ReasonKind.Gated"/></term><description>401 to someone not signed in, otherwise 403, with the reason, its word as <c>gate</c> and its next step as <c>next</c>.</description></item>
+/// <item><term><see cref="ReasonKind.Absent"/></term><description>404, saying <see cref="Nothing"/> whatever the reason says, so nothing an application words tells a hidden resource from a missing one.</description></item>
+/// <item><term><see cref="ReasonKind.Gated"/></term><description>401 to someone not signed in, otherwise 403, with the reason and its word as <c>gate</c>.</description></item>
 /// <item><term><see cref="ReasonKind.Conflict"/></term><description>409, with the reason.</description></item>
 /// <item><term>Failed</term><description>503 when it never ran, otherwise 500, naming no cause.</description></item>
-/// </list>
-/// A request whose <c>Accept</c> prefers HTML, as a browser's form post does, reads the problem as a page: <see cref="IProblemView"/> where the
-/// application supplies one, otherwise a plain one. Everything else reads <c>application/problem+json</c>.</summary>
+/// </list></summary>
 public static class Answers
 {
-    private const string Kind = "kind";
-    private const string ProblemJson = "application/problem+json";
+    /// <summary>What every door says for anything absent.</summary>
+    public const string Nothing = "Nothing answers at this address.";
 
     /// <summary>Answers <paramref name="done"/> for a command that committed, and the one mapping otherwise.</summary>
     public static IActionResult Answer<TResult>(this ControllerBase controller, Outcome<TResult> outcome, Func<TResult, IActionResult> done)
-        => outcome is Outcome<TResult>.Done committed ? done(committed.Result) : NotDone(controller, outcome);
+        => outcome is Outcome<TResult>.Done committed ? done(committed.Result) : NotDone(controller.HttpContext, outcome);
 
     /// <inheritdoc cref="Answer{TResult}(ControllerBase, Outcome{TResult}, Func{TResult, IActionResult})"/>
     public static async Task<IActionResult> Answer<TResult>(this ControllerBase controller, Outcome<TResult> outcome, Func<TResult, Task<IActionResult>> done)
-        => outcome is Outcome<TResult>.Done committed ? await done(committed.Result) : NotDone(controller, outcome);
+        => outcome is Outcome<TResult>.Done committed ? await done(committed.Result) : NotDone(controller.HttpContext, outcome);
 
-    private static IActionResult NotDone<TResult>(ControllerBase controller, Outcome<TResult> outcome)
+    /// <summary>The one mapping of a reason.</summary>
+    public static IActionResult Refused(this ControllerBase controller, Reason reason) => Refused(controller.HttpContext, reason);
+
+    /// <inheritdoc cref="Refused(ControllerBase, Reason)"/>
+    public static IActionResult Refused(HttpContext http, Reason reason) => new Problem(Status(http, reason),
+        reason.Kind == ReasonKind.Absent ? Nothing : reason.Text, reason.Word).ToResult();
+
+    /// <summary>The status a reason answers with, for a page that shows it in place.</summary>
+    public static int Status(HttpContext http, Reason reason) => reason.Kind switch
     {
-        var http = controller.HttpContext;
+        ReasonKind.Absent => StatusCodes.Status404NotFound,
+        ReasonKind.Gated => http.User.Identity?.IsAuthenticated == true ? StatusCodes.Status403Forbidden : StatusCodes.Status401Unauthorized,
+        ReasonKind.Conflict => StatusCodes.Status409Conflict,
+        _ => StatusCodes.Status400BadRequest,
+    };
+
+    /// <summary>The one mapping of an outcome that is not done.</summary>
+    public static IActionResult NotDone<TResult>(HttpContext http, Outcome<TResult> outcome)
+    {
         switch (outcome)
         {
-            case Outcome<TResult>.Refused { Reason: { Kind: ReasonKind.Absent } reason }:
-                return AbsentAnswer(http, reason);
-            case Outcome<TResult>.Refused { Reason: { Kind: ReasonKind.Gated } reason }:
-                return controller.User.Identity?.IsAuthenticated == true
-                    ? Problem(http, StatusCodes.Status403Forbidden, reason.Heading ?? "Not open to you", reason.Text, "gated", reason)
-                    : Problem(http, StatusCodes.Status401Unauthorized, reason.Heading ?? "Sign in first", reason.Text, "gated", reason);
-            case Outcome<TResult>.Refused { Reason: { Kind: ReasonKind.Conflict } reason }:
-                return Problem(http, StatusCodes.Status409Conflict, "Conflict", reason.Text, "conflict");
-            case Outcome<TResult>.Refused { Reason: var reason }:
-                return Problem(http, StatusCodes.Status400BadRequest, "Not accepted", reason.Text, "invalid");
+            case Outcome<TResult>.Refused refused:
+                return Refused(http, refused.Reason);
             case Outcome<TResult>.Failed { Landed: DataCommitOutcome.NotDispatched } failed:
-                Log(controller, failed.Cause);
-                controller.Response.Headers.RetryAfter = "1";
-                return Problem(http, StatusCodes.Status503ServiceUnavailable, "Try again", "It never ran, because the store is busy or cannot take it.", "failed");
+                Log(http, failed.Cause);
+                http.Response.Headers.RetryAfter = "1";
+                return new Problem(StatusCodes.Status503ServiceUnavailable, "It never ran, so it is safe to send again.").ToResult();
             case Outcome<TResult>.Failed failed:
-                Log(controller, failed.Cause);
-                return Problem(http, StatusCodes.Status500InternalServerError, "Failed",
-                    failed.Landed == DataCommitOutcome.Unknown ? "It may or may not have landed." : "It failed, and nothing landed.", "failed");
+                Log(http, failed.Cause);
+                return new Problem(StatusCodes.Status500InternalServerError,
+                    failed.Landed == DataCommitOutcome.Unknown ? "It may or may not have landed." : "It failed, and nothing landed.").ToResult();
             default:
                 throw new InvalidOperationException($"A command answered {outcome}.");
         }
     }
 
-    internal static IActionResult TooLarge(HttpContext http)
-        => Problem(http, StatusCodes.Status413PayloadTooLarge, "Too large", "This is more than this address takes, so nothing was done.", "invalid");
+    internal static IActionResult TooLarge()
+        => new Problem(StatusCodes.Status413PayloadTooLarge, "This is more than this address takes, so nothing was done.").ToResult();
 
-    internal static IActionResult Denied(HttpContext http, AuthorizeDecision decision) => decision switch
+    internal static IActionResult Denied(AuthorizeDecision decision) => (decision switch
     {
-        AuthorizeDecision.Absent => AbsentAnswer(http, Reason.Absent("")),
-        AuthorizeDecision.Challenge => Problem(http, StatusCodes.Status401Unauthorized, "Sign in first", "Sign in to do this.", "gated"),
-        _ => Problem(http, StatusCodes.Status403Forbidden, "Not open to you", "This isn't open to you.", "gated"),
-    };
+        AuthorizeDecision.Absent => new Problem(StatusCodes.Status404NotFound, Nothing),
+        AuthorizeDecision.Challenge => new Problem(StatusCodes.Status401Unauthorized, "Sign in to do this."),
+        _ => new Problem(StatusCodes.Status403Forbidden, "This isn't open to you."),
+    }).ToResult();
 
-    private static IActionResult AbsentAnswer(HttpContext http, Reason reason) => Problem(http, StatusCodes.Status404NotFound, "Not found", reason.Said, "absent");
+    internal static IActionResult Unbound(ModelStateDictionary state)
+        => new Problem(StatusCodes.Status400BadRequest, Errors: new ValidationProblemDetails(state).Errors.AsReadOnly()).ToResult();
 
-    internal static IActionResult Unbound(HttpContext http, ModelStateDictionary state)
-    {
-        var problem = new ValidationProblemDetails(state) { Status = StatusCodes.Status400BadRequest, Title = "Not accepted" };
-        problem.Extensions[Kind] = "invalid";
-        return Negotiated(http, problem);
-    }
-
-    private static IActionResult Problem(HttpContext http, int status, string title, string detail, string kind, Reason? reason = null)
-    {
-        var problem = new ProblemDetails { Status = status, Title = title, Detail = detail };
-        problem.Extensions[Kind] = kind;
-        if (reason?.Word is { } word) problem.Extensions["gate"] = word;
-        if (reason?.Next is { } next) problem.Extensions["next"] = next;
-        return Negotiated(http, problem);
-    }
-
-    private static IActionResult Negotiated(HttpContext http, ProblemDetails problem) => PrefersHtml(http.Request)
-        ? (http.RequestServices.GetService<IProblemView>() ?? ProblemPage.Instance).Render(http, problem)
-        : new ObjectResult(problem) { StatusCode = problem.Status, ContentTypes = { ProblemJson } };
-
-    /// <summary>Whether <c>Accept</c> names HTML at least as highly as it names JSON. <c>*/*</c> names neither, so a client that asks for anything reads JSON.</summary>
-    private static bool PrefersHtml(HttpRequest request)
-    {
-        double html = 0, json = 0;
-        foreach (var type in request.GetTypedHeaders().Accept)
-        {
-            var quality = type.Quality ?? 1;
-            if (type.SubType == "html" || type.SubType == "xhtml+xml") html = Math.Max(html, quality);
-            else if (type.SubType == "json" || type.Suffix == "json") json = Math.Max(json, quality);
-        }
-
-        return html > 0 && html >= json;
-    }
-
-    private static void Log(ControllerBase controller, Exception cause)
-        => controller.HttpContext.RequestServices.GetService<ILoggerFactory>()?.CreateLogger(typeof(Answers))
-            .LogError(cause, "A command failed at {Path}", controller.Request.Path);
+    private static void Log(HttpContext http, Exception cause)
+        => http.RequestServices.GetService<ILoggerFactory>()?.CreateLogger(typeof(Answers))
+            .LogError(cause, "A command failed at {Path}", http.Request.Path);
 }

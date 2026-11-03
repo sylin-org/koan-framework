@@ -15,6 +15,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Formatters;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.Configuration;
@@ -311,13 +312,13 @@ public sealed class ApplicationMiddlewareSpec
     }
 
     [Fact]
-    public async Task An_applications_view_answers_a_browser_in_place_of_the_plain_page()
+    public async Task An_applications_own_formatter_answers_a_browser_with_its_page()
     {
         var path = NewPath();
         try
         {
             var builder = NewApplication(path);
-            builder.Services.AddSingleton<IProblemView, OwnView>();
+            builder.Services.Configure<MvcOptions>(mvc => mvc.OutputFormatters.Insert(0, new OwnPage()));
             await using var app = builder.Build();
             await app.StartAsync(Ct);
             using var client = app.GetTestClient();
@@ -338,14 +339,18 @@ public sealed class ApplicationMiddlewareSpec
         }
     }
 
-    private sealed class OwnView : IProblemView
+    /// <summary>An application's page for a refusal: it claims a <see cref="Problem"/> for a request that asks for HTML.</summary>
+    private sealed class OwnPage : IOutputFormatter
     {
-        public IActionResult Render(HttpContext http, ProblemDetails problem) => new ContentResult
+        public bool CanWriteResult(OutputFormatterCanWriteContext context)
+            => context.Object is Problem && context.HttpContext.Request.Headers.Accept.ToString().Contains("text/html");
+
+        public Task WriteAsync(OutputFormatterWriteContext context)
         {
-            StatusCode = problem.Status,
-            ContentType = "text/html",
-            Content = $"own: {problem.Extensions["kind"]}: {problem.Detail}",
-        };
+            var problem = (Problem)context.Object!;
+            context.HttpContext.Response.ContentType = "text/html";
+            return context.HttpContext.Response.WriteAsync($"own: {problem.Kind}: {problem.Detail}");
+        }
     }
 
     private sealed class Always(IOptionsMonitor<AuthenticationSchemeOptions> options, ILoggerFactory logger, UrlEncoder encoder)
