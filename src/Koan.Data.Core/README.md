@@ -333,13 +333,14 @@ var outcome = await new Reply(topicId, "hi").Send(ct);
   string, which is an invalid reason. A reason compared with a string compares its text, and a null string converts to no reason. `throw new Refusal(reason)` from below a command reaches its sender the same way. `Failed.Landed` says `NotDispatched` (it never ran: the
   sender gave up, the store's busy timeout ran out, the route cannot hold, or a scope is open around the send), `NotCommitted` (nothing landed) or `Unknown` (the native commit
   itself failed). A command that fails throws; only `Send` says `Failed`.
-- The token ends the wait and the command, and the outcome says what happened. Nothing cuts a commit short. `TrySend()` starts the command beside this flow and
-  never waits: null, and the command never runs, when too many tries are waiting. `CommandExtensions.TriesWaiting` says how many are; at zero, a command sent now runs behind all of them. A command that never returns hangs its own sender, and `HoldLimit` frees the store.
+- The token ends the wait and the command, and the outcome says what happened. Nothing cuts a commit short. A command that never returns hangs its own
+  sender, and `HoldLimit` frees the store.
+- A write is sent by whoever asks for it, in their own flow, and a read starts none (DATA-0168).
 - `Sequence.Of<Event>(e => e.Seq)` names a column under `[Index(Unique = true)]`, and `Next(ct)` numbers it with no gap in what commits, across
   processes too. It reads the top of the column at its first use in a hold, and refuses outside one, and over an entity a read scope such as soft
   delete hides rows of.
-- An `ICommandWatcher` registered in DI is told each commit that wrote, in this process, in commit order, before the sender is answered. What goes wrong there costs
-  nothing but itself, and a send it starts takes its turn behind this command.
+- Work that must follow a command's commit registers `EntityContext.UncommittedScope.AfterCommit` from inside it. It runs only if the command commits, once the
+  turn has passed on and before the sender is answered, so it can send. A fact other code acts on is an Entity event, which waits for the commit too.
 
 ## Hold a transaction from the start of a scope
 

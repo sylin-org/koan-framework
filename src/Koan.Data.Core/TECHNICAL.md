@@ -364,12 +364,9 @@ validation:
   the scope, on its route; the Entity cache retires its entries that way and reads past itself inside a hold, so no flow sees
   uncommitted rows through it.
 - `Send` (DATA-0167) is one async method around `EntityContext.Hold`, in the sender's flow, with no service behind it: the store's turn is the line, and the hold's own
-  refusals are what a send that cannot run is told. `TransactionCoordinator.Wrote`, set by `AdmitToHold`, is why it needs no tracked operations to know a command wrote;
-  `TransactionCoordinator.Take` tallies a hold's `Sequence` numbers, which roll back with it by being read from the store at first use, through `Data<T,K>.Top`, which takes
-  no tiebreaker so that the store can answer out of the column's unique index. `BeforeItsTurnEnds` runs the `ICommandWatcher` announcement after the native commit and before
-  `EndHold` releases the turn, so that it is in commit order, and what it throws is logged, so that the turn always passes on. It runs under the context captured before the
-  hold, so what a watcher starts is off the hold. `EndedByItsOwner` refuses `Commit` and `Rollback` while `Run` runs. `TrySend` is `Send` on a task of its own, under a
-  process-wide count of what is waiting, whose slot ends when the hold begins.
+  refusals are what a send that cannot run is told. `TransactionCoordinator.Take` tallies a hold's `Sequence` numbers, which roll back with it by being read from the store at first use, through `Data<T,K>.Top`, which takes
+  no tiebreaker so that the store can answer out of the column's unique index. `EndedByItsOwner` refuses `Commit` and `Rollback` while `Run` runs. The turn passes on
+  as soon as the native commit lands; `AfterCommit` runs after that, before `Send` answers.
 - Deferred entity operations restore their captured source, adapter and partition exactly during
   route resolution and execution. A captured default clears the commit caller's corresponding routing axis.
   Executing a tracked operation suppresses the transaction to prevent recursive enlistment.

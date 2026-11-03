@@ -1060,8 +1060,9 @@ switch (await new Reply(topicId, "hi").Send(ct))
 | `Reason.Conflict(text)` | it disagrees with what is there |
 
 Declare a reason's kind once, where the reason is defined. Code below the command that has no `Outcome<T>` to return throws `new Refusal(reason)`. `Send`'s token ends the wait and the command, and the outcome
-says which: nothing cuts a commit short. `TrySend()` starts it beside this flow and never waits. A number comes from `Sequence.Of<Event>(e => e.Seq)`, over a column
-carrying `[Index(Unique = true)]`, and has no gap in what commits, across processes too. An `ICommandWatcher` registered in DI is told what committed, in order.
+says which: nothing cuts a commit short. Whoever asks for a write sends it, in their own flow, and a read sends none. A number comes from `Sequence.Of<Event>(e => e.Seq)`,
+over a column carrying `[Index(Unique = true)]`, and has no gap in what commits, across processes too. Work that must follow the commit registers
+`EntityContext.UncommittedScope.AfterCommit` inside the command, and a fact other code acts on is an Entity event.
 
 A command runs in its sender's partition, source and tenant, and commands take turns in arrival order, with every other hold of the store. A sender waits at most the busy
 timeout and is then told `NotDispatched`, so raise `Koan:Data:Sqlite:BusyTimeout` if a burst that long is normal. A route with no holds is refused at the send, and so is a

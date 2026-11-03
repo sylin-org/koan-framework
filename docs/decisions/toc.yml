@@ -450,6 +450,8 @@
       href: DATA-0166-a-scope-can-hold-a-native-transaction-from-its-start.md
     - name: DATA-0167 An application sends a write as a value, and it runs in a hold of its own, in the sender's flow
       href: DATA-0167-an-application-sends-a-write-as-a-value.md
+    - name: DATA-0168 A read starts no write, and a command is sent by whoever asks for it
+      href: DATA-0168-a-read-starts-no-write.md
 - name: Web (WEB)
   items:
     - name: WEB-0010 Separate AI web surface

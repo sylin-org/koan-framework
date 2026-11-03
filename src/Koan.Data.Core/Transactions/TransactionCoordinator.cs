@@ -130,21 +130,12 @@ internal sealed class TransactionCoordinator : ITransactionCoordinator
     /// <summary>While a command runs, what sent it is what ends its hold.</summary>
     internal bool EndedByItsOwner { get; set; }
 
-    /// <summary>Runs once the native commit has landed and before the store's turn passes on, so that what it announces is in commit order.</summary>
-    internal Action? BeforeItsTurnEnds { get; set; }
-
     private void RefuseWhileItsOwnerEndsIt()
     {
         if (EndedByItsOwner)
             throw new InvalidOperationException(
                 $"Command '{Name}' does not end its own hold: it commits when it returns Done, and rolls back on anything else.");
     }
-
-    /// <summary>Whether this hold has admitted a write. <see cref="TrackedOperationCount"/> stays zero in a hold.</summary>
-    internal bool Wrote { get; private set; }
-
-    /// <summary>The last number this hold has taken from each <see cref="Sequence"/>.</summary>
-    internal IReadOnlyDictionary<Sequence, long> Sequences => _sequences;
 
     /// <summary>The next number of <paramref name="sequence"/> in this hold: its first use reads the store, and the flows of a hold take turns.</summary>
     internal async Task<long> Take(Sequence sequence, CancellationToken ct)
@@ -244,10 +235,7 @@ internal sealed class TransactionCoordinator : ITransactionCoordinator
         if (binding is not null &&
             string.Equals(binding.Plan.Adapter, held.Adapter, StringComparison.OrdinalIgnoreCase) &&
             string.Equals(binding.Plan.ConnectionIdentity, held.ConnectionIdentity, StringComparison.Ordinal))
-        {
-            Wrote = true;
             return;
-        }
         throw new NotSupportedException(
             $"Transaction '{Name}' holds a native transaction on route '{held.Source}' ({held.Adapter}), and '{operation}' on " +
             $"'{entity}' is routed to '{binding?.Plan.Source ?? "an unbound store"}' ({binding?.Plan.Adapter ?? "unknown"}): one " +
@@ -315,15 +303,6 @@ internal sealed class TransactionCoordinator : ITransactionCoordinator
             }
 
             _isCompleted = true;
-            try
-            {
-                BeforeItsTurnEnds?.Invoke();
-            }
-            catch (Exception ex)
-            {
-                // The commit stands and the turn must pass on, whatever an announcement does.
-                _logger.LogError(ex, "Transaction '{TransactionName}' committed, and what it announces before its turn ends failed", Name);
-            }
             await EndHold(held).ConfigureAwait(false);
             _logger.LogInformation("Transaction '{TransactionName}' committed its held transaction", Name);
             _activity?.SetStatus(ActivityStatusCode.Ok);

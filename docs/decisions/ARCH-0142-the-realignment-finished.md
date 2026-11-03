@@ -11,9 +11,14 @@ related:
   - SEC-0036
   - ARCH-0092
   - ARCH-0141
+amended_by:
+  - DATA-0168
 ---
 
 # ARCH-0142: A table exists before the host says started, a page and an API share one answer, and what a scope wrote is not told until it stands
+
+> **Amended by [DATA-0168](DATA-0168-a-read-starts-no-write.md) (2026-11-03): `CommandExtensions.TriesWaiting` is gone, with `TrySend`.** Item 4, its entry among
+> the new public concepts and its line in the measurements no longer hold.
 
 ## Context
 
