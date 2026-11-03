@@ -128,8 +128,8 @@ produce startup warnings; add `[McpDescription]` only when richer agent guidance
 - Entity tools reuse Koan Web's governed endpoint pipeline; MCP does not create a second authorization, filtering,
   relationship, or mutation implementation.
 - The HTTP edge authenticates nobody itself, and `RequireAuthentication` only closes it to visitors. Declare Entity
-  access and custom-tool scopes for business authority, and turn on `Koan:Web:RefuseCrossSiteWrites` where a browser
-  holds a session.
+  access and custom-tool scopes for business authority, on the entity, since a controller's `[Authorize]` does not
+  reach an entity's tools. `/mcp` takes `application/json` alone, and `Koan:Web:RefuseCrossSiteWrites` is on.
 - STDIO is a trusted local process-owner transport. Do not expose its streams through a remote shell or relay and
   infer HTTP-style identity guarantees.
 - Code Mode executes Jint JavaScript under bounded CPU, memory, recursion, code-length, and SDK-call controls. It is

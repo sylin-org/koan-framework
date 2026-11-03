@@ -107,7 +107,7 @@ bearer for the same person through Web Auth's resource edge included — never s
 pillar's `IIssuer` to mint ES256 access tokens; it does not own login-provider mechanics. Issued authority is
 derived from the authenticated session and approved scopes, not from caller-supplied roles.
 
-Tokens are bound to the requested resource. The MCP resource-server edge validates the signature, issuer, lifetime,
+Tokens are bound to the requested resource. Web Auth's resource edge, on every route and at `/mcp`, validates the signature, issuer, lifetime,
 and exact audience before the normal Koan access pipeline evaluates declarations. The origin used for advertised
 endpoints is `Issuer` when configured, else the application's canonical base URL (`Koan:Web:ApplicationUrl`,
 WEB-0078, path included, else the URL the application accepted, WEB-0081, read per request); with neither,

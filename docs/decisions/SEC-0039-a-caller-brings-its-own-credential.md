@@ -35,8 +35,8 @@ else, so there is no token for the application to mint and no second audience fo
 2. **What stood on its own is kept.** These were SEC-0037's rules 6 to 9 and its fixes, and they are now this record's:
    - `initialize` answers a version the server speaks, from the one list the transport checks.
    - Outside Development a request's `Host` names no audience, at any door: `KoanWebBaseUrl.Audience` is the configured or
-     accepted URL, and in Development the request's. Until one exists, the pages' resource edge refuses every bearer and the
-     MCP edge answers 503 with the correction. An explicit `ResourceServer:Resource` or `ResourceUri` names its own.
+     accepted URL, and in Development the request's. Until one exists, Web Auth's resource edge refuses every bearer, on a
+     page and at `/mcp` alike, and a cookie still signs in. An explicit `ResourceServer:Resource` names its own.
    - A session cookie that no longer holds is a visitor on every route (`SessionCookieHandler`). A credential a caller
      presented stays rejected.
    - A token holds what was requested and what the person holds (SEC-0006 D6), in the code flow, its remembered path and the
@@ -75,14 +75,24 @@ else, so there is no token for the application to mint and no second audience fo
    OAuth server stays for other applications: its token is for the application, and the ordinary resource edge reads it
    at `/mcp` as on a page; the dev token defaults to that audience. A session cookie that no longer holds is a visitor
    there too, and a write is refused with the sign-in gate.
-8. **One check against forgery, at one seam.** `Koan:Web:RefuseCrossSiteWrites` (default false) refuses with 403 an unsafe
-   request a page of another site sent, at every endpoint, `/mcp` included. Without sessions nothing forced a preflight on
-   a tool call, and `/mcp` never read the content type, so a `text/plain` post from a sibling subdomain, which
-   `SameSite=Lax` sends the cookie to, reached the tools. `Sec-Fetch-Site` decides when present (`same-origin` and `none`
-   pass); else `Origin` must be the request's own scheme and host, `null` refused; with neither, the request is not a
-   browser's and passes. Proxies and `Host` cannot touch the first branch. A tool call's own request keeps `Sec-Fetch-Site`
-   and drops `Origin`, so it is judged as the call was. It refuses every cross-site unsafe request, cookie or not: a
-   browser page of another site posting to Koan's OAuth token endpoint is refused too.
+8. **A forged tool call cannot be sent, and a forged request is refused, with nothing set.** Without sessions nothing
+   forced a preflight on a tool call, and `/mcp` never read the content type, so a `text/plain` post from a sibling
+   subdomain or another port of `localhost`, which `SameSite=Lax` sends the cookie to, ran tools as the person.
+   - **`POST /mcp` takes `application/json` alone** and answers anything else `415`. Every conformant client sends JSON,
+     and a page of another site cannot without a preflight no CORS policy grants. It needs no option.
+   - **`Koan:Web:RefuseCrossSiteWrites`, on by default,** refuses with 403 an unsafe request that carries a cookie and that
+     a page of another site sent, at every endpoint, `/mcp` included. A forgery borrows an ambient credential, so a request
+     with no cookie has nothing to borrow and is not judged: a client posting to Koan's OAuth token endpoint passes.
+     `Sec-Fetch-Site` decides when present (`same-origin` and `none` pass); else `Origin` must be the request's own scheme
+     and host, `null` refused; with neither, the request is not a browser's and passes. Proxies and `Host` cannot touch the
+     first branch. A tool call's own request keeps `Sec-Fetch-Site` and drops `Origin`, so it is judged as the call was.
+     No Koan sign-in posts across sites: OIDC is `ResponseMode=query` and the OAuth and atproto callbacks are redirects,
+     so the correlation cookie never rides a cross-site post. The option exists for one need: a front end on another site
+     that calls this application with its session cookie under a credentialed CORS policy, such as `Koan:Mcp:AllowedOrigins`.
+   - **A credential the caller presented and the application refused is `401` at `/mcp`** before any tool runs, as REST
+     answers it, where it once reached entity tools as a visitor (they build their request with no `HttpContext`, so the
+     refusal never reached them). A client holding an expired bearer is told to refresh. A session cookie that no longer
+     holds is no result, so it stays a visitor.
 9. **Code mode keeps its HTTP pieces.** `koan_code_execute` is unreachable over HTTP, since the HTTP dispatcher knows
    entity and custom tools alone, but mapping `/mcp/sdk/definitions` is also what writes the `.d.ts` the code-mode sample
    reads. Removing code mode's HTTP side means moving that write first; removing code mode is its own decision.
@@ -90,7 +100,7 @@ else, so there is no token for the application to mint and no second audience fo
 ## Compatibility
 
 - `Koan:Mcp:AcceptApplicationBearer` is no longer read. An application that set it sees the edge take its own audience
-  alone, and authentication follows `RequireAuthentication`, which defaults by environment.
+  alone; the edge then has no authentication of its own, and `RequireAuthentication` defaults to false everywhere.
 - `AccessToken` is removed from `Koan.Web.Auth.Server.Protocol`. A door that minted one has no replacement here: a caller
   signs in with its own credential.
 - `KoanBearerResource.Authenticate(context, resource)` takes one resource again.
@@ -115,7 +125,21 @@ else, so there is no token for the application to mint and no second audience fo
   `{base}/mcp` is no credential; ask for the application's resource with Web Auth's resource edge on. The dev token's
   default audience is the application's resource, where it was `{base}/mcp`. `KoanBearerResource.Challenge` takes no
   `resourceMetadata`.
-- `Koan:Web:RefuseCrossSiteWrites` is new and off.
+- **Open entity tools and `[McpTool]` verbs take anonymous writes in Production too.** `RequireAuthentication` was true
+  there and is now false, so a visitor reaches every tool whose gate lets a visitor through. That is REST's answer for an
+  entity with no `[Access]`, since both doors allow by default, and visitors are wanted. The remedy is to declare it:
+  `[Access]` on the entity, or on the verb.
+- **Known gap: a controller's `[Authorize]` does not reach an entity's tools.** Entity tools call `IEntityEndpointService`
+  directly (`EndpointToolExecutor`), not the controller, so an `EntityController<T>` closed with `[Authorize]` is closed on
+  REST and open over MCP. Declare `[Access]` on the entity. The natural fix is entity tools being route tools of their
+  controller, which is its own package.
+- `Koan:Web:RefuseCrossSiteWrites` is new and on: a cross-site unsafe request carrying a cookie is refused, at every
+  endpoint. An application whose front end lives on another site turns it off.
+- `POST /mcp` with a content type that is not JSON answers `415`.
+- A refused credential at `/mcp` is `401` with the application's challenge, where a tool call once ran as a visitor.
+- `Koan.Mcp` no longer references `Koan.Security.Trust` or `Koan.Web.Sse`, so an application referencing `Koan.Mcp` alone
+  no longer activates the trust fabric. Its `dependency-versions.json` still lists both until the release run of
+  `stamp-dependents`, which on this branch rewrote 101 stamps from branch heights and so belongs to the release.
 
 ## Limits
 
@@ -147,3 +171,9 @@ else, so there is no token for the application to mint and no second audience fo
   `cross-site` and `same-site` refused, `same-origin` and `none` pass whatever `Origin` says, a foreign `Origin` and
   `null` refused without `Sec-Fetch-Site`, its own passes, neither passes; a route's post refused alike and a read not;
   off, nothing is refused.
+- `CrossSiteWritesSpec`, `CrossSiteWritesOffSpec` and `RejectedCredentialAtTheEdgeSpec` (Koan.Mcp.Verbs.Tests), on a host that
+  sets nothing: `/mcp` answers a `text/plain`, form or multipart post `415`; a cookie-bearing `cross-site` or `same-site` post is
+  refused there and on a route, a cookie-less one is not judged; a refused bearer is `401 invalid_token` at `/mcp` as on
+  REST, for `tools/list` and `tools/call`, and a stale session cookie stays a visitor. Each fails with its rule removed:
+  any content type taken (3), every request judged cookie or not (1), off by default (5), a refused credential reaching
+  the tools (3, with `OneVerbTwoDoorsSpec`).

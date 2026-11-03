@@ -178,8 +178,8 @@ judges as each route's does. For a production edge:
 
 1. serve MCP over HTTPS;
 2. declare Entity access and custom-tool scopes for business authority: they are the door;
-3. turn on `Koan:Web:RefuseCrossSiteWrites`, so a page of another site cannot drive tools with a person's
-   cookie: a body `/mcp` reads needs no preflight;
+3. keep `Koan:Web:RefuseCrossSiteWrites` on, its default, so a page of another site cannot drive tools with a
+   person's cookie; `/mcp` also takes `application/json` alone, which such a page cannot send without a preflight;
 4. set `RequireAuthentication` only to close the door to visitors, who are then answered as the
    application's authentication answers anyone signed out;
 5. configure `AllowedOrigins` when browser clients are permitted;

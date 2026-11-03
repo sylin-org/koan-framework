@@ -1,10 +1,10 @@
 ---
 type: GUIDE
 domain: web
-title: "Embedded OAuth 2.1 Authorization Server (the MCP auth on-ramp)"
+title: "Embedded OAuth 2.1 Authorization Server"
 audience: [developers, architects, ai-agents]
 status: current
-last_updated: 2026-07-18
+last_updated: 2026-11-03
 framework_version: v1.0.0
 validation:
   date_last_tested: 2026-07-18
@@ -17,16 +17,16 @@ related_guides:
   - authentication-setup.md
 ---
 
-# Embedded OAuth 2.1 Authorization Server (the MCP auth on-ramp)
+# Embedded OAuth 2.1 Authorization Server
 
 **Related Guides**
-- [MCP over HTTP + SSE](mcp-http-sse-howto.md) — the `/mcp` resource-server edge that validates the tokens this AS issues
+- [MCP over HTTP](mcp-http-sse-howto.md) — the `/mcp` edge, which has no authentication of its own: the application's reads a token there as on any route
 - [MCP Agent-Native](mcp-agent-native-howto.md) — the end-to-end "go remote with auth" walkthrough
 - [Authentication Setup](authentication-setup.md) — provider sign-in vs. token issuance
 
 ---
 
-This guide is about Koan **issuing** OAuth tokens. It is what lets a stock MCP client — Claude Desktop, a headless agent — connect to your app's `/mcp` surface, get a token through the standard OAuth dance, and call your tools under the **same `[Access]` authorization** your REST surface already enforces.
+This guide is about Koan **issuing** OAuth tokens. It is what lets a client — a desktop app, a headless agent — get a token for your application through the standard OAuth dance and call your routes and your `/mcp` tools as the person who approved it, under the **same `[Access]` authorization** your REST surface already enforces. A stock MCP client does not discover this server from `/mcp`: that edge has no authentication of its own ([SEC-0039](../decisions/SEC-0039-a-caller-brings-its-own-credential.md)), so the client is told the application's authorization server, or a person and an agent sign in with their own credentials.
 
 ## Two different things at `/auth` and `/oauth`
 
@@ -53,8 +53,8 @@ builder.Services.AddKoan();
 ```
 
 Referencing `Koan.Web.Auth.Server` activates the AS at `/oauth/…`, the discovery documents under `/.well-known/…`,
-and Trust's persisted ES256 signing-key lifecycle. Trust itself wires the `Koan.bearer` scheme that the `/mcp` edge
-uses before applying its exact audience check. You write declarations, not ceremony.
+and Trust's persisted ES256 signing-key lifecycle. Trust itself wires the `Koan.bearer` scheme that Web Auth's resource
+edge uses before applying its exact audience check, on every route and at `/mcp`. You write declarations, not ceremony.
 
 ## What you implement: exactly two pages
 
@@ -83,7 +83,7 @@ GET /oauth/request/{rid}
 → 200 {
     "client":   { "name": "Claude", "verified": false },
     "scopes":   [ { "id": "mcp.read", "description": "mcp.read" } ],
-    "resource": "https://app.example.com/mcp",
+    "resource": "https://app.example.com",
     "user":     { "loggedIn": true },
     "providers": [ /* same shape as /.well-known/auth/providers */ ]
   }
@@ -177,7 +177,7 @@ curl -i -H "Authorization: Bearer <token>" -H "Accept: application/json, text/ev
 curl -b cookies.txt "http://localhost:5000/oauth/dev-token?scope=orders:read%20orders:fulfill&roles=admin"
 ```
 
-This is the fast path to exercise the authenticated `/mcp` edge end-to-end without standing up a real OAuth client. The `?scope=` (space-delimited) and `?roles=` knobs mint exactly those into the token **as-is** (no held-filter — a Development-only affordance; the endpoint stays a hard `404` outside Development).
+This is the fast path to exercise a token at `/mcp` and on your routes end-to-end without standing up a real OAuth client. The `?scope=` (space-delimited) and `?roles=` knobs mint exactly those into the token **as-is** (no held-filter — a Development-only affordance; the endpoint stays a hard `404` outside Development).
 
 ## Configuration reference (`Koan:Web:Auth:Server:*`)
 
@@ -205,4 +205,4 @@ This is the fast path to exercise the authenticated `/mcp` edge end-to-end witho
 
 - [SEC-0006](../decisions/SEC-0006-embedded-oauth-authorization-server.md) — the decision record (the nine load-bearing decisions, the rejected behaviors, the threat model).
 - [SEC-0001](../decisions/SEC-0001-fleet-identity-and-trust-fabric.md) — the trust fabric / issuer.
-- [MCP over HTTP + SSE](mcp-http-sse-howto.md) — the resource-server edge in depth.
+- [MCP over HTTP](mcp-http-sse-howto.md) — the `/mcp` edge in depth.

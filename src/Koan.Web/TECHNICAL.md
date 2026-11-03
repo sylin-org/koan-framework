@@ -107,10 +107,10 @@ expansion no adapter can serve fails closed with `422`; a response past the safe
 - When `EnableSecureHeaders` is true and `IsProxiedApi` is false, the existing header middleware wraps
   default/static-file responses as well as controllers. Optional configured CSP and app-supplied header
   values retain the same behavior; static middleware cannot short-circuit header normalization.
-- `RefuseCrossSiteWrites` (SEC-0039, default false) adds one middleware right after the security headers, before static
-  files, routing and every endpoint, MCP's included: an unsafe request whose `Sec-Fetch-Site` is not `same-origin` or
+- `RefuseCrossSiteWrites` (SEC-0039, default true) adds one middleware right after the security headers, before static
+  files, routing and every endpoint, MCP's included: an unsafe request carrying a cookie whose `Sec-Fetch-Site` is not `same-origin` or
   `none`, or, with no `Sec-Fetch-Site`, whose `Origin` is not its own scheme and host (`null` included), answers 403
-  with kind `gated`. A request with neither header passes. A tool call's own request keeps `Sec-Fetch-Site` and
+  with kind `gated`. A request with no cookie, or with neither header, passes. A tool call's own request keeps `Sec-Fetch-Site` and
   drops `Origin`, so it is judged as the call was.
 
 ## Usage guidance

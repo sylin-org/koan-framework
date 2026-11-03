@@ -311,7 +311,7 @@ public sealed class Note : Entity<Note> { /* … */ }
 
 ## Rung 9 — Go remote
 
-Everything above is transport-neutral. STDIO (rung 1's bootstrap) acts as one principal, anonymous + `origin:local`, for discovery and data alike: it lists what that principal can call (SEC-0017). To reach an agent over the network, add the HTTP transport — and you do **not** hand-roll an auth scheme: referencing the embedded Authorization Server *is* the scheme.
+Everything above is transport-neutral. STDIO (rung 1's bootstrap) acts as one principal, anonymous + `origin:local`, for discovery and data alike: it lists what that principal can call (SEC-0017). To reach an agent over the network, add the HTTP transport — and you do **not** hand-roll an auth scheme: the application's own authentication is the scheme, at `/mcp` as on every route.
 
 ```csharp
 // Referencing Koan.Web (for the HTTP host) + Koan.Mcp is the whole change — the framework maps the /mcp HTTP edge
@@ -326,7 +326,7 @@ await app.RunAsync();
 
 `/mcp` has no authentication of its own ([SEC-0039](../decisions/SEC-0039-a-caller-brings-its-own-credential.md)): an agent signs in with its own credential, as a person does, and the application's authentication finds it at `/mcp` as on any route. A tool call carries that credential to the route it reaches, so the *same* `[Access]`/`origin`/grant decisions (rungs 3–8) apply. A caller with none is a visitor, judged by each tool's gate; `RequireAuthentication: true` closes the door to visitors with whatever the application's authentication answers.
 
-**The app owns exactly two pages.** A consent page and a "you can close this page" terminal page (wired via `Koan:Web:Auth:Server:ConsentPath` / `DonePath`) — the app *renders*; the framework owns the OAuth protocol. The full transport + auth story — CORS, the Authorization Code + device on-ramp, the consent-seam contract — is in [mcp-http-sse-howto.md](mcp-http-sse-howto.md) and [oauth-server-howto.md](oauth-server-howto.md).
+**If the application also issues tokens** with the embedded Authorization Server (`Koan.Web.Auth.Server`), the app owns exactly two pages: a consent page and a "you can close this page" terminal page (wired via `Koan:Web:Auth:Server:ConsentPath` / `DonePath`) — the app *renders*; the framework owns the OAuth protocol. Its token is for the application and is read at `/mcp` by Web Auth's resource edge. The full transport + auth story is in [mcp-http-sse-howto.md](mcp-http-sse-howto.md) and [oauth-server-howto.md](oauth-server-howto.md).
 
 ---
 

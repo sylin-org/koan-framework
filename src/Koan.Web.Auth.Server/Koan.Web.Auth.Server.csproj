@@ -4,7 +4,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>Koan.Web.Auth.Server</RootNamespace>
-    <Description>SEC-0006 embedded OAuth 2.1 Authorization Server for Koan: the MCP auth on-ramp. Mints asymmetric (ES256) access tokens for OAuth clients via Authorization Code + PKCE and the Device Authorization Grant, advertises itself per the MCP authorization spec, and reuses the trust fabric for issuance. Opt-in leaf (Reference = Intent).</Description>
+    <Description>SEC-0006 embedded OAuth 2.1 Authorization Server for Koan. Mints asymmetric (ES256) access tokens for the application's own resource via Authorization Code + PKCE and the Device Authorization Grant, read by Web Auth's resource edge on every route, /mcp included, and reuses the trust fabric for issuance. Opt-in leaf (Reference = Intent).</Description>
     <PackageTags>$(CommonPackageTags);web;auth;oauth;oauth2;authorization-server;mcp;pkce</PackageTags>
   </PropertyGroup>
   <ItemGroup>
