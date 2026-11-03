@@ -63,11 +63,12 @@ public sealed class McpRpcHandler
     public Task<InitializeResult> Initialize(InitializeParams? parameters, CancellationToken cancellationToken)
         => Task.FromResult(BuildInitializeResult(parameters));
 
-    public const string DefaultProtocolVersion = "2025-06-18";
+    /// <summary>The latest revision this server speaks, which it answers when asked for one it does not, as the specification says it should.</summary>
+    public const string DefaultProtocolVersion = "2025-11-25";
 
-    /// <summary>The protocol versions this server speaks: the current and the two prior revisions a conformant client may still send.</summary>
+    /// <summary>The protocol versions this server speaks: the latest and the three prior revisions a conformant client may still send.</summary>
     internal static readonly IReadOnlySet<string> SupportedProtocolVersions =
-        new HashSet<string>(StringComparer.Ordinal) { DefaultProtocolVersion, "2025-03-26", "2024-11-05" };
+        new HashSet<string>(StringComparer.Ordinal) { DefaultProtocolVersion, "2025-06-18", "2025-03-26", "2024-11-05" };
 
     /// <summary>The provider this handler resolves from; transports open per-listing scopes from it (SEC-0011).</summary>
     internal IServiceProvider Services => _services;
@@ -348,7 +349,7 @@ public sealed class McpRpcHandler
     }
 
     [JsonRpcMethod("ping")]
-    public Task<string> Ping() => Task.FromResult("pong");
+    public Task<JObject> Ping() => Task.FromResult(new JObject());
 
     // P1.2: MCP resources. SEC-0017: the JSON-RPC entry points (STDIO) project for the STDIO principal, the one their
     // calls run as. The remote HTTP/SSE edge calls the *For overloads with its own request principal.
@@ -501,7 +502,7 @@ public sealed class McpRpcHandler
             Description = "Execute JavaScript code against Koan entity operations. Use SDK.Entities.* for entity operations and SDK.Out.answer() to return results.",
             InputSchema = inputSchema,
             // Code execution can mutate entities (SDK.Entities.*) — not read-only; effects depend on the script.
-            Annotations = ToolDescriptor.BuildAnnotations("Execute code", readOnly: false),
+            Annotations = ToolDescriptor.BuildAnnotations("Execute code", readOnly: false, destructive: true, idempotent: false, openWorld: false),
             Metadata = metadata
         };
     }
@@ -539,7 +540,7 @@ public sealed class McpRpcHandler
             Description = "Validate JavaScript code for syntax errors before execution.",
             InputSchema = inputSchema,
             // Validation only parses — it never executes code or touches state.
-            Annotations = ToolDescriptor.BuildAnnotations("Validate code", readOnly: true),
+            Annotations = ToolDescriptor.BuildAnnotations("Validate code", readOnly: true, destructive: false, idempotent: true, openWorld: false),
             Metadata = metadata
         };
     }
@@ -836,22 +837,15 @@ public sealed class McpRpcHandler
         [Newtonsoft.Json.JsonProperty("metadata")]
         public required JObject Metadata { get; init; }
 
-        // AN1/AN4: the spec ToolAnnotations container — a human title plus the verb-derived hint booleans.
-        // readOnlyHint is emitted whenever known; destructiveHint/idempotentHint are only meaningful when
-        // NOT read-only (MCP spec), so they ride alongside a false readOnlyHint.
-        internal static JObject BuildAnnotations(string? title, bool? readOnly = null, bool? destructive = null, bool? idempotent = null)
+        // AN1/AN4: the spec ToolAnnotations container — a human title plus every hint that is known, each on its own.
+        internal static JObject BuildAnnotations(string? title, bool? readOnly = null, bool? destructive = null, bool? idempotent = null, bool? openWorld = null)
         {
             var annotations = new JObject();
             if (!string.IsNullOrWhiteSpace(title)) annotations["title"] = title;
-            if (readOnly is bool ro)
-            {
-                annotations["readOnlyHint"] = ro;
-                if (!ro)
-                {
-                    if (destructive is bool d) annotations["destructiveHint"] = d;
-                    if (idempotent is bool i) annotations["idempotentHint"] = i;
-                }
-            }
+            if (readOnly is bool ro) annotations["readOnlyHint"] = ro;
+            if (destructive is bool d) annotations["destructiveHint"] = d;
+            if (idempotent is bool i) annotations["idempotentHint"] = i;
+            if (openWorld is bool o) annotations["openWorldHint"] = o;
             return annotations;
         }
 
@@ -859,11 +853,12 @@ public sealed class McpRpcHandler
         internal static (bool ReadOnly, bool Destructive, bool Idempotent) HintsForOperation(EntityEndpointOperationKind kind) => kind switch
         {
             EntityEndpointOperationKind.Collection or EntityEndpointOperationKind.Query
-                or EntityEndpointOperationKind.GetNew or EntityEndpointOperationKind.GetById => (true, false, false),
-            EntityEndpointOperationKind.Upsert or EntityEndpointOperationKind.UpsertMany => (false, false, true),
+                or EntityEndpointOperationKind.GetNew or EntityEndpointOperationKind.GetById => (true, false, true),
+            // An upsert replaces what is there, so it is no additive update.
+            EntityEndpointOperationKind.Upsert or EntityEndpointOperationKind.UpsertMany => (false, true, true),
             EntityEndpointOperationKind.Delete or EntityEndpointOperationKind.DeleteMany
                 or EntityEndpointOperationKind.DeleteByQuery or EntityEndpointOperationKind.DeleteAll => (false, true, false),
-            _ => (false, false, false) // Patch / None: a mutation with no asserted destructive/idempotent guarantee
+            _ => (false, true, false) // Patch / None: a mutation that may change what is there, with no asserted idempotent guarantee
         };
 
         public static ToolDescriptor From(McpEntityRegistration registration, McpToolDefinition tool)
@@ -885,7 +880,7 @@ public sealed class McpRpcHandler
                 Name = tool.Name,
                 Description = tool.Description,
                 InputSchema = tool.InputSchema,
-                Annotations = BuildAnnotations(tool.Description ?? tool.Name, readOnly, destructive, idempotent),
+                Annotations = BuildAnnotations(Koan.Mcp.CustomTools.ToolName.Title(tool.Name), readOnly, destructive, idempotent, openWorld: false),
                 Metadata = metadata
             };
         }
@@ -906,7 +901,7 @@ public sealed class McpRpcHandler
                 Name = tool.Name,
                 Description = tool.Description,
                 InputSchema = tool.InputSchema,
-                Annotations = BuildAnnotations(tool.Description ?? tool.Name, tool.ReadOnly, tool.Destructive, tool.Idempotent),
+                Annotations = BuildAnnotations(Koan.Mcp.CustomTools.ToolName.Title(tool.Name), tool.ReadOnly, tool.Destructive, tool.Idempotent, tool.OpenWorld),
                 Metadata = metadata
             };
         }

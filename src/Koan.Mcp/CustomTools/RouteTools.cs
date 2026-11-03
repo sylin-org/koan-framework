@@ -2,7 +2,6 @@ using System.Collections;
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
 using System.Reflection;
-using Koan.Mcp.Execution;
 using Koan.Web.Attributes;
 using Koan.Web.Authorization;
 using Microsoft.AspNetCore.Http;
@@ -52,8 +51,14 @@ internal static class RouteTools
         var (schema, query, bodyField) = Input(action, pattern, method, where);
         var isGet = HttpMethods.IsGet(method) || HttpMethods.IsHead(method);
         var description = action.MethodInfo.GetCustomAttribute<DescriptionAttribute>()?.Description;
+        // What a route's method promises, and nothing it does not. Whether a POST only adds, or reaches beyond the application, is the action's to say: the specification reads a hint left out as "it may", and a false one here would tell every client that follows it something untrue.
+        var stated = attribute?.Stated ?? default;
+        var forAll = action.ControllerTypeInfo.GetCustomAttribute<ToolAttribute>(inherit: false)?.Stated ?? default;
         return McpCustomToolRegistry.Assemble(name, description ?? $"{method} /{template}", schema, action.MethodInfo, !isGet,
-            readOnly: isGet ? true : null, destructive: HttpMethods.IsDelete(method) ? true : null,
+            readOnly: isGet,
+            destructive: isGet ? false : stated.Destructive ?? forAll.Destructive ?? (HttpMethods.IsDelete(method) ? true : null),
+            idempotent: isGet || (stated.Idempotent ?? forAll.Idempotent ?? (HttpMethods.IsPut(method) || HttpMethods.IsDelete(method))),
+            openWorld: stated.OpenWorld ?? forAll.OpenWorld ?? (isGet ? false : null),
             gateAction: EntityAuthorization.ActionOf(method), route: new RouteTool(action, method, pattern, query, bodyField));
     }
 
@@ -119,10 +124,7 @@ internal static class RouteTools
         foreach (var parameter in pattern.Parameters.Where(parameter => !properties.ContainsKey(parameter.Name)))
             Field(parameter.Name, typeof(string), [], IsRequired(parameter), asQuery: false);
 
-        // Mutating verbs advertise a rehearsal as every custom verb does; the handler answers it without running the action.
-        if (!isRead)
-            properties[McpDryRun.ArgumentName] = new JObject { ["type"] = "boolean", ["description"] = McpDryRun.SchemaDescription };
-
+        // A route offers no rehearsal, because its effects are the action's and all it could ever say is that it cannot. One asked for anyway is still answered without running the action.
         var result = new JObject { ["type"] = "object", ["properties"] = properties };
         if (required.Count > 0) result["required"] = required;
         return (result, query, bodyField);

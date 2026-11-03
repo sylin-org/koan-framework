@@ -362,7 +362,7 @@ public sealed class OneVerbTwoDoorsSpec(ForumFixture forum) : IClassFixture<Foru
         var input = (JObject)reply["inputSchema"]!["properties"]!;
 
         reply["description"]!.Value<string>().Should().Be("Reply in a Topic.");
-        input.Properties().Select(p => p.Name).Should().BeEquivalentTo("place", "topic", "body", "parent", "notify", "id", "dry_run");
+        input.Properties().Select(p => p.Name).Should().BeEquivalentTo("place", "topic", "body", "parent", "notify", "id");
         input["body"]!["description"]!.Value<string>().Should().Be("The reply, in plain words.");
         input["notify"]!["type"]!.Value<string>().Should().Be("boolean");
         reply["inputSchema"]!["required"]!.Values<string>().Should().BeEquivalentTo("place", "topic");

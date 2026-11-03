@@ -30,6 +30,7 @@ public sealed class McpCustomTool
     public bool? ReadOnly { get; init; }
     public bool? Destructive { get; init; }
     public bool? Idempotent { get; init; }
+    public bool? OpenWorld { get; init; }
 
     public required MethodInfo Method { get; init; }
     public required IReadOnlyList<McpCustomToolParameter> Parameters { get; init; }

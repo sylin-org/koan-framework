@@ -25,6 +25,13 @@ internal static partial class ToolName
     public static string Of(params IEnumerable<string?> parts)
         => string.Join('_', parts.Where(static part => !string.IsNullOrWhiteSpace(part)).Select(static part => Words(part!)).Where(static word => word.Length > 0));
 
+    /// <summary>What a person reads when a client asks them about this tool: <c>delete_role</c> is "Delete role".</summary>
+    public static string Title(string name)
+    {
+        var words = Words(name).Replace('_', ' ');
+        return words.Length == 0 ? name : char.ToUpperInvariant(words[0]) + words[1..];
+    }
+
     private static string Words(string text)
         => NotAWord().Replace(WordBoundary().Replace(text, "_").ToLowerInvariant(), "_").Trim('_');
 }

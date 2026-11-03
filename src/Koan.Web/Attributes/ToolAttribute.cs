@@ -25,6 +25,25 @@ public sealed class ToolAttribute(string? particle = null) : Attribute, IControl
     /// <summary>The whole name, stated, in place of the derived one.</summary>
     public string? Name { get; set; }
 
+    /// <summary>Whether a call may destroy something, such as a <c>POST</c> that removes or bans, so a client asks its person first; false says it only adds. Left unsaid, a
+    /// <c>DELETE</c> does, a read does not, and of anything else nothing is said, which the specification reads as "it may". On a controller it speaks for every action that does not say.</summary>
+    public bool Destructive { get => _destructive ?? false; set => _destructive = value; }
+
+    /// <summary>Whether calling again with the same arguments changes nothing more, so a client may retry. Left unsaid, what HTTP promises of the method:
+    /// <c>GET</c>, <c>HEAD</c>, <c>PUT</c> and <c>DELETE</c> are. On a controller it speaks for every action that does not say.</summary>
+    public bool Idempotent { get => _idempotent ?? false; set => _idempotent = value; }
+
+    /// <summary>Whether a call reaches beyond this application, such as one that posts elsewhere or fetches a stranger's address; false says it stays within. Left unsaid, a read does
+    /// not, and of anything else nothing is said, which the specification reads as "it may". On a controller it speaks for every action that does not say.</summary>
+    public bool OpenWorld { get => _openWorld ?? false; set => _openWorld = value; }
+
+    /// <summary>What this attribute says of a call's effects, null where it says nothing.</summary>
+    public (bool? Destructive, bool? Idempotent, bool? OpenWorld) Stated => (_destructive, _idempotent, _openWorld);
+
+    private bool? _destructive;
+    private bool? _idempotent;
+    private bool? _openWorld;
+
     /// <summary>Whether <paramref name="action"/> of <paramref name="controller"/> is a tool. An action inherited from
     /// <see cref="EntityController{TEntity,TKey}"/> is not: its operations are the entity's own tools.</summary>
     public static bool Exposes(MethodInfo action, Type controller)

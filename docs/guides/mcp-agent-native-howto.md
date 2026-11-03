@@ -68,7 +68,7 @@ public sealed class Note : Entity<Note>
 { "tools": [
   { "name": "note_collection", "description": "List Note records …",
     "inputSchema": { "type": "object", "properties": { "filter": {…}, "page": {…} } },
-    "annotations": { "title": "List Note", "readOnlyHint": true } },
+    "annotations": { "title": "Note collection", "readOnlyHint": true } },
   { "name": "note_upsert", "description": "Insert or update a Note record.",
     "annotations": { "readOnlyHint": false, "idempotentHint": true } },
   { "name": "note_delete", "annotations": { "destructiveHint": true } }
@@ -224,6 +224,8 @@ public static class NoteTools
 ```
 
 **What the agent sees** — a new `archive_stale` tool alongside the entity verbs, with the input schema inferred from the parameters (`IServiceProvider`/`CancellationToken` are injected, not advertised) and the `destructiveHint` you marked.
+
+**What a route says about itself** — a `[Tool]` publishes what its HTTP method promises unless it says otherwise. Of a `POST`, `PUT` or `PATCH` it says nothing about destruction or the open world, which a client following the specification reads as "it may", so a `POST` that only adds says `[Tool(Destructive = false, OpenWorld = false)]`, one that removes or bans says `Destructive = true`, one that may safely be retried says `Idempotent = true`, and one that reaches beyond the application says `OpenWorld = true`. A client decides when to ask its person from these.
 
 **What happens** — custom verbs gain *nothing* automatically: the framework can't infer that `archive_stale` is dangerous, so you mark it (`[McpReadOnly]`/`[McpDestructive]`/`[McpIdempotent]`). A custom verb's access is the one gate: `[Access]` or `[RequireScope]` on the method or its class, and any `IAuthorizationProvider` asked for the method.
 

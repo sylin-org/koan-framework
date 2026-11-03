@@ -39,7 +39,9 @@ public sealed class AnnotationDerivationSpec : IClassFixture<ConformanceFixture>
     {
         var ann = await Annotations("gadget", EntityEndpointOperationKind.Delete);
         ann["readOnlyHint"]?.Value<bool>().Should().BeFalse();
-        ann["destructiveHint"]?.Value<bool>().Should().BeTrue("delete is destructive");
+        ann["destructiveHint"]!.Value<bool>().Should().BeTrue("delete is destructive");
+        ann["title"]!.Value<string>().Should().NotBe((await _fx.GetWireToolAsync(_fx.ResolveToolName("gadget", EntityEndpointOperationKind.Delete)))!["description"]!.Value<string>(), "a title is not its paragraph");
+        ann["openWorldHint"]!.Value<bool>().Should().BeFalse("an entity's tool acts on the application's own data");
     }
 
     [Fact]
@@ -47,7 +49,8 @@ public sealed class AnnotationDerivationSpec : IClassFixture<ConformanceFixture>
     {
         var ann = await Annotations("gadget", EntityEndpointOperationKind.Upsert);
         ann["readOnlyHint"]?.Value<bool>().Should().BeFalse();
-        ann["idempotentHint"]?.Value<bool>().Should().BeTrue("upsert by id is idempotent");
+        ann["idempotentHint"]!.Value<bool>().Should().BeTrue("upsert by id is idempotent");
+        ann["destructiveHint"]!.Value<bool>().Should().BeTrue("an upsert replaces what is there, so it is no additive update");
     }
 
     [Fact]
@@ -58,6 +61,7 @@ public sealed class AnnotationDerivationSpec : IClassFixture<ConformanceFixture>
         unmarked.ContainsKey("destructiveHint").Should().BeFalse();
 
         var purge = (JObject)(await _fx.GetWireToolAsync("gadget_purge"))!["annotations"]!;
-        purge["destructiveHint"]?.Value<bool>().Should().BeTrue("[McpDestructive] marks the verb destructive");
+        purge["destructiveHint"]!.Value<bool>().Should().BeTrue("[McpDestructive] marks the verb destructive");
+        purge["title"]!.Value<string>().Should().Be("Gadget purge");
     }
 }

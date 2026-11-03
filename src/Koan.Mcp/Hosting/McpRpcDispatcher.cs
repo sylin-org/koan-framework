@@ -82,7 +82,7 @@ public sealed class McpRpcDispatcher
                 case "resources/read":
                     return HandleResourcesRead(envelope, principal, handler);
                 case "ping":
-                    return new JObject { ["jsonrpc"] = "2.0", ["id"] = CloneId(envelope.Id), ["result"] = "pong" };
+                    return Wrap(envelope.Id, new JObject());
                 default:
                     return CreateError(envelope.Id, -32601, $"Method '{envelope.Method}' is not supported.");
             }
@@ -137,7 +137,7 @@ public sealed class McpRpcDispatcher
 
         if (!_registry.TryGetTool(toolName, out _, out _) && !_customTools.TryGet(toolName, out _))
         {
-            return CreateError(envelope.Id, -32601, $"Tool '{toolName}' is not registered.");
+            return CreateError(envelope.Id, -32602, $"Tool '{toolName}' is not registered.");
         }
 
         // SEC-0004, ARCH-0141: a tool's authority is the one gate, enforced inside CallToolFor with the threaded

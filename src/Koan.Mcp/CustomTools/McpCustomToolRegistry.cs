@@ -186,7 +186,7 @@ public sealed class McpCustomToolRegistry
     /// also says what its HTTP method promises. A verb on an [McpOperationalToolset]-marked Toolset is config-gated by that
     /// toolset's key (P3.2).</summary>
     internal static McpCustomTool Assemble(string name, string? description, JObject schema, MethodInfo method, bool isMutation, string gateAction,
-        bool? readOnly = null, bool? destructive = null, RouteTool? route = null, IReadOnlyList<McpCustomToolParameter>? parameters = null) => new()
+        bool? readOnly = null, bool? destructive = null, bool? idempotent = null, bool? openWorld = null, RouteTool? route = null, IReadOnlyList<McpCustomToolParameter>? parameters = null) => new()
     {
         Name = name,
         Description = description,
@@ -195,7 +195,8 @@ public sealed class McpCustomToolRegistry
         GateAction = gateAction,
         ReadOnly = method.GetCustomAttribute<McpReadOnlyAttribute>() is not null ? true : readOnly,
         Destructive = method.GetCustomAttribute<McpDestructiveAttribute>() is not null ? true : destructive,
-        Idempotent = method.GetCustomAttribute<McpIdempotentAttribute>() is not null ? true : null,
+        Idempotent = method.GetCustomAttribute<McpIdempotentAttribute>() is not null ? true : idempotent,
+        OpenWorld = openWorld,
         OperationalToolsetKey = method.DeclaringType?.GetCustomAttribute<McpOperationalToolsetAttribute>()?.Key,
         Method = method,
         Parameters = parameters ?? [],
