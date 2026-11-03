@@ -171,21 +171,22 @@ is absent from discovery and cannot be reached by calling its name directly.
 
 ## Security posture
 
-HTTP authentication defaults on in Production and containers. Development may be open for local
-inspection. For a production edge:
+The edge has no authentication of its own (SEC-0039). A caller signs in with its own credential, a person
+and an agent alike, and the application's authentication finds it at `/mcp` as on any route; a tool call
+carries that credential to the route it reaches. A caller with none is a visitor, whom each tool's gate
+judges as each route's does. For a production edge:
 
 1. serve MCP over HTTPS;
-2. set `Koan:Web:ApplicationUrl` to the application's public URL, or have the application accept it (WEB-0081), so
-   the `/mcp` audience, the authorization-server URL and the protected-resource metadata derive from it behind a proxy
-   (WEB-0078), and until it does, outside Development, the edge takes no token (SEC-0037, SEC-0039); `ResourceUri` remains an
-   explicit override of the audience alone. A token is accepted when its audience names that resource, with or
-   without one trailing slash; one that is expired, foreign or issued for another resource — the application's own
-   pages included — answers 401 with `error="invalid_token"` (SEC-0025);
-3. reference `Koan.Web.Auth.Server` for Koan's OAuth 2.1 authorization-server/resource-server path,
-   or register the application’s external bearer scheme;
-4. declare Entity access and custom-tool scopes for business authority;
+2. declare Entity access and custom-tool scopes for business authority: they are the door;
+3. turn on `Koan:Web:RefuseCrossSiteWrites`, so a page of another site cannot drive tools with a person's
+   cookie: a body `/mcp` reads needs no preflight;
+4. set `RequireAuthentication` only to close the door to visitors, who are then answered as the
+   application's authentication answers anyone signed out;
 5. configure `AllowedOrigins` when browser clients are permitted;
 6. keep operational toolsets disabled unless explicitly needed and grant-gated.
+
+A bearer from Koan's OAuth server is the caller at `/mcp` when Web Auth's resource edge is on
+(`Koan:Web:Auth:ResourceServer:Enabled`), for the application's own resource (SEC-0025).
 
 See [OAuth server](oauth-server-howto.md) for token acquisition and
 [authorization](authorization-howto.md) for the Entity/tool authority model.
@@ -197,8 +198,7 @@ See [OAuth server](oauth-server-howto.md) for token acquisition and
 | `EnableStdioTransport` | `true` | Host the local process-owned transport |
 | `EnableStreamableHttpTransport` | `false` | Host the primary Streamable HTTP edge |
 | `HttpRoute` | `/mcp` | Shared base route for MCP over HTTP |
-| `RequireAuthentication` | environment-derived | Require a remote authenticated principal |
-| `ResourceUri` | unset | Explicit OAuth resource/audience identifier; unset, it is the base URL (`Koan:Web:ApplicationUrl`, else the accepted URL) + `HttpRoute` |
+| `RequireAuthentication` | `false` | Close the door to anyone the application's authentication did not find |
 | `EnableCors` | `false` | Enable the MCP CORS policy |
 | `AllowedOrigins` | empty | Origins admitted when CORS is enabled |
 
@@ -207,7 +207,7 @@ See [OAuth server](oauth-server-howto.md) for token acquisition and
 | Observation | Meaning | Action |
 |---|---|---|
 | `400` after negotiation | Unsupported protocol contract | Send the negotiated `MCP-Protocol-Version` |
-| `401` | Remote authentication failed | Follow the protected-resource challenge or fix bearer configuration |
+| `401` | The credential was refused, or the door is closed to visitors | Sign in as the application asks, or fix the credential |
 | `403` or a structured short-circuit | Caller lacks business authority | Correct grants; do not retry unchanged |
 | `405` on `GET` or `DELETE /mcp` | There is no stream and no session | POST each request on its own |
 | `406` | POST does not accept the supported response media types | Send both JSON and event-stream in `Accept` |

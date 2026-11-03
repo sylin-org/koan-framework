@@ -44,16 +44,32 @@ public sealed class StreamableAuthSpec : IClassFixture<StreamableAuthFixture>
         res.StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
+    /// <summary>The closed door answers as the application's own authentication does, and points at no OAuth metadata of its own.</summary>
     [Fact]
-    public async Task A_request_with_no_bearer_is_challenged()
+    public async Task A_request_with_no_credential_is_refused_as_the_applications_authentication_refuses_it()
     {
-        using var client = _fx.NewClient();
+        using var client = new HttpClient(new HttpClientHandler { AllowAutoRedirect = false }) { BaseAddress = new Uri(_fx.BaseUrl) };
         using var req = PostRequest(Route, Rpc("tools/list", id: 2));
 
         var res = await client.SendAsync(req, Quick);
 
+        res.IsSuccessStatusCode.Should().BeFalse();
+        res.Headers.WwwAuthenticate.ToString().Should().NotContain("resource_metadata");
+        (await client.GetAsync("/.well-known/oauth-protected-resource/mcp", Quick)).StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task A_bearer_for_another_resource_is_refused_by_the_resource_edge()
+    {
+        using var client = _fx.NewClient();
+        using var req = PostRequest(Route, Rpc("tools/list", id: 2));
+        req.Headers.Authorization = new AuthenticationHeaderValue("Bearer",
+            _fx.Services.GetRequiredService<IIssuer>().Issue(new TrustClaims { Subject = "alice" }, TimeSpan.FromMinutes(5), audience: $"{_fx.BaseUrl}/mcp"));
+
+        var res = await client.SendAsync(req, Quick);
+
         res.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
-        res.Headers.WwwAuthenticate.ToString().Should().Contain("resource_metadata");
+        res.Headers.WwwAuthenticate.ToString().Should().Be("Bearer error=\"invalid_token\"");
     }
 
     // SEC-0016: each request runs as the principal it carries. A refreshed token with fewer scopes reduces authority at once.

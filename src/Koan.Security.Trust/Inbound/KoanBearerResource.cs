@@ -56,15 +56,14 @@ public static class KoanBearerResource
     }
 
     /// <summary>
-    /// The RFC 6750 <c>WWW-Authenticate</c> value of a bearer challenge: <c>Bearer</c> with <paramref name="error"/>, its
-    /// <paramref name="description"/> and an RFC 9728 <paramref name="resourceMetadata"/> URL, each only when given.
+    /// The RFC 6750 <c>WWW-Authenticate</c> value of a bearer challenge: <c>Bearer</c> with <paramref name="error"/> and its
+    /// <paramref name="description"/>, each only when given.
     /// </summary>
-    public static string Challenge(string? error = null, string? description = null, string? resourceMetadata = null)
+    public static string Challenge(string? error = null, string? description = null)
     {
-        var parts = new List<string>(3);
+        var parts = new List<string>(2);
         if (!string.IsNullOrEmpty(error)) parts.Add($"error=\"{error}\"");
         if (!string.IsNullOrEmpty(description)) parts.Add($"error_description=\"{description}\"");
-        if (!string.IsNullOrEmpty(resourceMetadata)) parts.Add($"resource_metadata=\"{resourceMetadata}\"");
         return parts.Count == 0 ? "Bearer" : "Bearer " + string.Join(", ", parts);
     }
 }

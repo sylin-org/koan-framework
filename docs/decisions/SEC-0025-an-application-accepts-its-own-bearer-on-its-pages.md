@@ -18,7 +18,9 @@ amended_by: SEC-0039
 
 > **Amended by [SEC-0039](SEC-0039-a-caller-brings-its-own-credential.md) (2026-11-02):** rule 2's base URL holds a token
 > only when it is configured or accepted, or in Development: elsewhere, until one exists, no token is for the application.
-> [SEC-0037](SEC-0037-an-edge-that-is-part-of-the-application.md)'s second audience at `/mcp` is gone, so rule 4 stands as written.
+> The MCP edge no longer authenticates a bearer of its own: this edge reads the application's token at `/mcp` as on a page,
+> and a token for `{base}/mcp` is no credential anywhere. [SEC-0037](SEC-0037-an-edge-that-is-part-of-the-application.md)'s
+> second audience is gone with it.
 
 ## Context
 

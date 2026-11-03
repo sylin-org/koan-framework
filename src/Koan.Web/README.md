@@ -94,8 +94,8 @@ Set `Koan:Web:ApplicationUrl` to the one public URL the application answers at �
 
 When it is set it is authoritative. Koan serves the application under its path and nothing at the root (routes,
 static files, `/health` and its alias, the well-known documents all live under `/app`), and every absolute URL Koan
-writes derives from it: the authorization server's issuer, the MCP resource identity, OpenGraph card URLs, the atproto
-client metadata. Each of those keeps its explicit override (`Issuer`, `ResourceUri`, `ClientId`) for the rare case
+writes derives from it: the authorization server's issuer, the dev token's audience, OpenGraph card URLs, the atproto
+client metadata. Each of those keeps its explicit override (`Issuer`, `ResourceServer:Resource`, `ClientId`) for the rare case
 where it must differ. The value is held normalised — lowercase scheme and host, the port only when it is not the
 default, the path percent-encoded in canonical form, no trailing slash — and a value that is not the public URL
 (not absolute http(s), a query or fragment, an encoded `/`, or a listen address such as `0.0.0.0`) stops boot with

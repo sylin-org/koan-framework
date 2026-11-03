@@ -39,7 +39,6 @@ internal static class McpEndpointMapping
         {
             baseRoute = "/mcp";
         }
-        var configuredResource = options.ResourceUri;
         // An application that exposes tools alone gets no code mode's SDK, published or written, whatever CodeMode:Enabled says.
         var codeModeOn = McpExposure.ExposesCode(McpExposure.Resolve(options));
         var streamable = services.GetRequiredService<StreamableHttpTransport>();
@@ -65,42 +64,16 @@ internal static class McpEndpointMapping
             .ExcludeFromDescription();
         ApplyCors(bareGet);
 
-        // The authenticated route group — POST, capabilities, health, and the public well-known metadata beside it.
+        // The route group — POST, capabilities, health. SEC-0039: the edge has no authentication of its own. The caller is
+        // whoever the application's authentication found on this request, a visitor when nobody, judged by each tool's gate.
         if (streamableOn)
         {
             var capabilityReporter = services.GetService<IMcpCapabilityReporter>();
             var group = endpoints.MapGroup(baseRoute);
             ApplyCors(group);
 
-            if (options.RequireAuthentication)
-            {
-                // SEC-0006 D2/D3 — gate the group by authenticating the trust-fabric bearer scheme explicitly (not
-                // RequireAuthorization, whose generic 401 would pre-empt the RFC 9728 challenge). The filter lands the
-                // bearer identity in context.User and enforces aud == this resource.
-                group.AddEndpointFilter(async (efic, next) =>
-                {
-                    if (!await McpEdgeAuth.EnsureAuthorized(efic.HttpContext, baseRoute, requireAuth: true, options))
-                        return Results.Empty; // EnsureAuthorized already wrote the 401 + WWW-Authenticate
-                    return await next(efic);
-                });
-            }
-
-            // SEC-0006 D2 (RFC 9728) — public protected-resource metadata at the well-known root (NOT under the
-            // authenticated group) so an unauthenticated client can discover the Authorization Server.
-            endpoints.MapGet($"/.well-known/oauth-protected-resource{baseRoute}", context =>
-            {
-                var doc = new
-                {
-                    // What a token here must name, so a client that follows this gets one the edge takes.
-                    resource = McpResourceIdentity.Audience(context, baseRoute, options) ?? McpResourceIdentity.Resolve(context, baseRoute, configuredResource),
-                    authorization_servers = new[] { McpResourceIdentity.AuthorizationServer(context) },
-                    bearer_methods_supported = new[] { "header" },
-                };
-                return context.Response.WriteAsJsonAsync(doc, cancellationToken: context.RequestAborted);
-            })
-            .WithName("KoanMcpProtectedResourceMetadata")
-            .WithMetadata(new ProducesResponseTypeAttribute(typeof(object), StatusCodes.Status200OK, "application/json"))
-            .ExcludeFromDescription();
+            // A door the application closes answers as its own authentication does when nobody is signed in.
+            if (options.RequireAuthentication) group.RequireAuthorization();
 
             // AI-0037, SEC-0039 — one POST is one request, answered as JSON. No DELETE: there is no session to end, so
             // routing answers 405.

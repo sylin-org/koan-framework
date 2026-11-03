@@ -1,4 +1,5 @@
 using Koan.Core;
+using Koan.Web.Auth.Options;
 using Koan.Web.Auth.Server.Options;
 using Koan.Security.Trust.Issuer;
 using Koan.Web.Hosting;
@@ -12,8 +13,8 @@ namespace Koan.Web.Auth.Server.Hosting;
 
 /// <summary>
 /// SEC-0006 — the <c>GET /oauth/dev-token</c> convenience endpoint. Mints a real ES256 access token
-/// for the <b>currently signed-in cookie user</b>, bound (RFC 8707) to the requested resource (default: this
-/// host's MCP edge). It exists to validate the whole token → bearer → SEC-0004/0005 chain end-to-end without
+/// for the <b>currently signed-in cookie user</b>, bound (RFC 8707) to the requested resource (default: the
+/// application's own). It exists to validate the whole token → bearer → SEC-0004/0005 chain end-to-end without
 /// standing up a full OAuth client.
 /// <para>
 /// <b>Hard dev-gate:</b> it returns 404 outside the Development environment — even if <see cref="AuthServerOptions.DevTokenEnabled"/>
@@ -46,12 +47,14 @@ internal static class DevTokenEndpoint
             return;
         }
 
-        // Resource (RFC 8707): the audience to bind. Default to this host's MCP resource so the minted token is
-        // immediately usable against the local /mcp edge. An explicit ?resource= must be an absolute http(s) URI.
+        // Resource (RFC 8707): the audience to bind. Default to the application's own resource, the one its resource edge
+        // takes on every route and at /mcp (SEC-0039). An explicit ?resource= must be an absolute http(s) URI.
         var resource = ctx.Request.Query["resource"].ToString();
         if (string.IsNullOrWhiteSpace(resource))
         {
-            resource = DefaultMcpResource(ctx);
+            resource = ctx.RequestServices.GetRequiredService<IOptions<AuthOptions>>().Value.ResourceServer.Resource
+                ?? ctx.RequestServices.GetService<KoanWebBaseUrl>()?.Resolve(ctx)
+                ?? $"{ctx.Request.Scheme}://{ctx.Request.Host}{ctx.Request.PathBase}";
         }
         else if (!Uri.TryCreate(resource, UriKind.Absolute, out var parsed)
             || (parsed.Scheme != Uri.UriSchemeHttp && parsed.Scheme != Uri.UriSchemeHttps))
@@ -89,26 +92,6 @@ internal static class DevTokenEndpoint
     }
 
     // Accepts space- OR comma-delimited input; null when the query param was absent (so the session value is kept).
-    /// <summary>
-    /// WEB-0078: the identity the MCP edge enforces (<c>McpResourceIdentity.Resolve</c>): the configured
-    /// <c>Koan:Mcp:ResourceUri</c>, else the application's base URL plus the MCP route. This package does not reference
-    /// Koan.Mcp, so it reads the same configuration keys the edge binds rather than its own idea of the host.
-    /// </summary>
-    private static string DefaultMcpResource(HttpContext ctx)
-    {
-        var configuration = ctx.RequestServices.GetService<IConfiguration>();
-        var configured = configuration?["Koan:Mcp:ResourceUri"];
-        if (!string.IsNullOrWhiteSpace(configured)) return configured.TrimEnd('/');
-
-        var route = configuration?["Koan:Mcp:HttpRoute"];
-        route = string.IsNullOrWhiteSpace(route) ? "/mcp" : route.TrimEnd('/');
-        if (route.Length == 0) route = "/mcp";
-
-        var baseUrl = ctx.RequestServices.GetService<KoanWebBaseUrl>();
-        var origin = baseUrl?.Resolve(ctx) ?? $"{ctx.Request.Scheme}://{ctx.Request.Host}{ctx.Request.PathBase}";
-        return origin + route;
-    }
-
     private static IReadOnlyCollection<string>? ParseList(string? raw)
         => string.IsNullOrWhiteSpace(raw)
             ? null

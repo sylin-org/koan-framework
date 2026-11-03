@@ -5,7 +5,6 @@ using Koan.Mcp.Execution;
 using Koan.Mcp.Hosting;
 using Koan.Web.Authorization;
 using Koan.Web.Hosting;
-using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Extensions;
 using Microsoft.AspNetCore.Http.Metadata;
@@ -20,8 +19,9 @@ namespace Koan.Mcp.CustomTools;
 /// <summary>
 /// A tool call as a request (ARCH-0141). The arguments become a path, a query and a JSON body, and the request goes through the application's whole
 /// pipeline, on a flow of its own as a request from a server is: routing, authentication, authorization, the limiter, its own middleware, the filters, the
-/// action. Nothing here decides what a route would. The request is the caller's, without its credential or transport headers, with the principal the MCP edge
-/// established. This is the MCP surface's one mapping: a status of 400 and over is a failed call, and the answer's <c>kind</c>, or else its status, is the <c>errorCode</c>.
+/// action. Nothing here decides what a route would. The request is the caller's, its own credential included and its transport headers left out, so the
+/// application's authentication finds the caller as it finds them on any route (SEC-0039); with no request behind the call (STDIO) it is the principal given.
+/// This is the MCP surface's one mapping: a status of 400 and over is a failed call, and the answer's <c>kind</c>, or else its status, is the <c>errorCode</c>.
 /// </summary>
 internal sealed class RouteToolInvoker(RoutePipeline pipeline, IServiceScopeFactory scopes, ILogger<RouteToolInvoker> logger,
     IHttpContextAccessor? accessor = null, KoanWebBaseUrl? baseUrl = null)
@@ -29,7 +29,7 @@ internal sealed class RouteToolInvoker(RoutePipeline pipeline, IServiceScopeFact
     /// <summary>What only the HTTP connection means, or what the edge has already spent.</summary>
     private static readonly HashSet<string> Withheld = new(StringComparer.OrdinalIgnoreCase)
     {
-        "Authorization", "Cookie", "Accept", "Accept-Encoding", "Content-Type", "Content-Length", "Transfer-Encoding", "Connection", "Upgrade", "Expect", "Host", "Origin",
+        "Accept", "Accept-Encoding", "Content-Type", "Content-Length", "Transfer-Encoding", "Connection", "Upgrade", "Expect", "Host", "Origin",
         "Mcp-Session-Id", "MCP-Protocol-Version", "Last-Event-ID",
     };
 
@@ -84,7 +84,7 @@ internal sealed class RouteToolInvoker(RoutePipeline pipeline, IServiceScopeFact
         var origin = outer is null && baseUrl?.Current is { } current ? new Uri(current) : null;
         await using var scope = scopes.CreateAsyncScope();
         using var answer = new MemoryStream();
-        var http = new DefaultHttpContext { RequestServices = scope.ServiceProvider, User = user ?? new ClaimsPrincipal(), RequestAborted = ct };
+        var http = new DefaultHttpContext { RequestServices = scope.ServiceProvider, User = outer is null ? user ?? new ClaimsPrincipal() : new ClaimsPrincipal(), RequestAborted = ct };
         if (outer is not null)
             foreach (var (name, value) in outer.Request.Headers)
                 if (!Withheld.Contains(name)) http.Request.Headers[name] = value;
@@ -105,14 +105,8 @@ internal sealed class RouteToolInvoker(RoutePipeline pipeline, IServiceScopeFact
         http.Response.Body = answer;
         http.Connection.RemoteIpAddress = outer?.Connection.RemoteIpAddress;
         http.Features.Set(route);
-        if (OriginStamp.TierOf(http.User) is { } tier) http.Features.Set(new OriginFeature(tier));
-        // What ASP.NET's policy evaluator goes by, for 403 or 401. The edge's result for a principal it accepted, which the application's default scheme might refuse. WEB-0083: a
-        // credential rejected at the edge with nothing to replace it is rejected here too. The ticket names the scheme that established the caller, as a request of its own would say.
-        if (http.User.Identity is { IsAuthenticated: true, AuthenticationType: var type })
-            http.Features.Set<IAuthenticateResultFeature>(new Authenticated(AuthenticateResult.Success(new AuthenticationTicket(http.User,
-                outer?.Features.Get<IAuthenticateResultFeature>()?.AuthenticateResult?.Ticket?.AuthenticationScheme ?? type ?? "mcp"))));
-        else if (outer?.Features.Get<IAuthenticateResultFeature>() is { AuthenticateResult.Failure: not null } rejected)
-            http.Features.Set(rejected);
+        // With a connection, the origin is the connection's, as on any request; with none, the principal's.
+        if (outer is null && OriginStamp.TierOf(http.User) is { } tier) http.Features.Set(new OriginFeature(tier));
 
         try
         {
@@ -132,11 +126,6 @@ internal sealed class RouteToolInvoker(RoutePipeline pipeline, IServiceScopeFact
             logger.LogError(failure, "The route of tool {Tool} failed.", tool.Name);
             return Failed(tool, StatusCodes.Status500InternalServerError, "failed", "It failed.", null);
         }
-    }
-
-    internal sealed class Authenticated(AuthenticateResult result) : IAuthenticateResultFeature
-    {
-        public AuthenticateResult? AuthenticateResult { get; set; } = result;
     }
 
     private static string? Take(JObject fields, string name)

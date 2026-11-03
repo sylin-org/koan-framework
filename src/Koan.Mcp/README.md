@@ -1,4 +1,4 @@
-﻿# Sylin.Koan.Mcp
+# Sylin.Koan.Mcp
 
 Project the entities and business tools an application already governs to AI agents over the Model
 Context Protocol, under the access declarations that govern its HTTP surface.
@@ -80,8 +80,9 @@ A tool's name is lower-case words joined by underscores, at most 64 characters, 
 
 `AllowMutations = false` removes generated mutation tools, but it is not an authorization system.
 Use Koan's entity `[Access]` declarations for data authority and tool access policies/scopes for
-custom workflows. HTTP authentication is required by default in production and containers; local
-Development may be open so the first-use path remains observable.
+custom workflows. The HTTP edge has no authentication of its own: a caller brings its own credential,
+which the application's authentication reads at `/mcp` as on any route, and a caller with none is a visitor
+whom each tool's gate judges (SEC-0039).
 
 Tool advertisement and enforcement share the same caller-aware projection. A denied or disabled
 tool is not offered and cannot be reached by calling its name directly.
@@ -126,8 +127,9 @@ produce startup warnings; add `[McpDescription]` only when richer agent guidance
   mapping are framework internals.
 - Entity tools reuse Koan Web's governed endpoint pipeline; MCP does not create a second authorization, filtering,
   relationship, or mutation implementation.
-- HTTP authentication defaults on in production and containers, but transport authentication is not application
-  authorization. Declare Entity access and custom-tool scopes for business authority.
+- The HTTP edge authenticates nobody itself, and `RequireAuthentication` only closes it to visitors. Declare Entity
+  access and custom-tool scopes for business authority, and turn on `Koan:Web:RefuseCrossSiteWrites` where a browser
+  holds a session.
 - STDIO is a trusted local process-owner transport. Do not expose its streams through a remote shell or relay and
   infer HTTP-style identity guarantees.
 - Code Mode executes Jint JavaScript under bounded CPU, memory, recursion, code-length, and SDK-call controls. It is

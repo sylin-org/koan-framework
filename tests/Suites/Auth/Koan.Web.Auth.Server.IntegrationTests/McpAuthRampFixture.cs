@@ -18,9 +18,9 @@ namespace Koan.Web.Auth.Server.IntegrationTests;
 /// <summary>
 /// SEC-0006 Phase 1 — boots a REAL Kestrel host (Development, loopback) with the full Koan composition through
 /// <c>AddKoan()</c>: the trust fabric (ES256 issuer), the cookie session, the embedded AS leaf
-/// (<c>Koan.Web.Auth.Server</c> → <c>/oauth/dev-token</c>), and the MCP HTTP/SSE edge with
+/// (<c>Koan.Web.Auth.Server</c> → <c>/oauth/dev-token</c>), the resource edge for ordinary requests, and the MCP edge with
 /// <c>RequireAuthentication</c> on. This is the ARCH-0079 composition that proves the on-ramp end-to-end:
-/// cookie → dev-token (ES256, aud-bound) → bearer → the MCP edge gates.
+/// cookie → dev-token (ES256, for the application) → bearer → the application's authentication at <c>/mcp</c> (SEC-0039).
 /// </summary>
 public sealed class McpAuthRampFixture : IAsyncLifetime
 {
@@ -39,6 +39,7 @@ public sealed class McpAuthRampFixture : IAsyncLifetime
             {
                 ["Koan:Data:Sources:Default:Adapter"] = "inmemory",
                 ["Koan:Data:Sources:Default:ConnectionString"] = "memory://mcp-auth-ramp",
+                ["Koan:Web:Auth:ResourceServer:Enabled"] = "true",
                 ["ConnectionStrings:Redis"] = "localhost:0", // offline-only, mirrors the bootstrap specs
             }))
             .ConfigureWebHostDefaults(web =>
@@ -50,7 +51,7 @@ public sealed class McpAuthRampFixture : IAsyncLifetime
                     s.AddKoan();
                     s.AddKoanWeb();
                     s.AddKoanControllersFrom<TestSignInController>();
-                    // Turn the MCP HTTP edge on and require auth so the SEC-0006 gates engage even in
+                    // Turn the MCP HTTP edge on and close its door, so the application's authentication decides even in
                     // Development.
                     s.Configure<McpServerOptions>(o =>
                     {

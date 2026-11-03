@@ -49,8 +49,8 @@ public sealed class StreamableHttpTransport
     }
 
     /// <summary>
-    /// SEC-0016: the principal one HTTP request is authorized as: the credential it carries (the bearer the edge
-    /// authenticated, or the default scheme's user), stamped with the origin tier of its own connection. SEC-0004 origin: a
+    /// SEC-0016, SEC-0039: the principal one HTTP request is authorized as: whoever the application's authentication found
+    /// on it, or nobody, stamped with the origin tier of its own connection. SEC-0004 origin: a
     /// remote (HTTP) caller is never <c>local</c>; it is <c>internal</c> only from a declared trusted network.
     /// </summary>
     public static ClaimsPrincipal RequestPrincipal(HttpContext context)
@@ -156,13 +156,6 @@ public sealed class StreamableHttpTransport
         {
             context.Response.StatusCode = StatusCodes.Status404NotFound;
             return false;
-        }
-
-        if (!options.RequireAuthentication && KoanEnv.Gate.LooksDeployed())
-        {
-            _logger.LogWarning(
-                "SECURITY WARNING: MCP Streamable HTTP transport running without authentication in {Environment}.",
-                KoanEnv.EnvironmentName);
         }
 
         if (KoanEnv.IsProduction && !KoanEnv.InContainer && !context.Request.IsHttps)

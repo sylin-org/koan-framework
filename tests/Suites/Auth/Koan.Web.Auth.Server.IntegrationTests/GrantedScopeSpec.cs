@@ -11,6 +11,7 @@ using AwesomeAssertions;
 using Koan.Core;
 using Koan.Core.Hosting.App;
 using Koan.Data.Core;
+using Koan.Web.Attributes;
 using Koan.Web.Authorization;
 using Koan.Web.Extensions;
 using Microsoft.AspNetCore.Hosting;
@@ -23,13 +24,13 @@ using static Koan.Web.Auth.Server.IntegrationTests.OAuthTestFlows;
 
 namespace Koan.Web.Auth.Server.IntegrationTests;
 
-/// <summary>A role's door and a scope's.</summary>
+/// <summary>A role's door and a scope's, each a tool as SEC-0037's specs had them.</summary>
 public sealed class ScopeDoorController : ControllerBase
 {
-    [HttpPost("/test/scope/admin"), Access(all: "is:admin")]
+    [HttpPost("/test/scope/admin"), Tool(Name = "scope_admin"), Access(all: "is:admin")]
     public IActionResult Admin() => Ok(new { ran = true });
 
-    [HttpPost("/test/scope/scoped"), RequireScope("notes.write")]
+    [HttpPost("/test/scope/scoped"), Tool(Name = "scope_scoped"), RequireScope("notes.write")]
     public IActionResult Scoped() => Ok(new { ran = true });
 }
 

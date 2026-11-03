@@ -30,8 +30,8 @@ using Xunit;
 
 namespace Koan.Mcp.Verbs.Tests;
 
-/// <summary>Who a request is: <c>Authorization: Test person;role=x;flagged=true</c>; none is a visitor. The header is the credential, which stops at the MCP edge, so a route
-/// a tool call reaches has only the principal the edge placed on it.</summary>
+/// <summary>Who a request is: <c>Authorization: Test person;role=x;flagged=true</c>; none is a visitor. The header is the credential, which a tool call carries
+/// to the route it reaches, so the route finds the caller as on a request of its own (SEC-0039).</summary>
 internal sealed class TestAuth(IOptionsMonitor<AuthenticationSchemeOptions> options, ILoggerFactory logger, UrlEncoder encoder)
     : AuthenticationHandler<AuthenticationSchemeOptions>(options, logger, encoder)
 {

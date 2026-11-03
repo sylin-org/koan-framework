@@ -34,7 +34,5 @@ public sealed class KoanBearerResourceTests
     {
         KoanBearerResource.Challenge().Should().Be("Bearer");
         KoanBearerResource.Challenge(KoanBearerResource.InvalidToken).Should().Be("Bearer error=\"invalid_token\"");
-        KoanBearerResource.Challenge(resourceMetadata: "https://example.test/.well-known/oauth-protected-resource/mcp")
-            .Should().Be("Bearer resource_metadata=\"https://example.test/.well-known/oauth-protected-resource/mcp\"");
     }
 }

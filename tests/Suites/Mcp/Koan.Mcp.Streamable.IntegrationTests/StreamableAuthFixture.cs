@@ -16,9 +16,9 @@ using Xunit;
 namespace Koan.Mcp.Streamable.IntegrationTests;
 
 /// <summary>
-/// AI-0037 + SEC-0006 — the same composition as <see cref="StreamableHttpFixture"/> but with the MCP edge requiring
-/// authentication (the trust-fabric ES256 bearer). Used to prove that each request is authorized as the bearer it
-/// carries.
+/// AI-0037 + SEC-0039 — the same composition as <see cref="StreamableHttpFixture"/> with the application's door closed
+/// (<c>RequireAuthentication</c>) and its resource edge on, so a bearer for the application is the caller at <c>/mcp</c>
+/// as on any route. Used to prove that each request is authorized as the bearer it carries.
 /// </summary>
 public sealed class StreamableAuthFixture : IAsyncLifetime
 {
@@ -26,7 +26,7 @@ public sealed class StreamableAuthFixture : IAsyncLifetime
 
     public int Port { get; private set; }
     public string BaseUrl => $"http://127.0.0.1:{Port}";
-    public string Resource => $"{BaseUrl}/mcp";
+    public string Resource => BaseUrl;
     public IServiceProvider Services => _host?.Services ?? throw new InvalidOperationException("Host not started");
 
     public async ValueTask InitializeAsync()
@@ -37,6 +37,7 @@ public sealed class StreamableAuthFixture : IAsyncLifetime
             .ConfigureAppConfiguration(b => b.AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["ConnectionStrings:Redis"] = "localhost:0",
+                ["Koan:Web:Auth:ResourceServer:Enabled"] = "true",
             }))
             .ConfigureWebHostDefaults(web =>
             {
@@ -49,7 +50,7 @@ public sealed class StreamableAuthFixture : IAsyncLifetime
                     s.Configure<McpServerOptions>(o =>
                     {
                         o.EnableStreamableHttpTransport = true;
-                        o.RequireAuthentication = true; // engage the SEC-0006 bearer gate + the same-principal check
+                        o.RequireAuthentication = true; // the application closes its door
                     });
                 });
                 web.Configure(_ => { });

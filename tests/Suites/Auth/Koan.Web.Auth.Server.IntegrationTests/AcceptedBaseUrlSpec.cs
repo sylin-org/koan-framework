@@ -24,10 +24,10 @@ namespace Koan.Web.Auth.Server.IntegrationTests;
 
 /// <summary>
 /// WEB-0081 — with nothing configured, the URL the application accepted is the authorization server's issuer and the
-/// root of every endpoint it advertises, of the MCP resource identity and of the dev token's audience; accepting
-/// another while the host runs moves all of them on the next request, and the issuer stated outside a request with it.
-/// A token minted under the previous URL is refused at the MCP edge, as it would be after a restart with the new URL
-/// configured, and a token minted under the new one is accepted.
+/// root of every endpoint it advertises and of the dev token's audience; accepting another while the host runs moves all
+/// of them on the next request, and the issuer stated outside a request with it. A token minted under the previous URL is
+/// refused at <c>/mcp</c> by the application's resource edge, as it would be after a restart with the new URL configured,
+/// and a token minted under the new one is accepted.
 /// </summary>
 [Collection(AuthServerHostCollection.Name)]
 public sealed class AcceptedBaseUrlSpec : IClassFixture<AcceptedBaseUrlFixture>
@@ -87,27 +87,12 @@ public sealed class AcceptedBaseUrlSpec : IClassFixture<AcceptedBaseUrlFixture>
             metadata.RootElement.GetProperty("jwks_uri").GetString().Should().Be($"{root}/.well-known/jwks.json");
         }
 
-        using (var resource = await Json(client, "/.well-known/oauth-protected-resource/mcp"))
-        {
-            resource.RootElement.GetProperty("resource").GetString().Should().Be($"{root}/mcp");
-            resource.RootElement.GetProperty("authorization_servers").EnumerateArray().Select(e => e.GetString()).Should().Equal(root);
-        }
-
         using (var token = await Json(client, "/oauth/dev-token"))
         {
-            token.RootElement.GetProperty("resource").GetString().Should().Be($"{root}/mcp");
+            token.RootElement.GetProperty("resource").GetString().Should().Be(root, "the dev token is for the application, the resource its edge takes");
             accessToken = token.RootElement.GetProperty("access_token").GetString()!;
         }
 
-        using var challenge = new HttpRequestMessage(HttpMethod.Post, "/mcp")
-        {
-            Content = new StringContent("{}", System.Text.Encoding.UTF8, "application/json"),
-        };
-        using var anonymous = new HttpClient { BaseAddress = client.BaseAddress };
-        using var unauthorized = await anonymous.SendAsync(challenge, Ct);
-        unauthorized.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
-        unauthorized.Headers.WwwAuthenticate.ToString().Should()
-            .Contain($"resource_metadata=\"{root}/.well-known/oauth-protected-resource/mcp\"");
         return accessToken;
     }
 
@@ -145,6 +130,7 @@ public sealed class AcceptedBaseUrlFixture : IAsyncLifetime
                 ["Koan:Environment"] = "Development",
                 ["Koan:Data:Sources:Default:Adapter"] = "inmemory",
                 ["Koan:Data:Sources:Default:ConnectionString"] = "memory://accepted-base-url-tests",
+                ["Koan:Web:Auth:ResourceServer:Enabled"] = "true",
                 ["Koan:BackgroundServices:Enabled"] = "false",
             }))
             .ConfigureWebHostDefaults(web =>

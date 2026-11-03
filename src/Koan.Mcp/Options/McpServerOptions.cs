@@ -31,25 +31,11 @@ public sealed class McpServerOptions
     public string HttpRoute { get; set; } = "/mcp";
 
     /// <summary>
-    /// SEC-0006 D2 — the canonical OAuth resource identifier (RFC 8707 <c>aud</c>) for this MCP edge, e.g.
-    /// <c>https://app.example.com/mcp</c>. When set, it is the fixed audience the edge enforces and advertises,
-    /// independent of the request <c>Host</c> header. When unset, the resource id is the application's canonical
-    /// base URL (<c>Koan:Web:ApplicationUrl</c>, WEB-0078, or the URL the application accepted, WEB-0081) plus
-    /// <see cref="HttpRoute"/> — the same host-spoof-proof posture without a second setting; with neither (Development
-    /// default) it derives from the live request host.
+    /// SEC-0039 — closes the HTTP door to anyone the application's own authentication did not find, who is then answered
+    /// as that authentication answers anybody signed out. False, the default: the edge has no authentication of its own,
+    /// and a caller with no credential is a visitor whom each tool's gate judges, as each route's does.
     /// </summary>
-    public string? ResourceUri { get; set; }
-
-    private bool? _requireAuthentication;
-
-    /// <summary>
-    /// Indicates whether MCP HTTP endpoints require authentication. Defaults to true in production or container environments.
-    /// </summary>
-    public bool RequireAuthentication
-    {
-        get => _requireAuthentication ?? KoanEnv.Gate.LooksDeployed();
-        set => _requireAuthentication = value;
-    }
+    public bool RequireAuthentication { get; set; }
 
     /// <summary>
     /// Enables CORS for MCP over HTTP.

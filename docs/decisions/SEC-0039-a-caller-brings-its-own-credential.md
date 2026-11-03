@@ -16,6 +16,9 @@ supersedes: SEC-0037
 
 # SEC-0039: A caller brings its own credential, and SEC-0037 is overturned
 
+Amends [SEC-0006](SEC-0006-embedded-oauth-authorization-server.md) D2 and D3, [SEC-0025](SEC-0025-an-application-accepts-its-own-bearer-on-its-pages.md),
+[ARCH-0141](ARCH-0141-one-verb-a-route-that-is-also-a-tool.md) rule 2 and [AI-0037](AI-0037-mcp-streamable-http-transport.md).
+
 ## Context
 
 [SEC-0037](SEC-0037-an-edge-that-is-part-of-the-application.md) rests on a premise that is wrong: that something acts on a
@@ -60,7 +63,27 @@ else, so there is no token for the application to mint and no second audience fo
    transport options that tuned them. Nothing in Koan sent anything on a stream: `listChanged` was already false. The
    deprecated `/sse` + `/rpc` pair needs a session by nature and is removed with `EnableLegacySseTransport`, as is the
    validation that named it for the retired `EnableHttpSseTransport`. Any node can answer any request.
-6. **Code mode keeps its HTTP pieces.** `koan_code_execute` is unreachable over HTTP, since the HTTP dispatcher knows
+7. **A tool call carries the caller's own credential, and the edge has none of its own.** The request a route tool makes
+   keeps `Authorization` and `Cookie`, and places no principal and no authentication result: the application's
+   authentication finds the caller there as on any route, a rejected credential rejected as anywhere. A tool with no route
+   takes the principal the application's authentication made of the `/mcp` request, which runs before every endpoint.
+   With no request behind the call (STDIO) the inner request is the principal given, origin `local`. `McpEdgeAuth`, its
+   challenge, `McpResourceIdentity`, the protected-resource metadata at `/.well-known/oauth-protected-resource{route}` and
+   `ResourceUri` are removed: they existed for an OAuth door at the edge. A caller with no credential is a visitor, judged
+   by each tool's gate. `RequireAuthentication` now defaults to false in every environment, and true closes the door to
+   visitors with `RequireAuthorization()`, answered as the application's authentication answers anyone signed out. Koan's
+   OAuth server stays for other applications: its token is for the application, and the ordinary resource edge reads it
+   at `/mcp` as on a page; the dev token defaults to that audience. A session cookie that no longer holds is a visitor
+   there too, and a write is refused with the sign-in gate.
+8. **One check against forgery, at one seam.** `Koan:Web:RefuseCrossSiteWrites` (default false) refuses with 403 an unsafe
+   request a page of another site sent, at every endpoint, `/mcp` included. Without sessions nothing forced a preflight on
+   a tool call, and `/mcp` never read the content type, so a `text/plain` post from a sibling subdomain, which
+   `SameSite=Lax` sends the cookie to, reached the tools. `Sec-Fetch-Site` decides when present (`same-origin` and `none`
+   pass); else `Origin` must be the request's own scheme and host, `null` refused; with neither, the request is not a
+   browser's and passes. Proxies and `Host` cannot touch the first branch. A tool call's own request keeps `Sec-Fetch-Site`
+   and drops `Origin`, so it is judged as the call was. It refuses every cross-site unsafe request, cookie or not: a
+   browser page of another site posting to Koan's OAuth token endpoint is refused too.
+9. **Code mode keeps its HTTP pieces.** `koan_code_execute` is unreachable over HTTP, since the HTTP dispatcher knows
    entity and custom tools alone, but mapping `/mcp/sdk/definitions` is also what writes the `.d.ts` the code-mode sample
    reads. Removing code mode's HTTP side means moving that write first; removing code mode is its own decision.
 
@@ -84,6 +107,22 @@ else, so there is no token for the application to mint and no second audience fo
   `Transport.SseKeepAliveInterval` are no longer read. `McpSessionManager`, `McpSession`, `McpSseStream`, `HttpSseTransport`
   and `HttpSseHeaders` are removed; `McpSessionManager.RequestPrincipal` is `StreamableHttpTransport.RequestPrincipal`.
 
+- **The MCP edge has no authentication of its own.** `Koan:Mcp:ResourceUri` is no longer read, the protected-resource
+  metadata and the `resource_metadata` challenge are gone, and a standard MCP client no longer discovers Koan's OAuth
+  server from a `401` at `/mcp`. `RequireAuthentication` defaults to false in Production and containers too, where it
+  was true: a caller with no credential is a visitor, and each tool's gate decides. An application that kept the door
+  closed by default sets it. A bearer is read at `/mcp` only by the application's own authentication, so a token for
+  `{base}/mcp` is no credential; ask for the application's resource with Web Auth's resource edge on. The dev token's
+  default audience is the application's resource, where it was `{base}/mcp`. `KoanBearerResource.Challenge` takes no
+  `resourceMetadata`.
+- `Koan:Web:RefuseCrossSiteWrites` is new and off.
+
+## Limits
+
+- Which MCP clients can set a `Cookie` header is not known, nor what WebKit before 16.4 sends for `Sec-Fetch-Site`.
+- `[RequireScope]` on a controller action is enforced when the action is a `[Tool]`; the specs here keep theirs tools, as
+  SEC-0037's did. Whether a plain action's `[RequireScope]` is enforced was not checked.
+
 ## Evidence
 
 - `ToolRequestSpec` (Koan.Mcp.Verbs.Tests): empty arrays on both doors, a JSON content type with no body, a form and a body
@@ -98,3 +137,13 @@ else, so there is no token for the application to mint and no second audience fo
   session id means nothing; a notification is 202; a `GET` and a `DELETE` are 405 and a stream `GET` asks for no
   credential; `ping` is empty; an unknown tool is `-32602`; each request is its own bearer's, a scope downgrade honored at
   once. `TransportContractSpec` (Koan.Mcp.Conformance.Tests): no session option and no legacy setting remain.
+- `ResourceServerSpec` and `CookieToolSpec` (Koan.Mcp.Verbs.Tests): a token for the application is its subject on both
+  doors, a token for an MCP audience is no credential, roles and ASP.NET's answers alike on both doors, a cookie reaches a
+  route tool as its person and none is a visitor. `McpAuthRampSpec`, `AcceptedBaseUrlSpec` and `BaseUrlPathSpec`
+  (Koan.Web.Auth.Server.IntegrationTests): no metadata, a closed door refused as the application refuses, a foreign token
+  refused by the resource edge, the dev token for the application reaching `/mcp`, a stale token refused there after
+  the URL moves. `StreamableAuthSpec`: the same over the Streamable transport.
+- `CrossSiteWritesSpec` and `CrossSiteWritesOffSpec` (Koan.Mcp.Verbs.Tests): on `/mcp` with a `text/plain` body,
+  `cross-site` and `same-site` refused, `same-origin` and `none` pass whatever `Origin` says, a foreign `Origin` and
+  `null` refused without `Sec-Fetch-Site`, its own passes, neither passes; a route's post refused alike and a read not;
+  off, nothing is refused.

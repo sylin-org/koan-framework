@@ -59,20 +59,7 @@ public sealed class BaseUrlPathSpec : IClassFixture<BaseUrlPathFixture>
     }
 
     [Fact]
-    public async Task The_mcp_resource_and_its_authorization_server_derive_from_the_base_url()
-    {
-        using var client = _fx.NewClient();
-        var res = await client.GetAsync($"{BaseUrlPathFixture.PathBase}/.well-known/oauth-protected-resource/mcp", Ct);
-        res.StatusCode.Should().Be(HttpStatusCode.OK);
-        using var doc = JsonDocument.Parse(await res.Content.ReadAsStringAsync(Ct));
-
-        doc.RootElement.GetProperty("resource").GetString().Should().Be($"{BaseUrlPathFixture.ApplicationUrl}/mcp");
-        doc.RootElement.GetProperty("authorization_servers").EnumerateArray().Select(e => e.GetString())
-            .Should().Equal(BaseUrlPathFixture.ApplicationUrl);
-    }
-
-    [Fact]
-    public async Task A_dev_token_minted_under_the_path_is_bound_to_the_resource_the_edge_enforces()
+    public async Task A_dev_token_minted_under_the_path_is_bound_to_the_application_and_reaches_the_mcp_edge()
     {
         using var client = _fx.NewCookieClient();
         (await client.GetAsync($"{BaseUrlPathFixture.PathBase}/test/signin", Ct)).StatusCode.Should().Be(HttpStatusCode.OK);
@@ -80,8 +67,8 @@ public sealed class BaseUrlPathSpec : IClassFixture<BaseUrlPathFixture>
         var tokenRes = await client.GetAsync($"{BaseUrlPathFixture.PathBase}/oauth/dev-token", Ct);
         tokenRes.StatusCode.Should().Be(HttpStatusCode.OK);
         using var tokenDoc = JsonDocument.Parse(await tokenRes.Content.ReadAsStringAsync(Ct));
-        tokenDoc.RootElement.GetProperty("resource").GetString().Should().Be($"{BaseUrlPathFixture.ApplicationUrl}/mcp",
-            "the default audience is the identity the MCP edge enforces, not the request host");
+        tokenDoc.RootElement.GetProperty("resource").GetString().Should().Be(BaseUrlPathFixture.ApplicationUrl,
+            "the default audience is the application's own, not the request host");
         var accessToken = tokenDoc.RootElement.GetProperty("access_token").GetString();
 
         using var req = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Post, $"{BaseUrlPathFixture.PathBase}/mcp");
@@ -94,18 +81,5 @@ public sealed class BaseUrlPathSpec : IClassFixture<BaseUrlPathFixture>
 
         res.StatusCode.Should().NotBe(HttpStatusCode.Unauthorized);
         res.Headers.Should().NotContain(h => h.Key == "WWW-Authenticate");
-    }
-
-    [Fact]
-    public async Task The_mcp_challenge_points_at_metadata_under_the_base_url()
-    {
-        using var client = _fx.NewClient();
-        using var req = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Post, $"{BaseUrlPathFixture.PathBase}/mcp");
-        req.Content = new System.Net.Http.StringContent("{}", System.Text.Encoding.UTF8, "application/json");
-        var res = await client.SendAsync(req, Ct);
-
-        res.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
-        res.Headers.WwwAuthenticate.ToString().Should()
-            .Contain($"resource_metadata=\"{BaseUrlPathFixture.ApplicationUrl}/.well-known/oauth-protected-resource/mcp\"");
     }
 }

@@ -102,8 +102,6 @@ The `rid` is a high-entropy, single-use handle **bound to the initiating browser
 A conformant client never needs hand-holding — it discovers and drives these itself. The catalogue:
 
 ### Discovery (RFC 9728 / RFC 8414)
-- A `401` from `/mcp` carries `WWW-Authenticate: Bearer resource_metadata="…/.well-known/oauth-protected-resource/mcp"`.
-- `GET /.well-known/oauth-protected-resource/mcp` → the resource id + the authorization server.
 - `GET /.well-known/oauth-authorization-server` (+ an OIDC-form mirror at `/.well-known/openid-configuration`) → the endpoints, `code_challenge_methods_supported: ["S256"]`, `token_endpoint_auth_methods_supported: ["none"]`, the grant types.
 - `GET /.well-known/jwks.json` → the public ES256 keys.
 
@@ -139,26 +137,6 @@ Only a client allowed the grant may start it: pre-register it with `GrantTypes =
 ### Refresh (stay connected)
 `POST /oauth/token` (grant `refresh_token`) rotates the token. Refresh tokens are **on by default** so a client is not forced to re-pop the browser every 15 minutes — made safe by rotation with reuse-detection (replaying a rotated token revokes the whole family) and backed by a **revocable grant** (see Security, below). **Consent is remembered** — once the person consents, a re-connect with the same scopes skips the consent page until that consent's grant expires or any of the person's approvals for that client and scope set is revoked.
 
-## The `/mcp` resource-server edge
-
-With `Koan:Mcp:RequireAuthentication=true`, the MCP HTTP edge (Streamable HTTP by default; [AI-0037](../decisions/AI-0037-mcp-streamable-http-transport.md)) is an OAuth 2.1 **resource server**:
-
-```jsonc
-"Koan": { "Mcp": {
-  "EnableStreamableHttpTransport": true,
-  "RequireAuthentication": true,
-  "ResourceUri": "https://app.example.com/mcp"   // canonical aud — see below
-} }
-```
-
-- It validates ES256 tokens via the framework's `Koan.bearer` scheme — **no `AddAuthentication`/`AddJwtBearer` ceremony**.
-- It enforces the **per-resource audience** (RFC 8707: `aud == this resource`) — a token minted for another resource (a sibling API, a service-mesh token) is rejected even though its signature is valid (the confused-deputy fix).
-- It emits the RFC 9728 `WWW-Authenticate` challenge and serves the protected-resource metadata.
-
-`Koan:Mcp:ResourceUri` is the **canonical** resource id and is authoritative when set — it defeats a spoofed `Host` header. Leave it unset only in Development, where it derives from the request host.
-
-Once the bearer identity lands in `context.User`, the existing **gate · constrain · project · origin · grant** chain ([SEC-0004](../decisions/SEC-0004-capability-authorization-gate-constrain-project.md) / [SEC-0005](../decisions/SEC-0005-governed-agent-access-grants-audit-door.md)) runs **unchanged** — the token is identity; your `[Access]` declarations are the authorization.
-
 ## The application's own pages as a resource
 
 When a client should read the application's ordinary pages as the person who approved it, request the token with
@@ -173,19 +151,24 @@ base URL (or `Koan:Web:Auth:ResourceServer:Resource`), its subject is the person
 token that is not accepted answers 401 with `Bearer error="invalid_token"`. The authorization server's own
 authorize and consent endpoints keep deciding by the person's session alone ([SEC-0026](../decisions/SEC-0026-the-authorization-server-decides-by-the-session.md)). See [SEC-0025](../decisions/SEC-0025-an-application-accepts-its-own-bearer-on-its-pages.md).
 
+The MCP edge has no authentication of its own ([SEC-0039](../decisions/SEC-0039-a-caller-brings-its-own-credential.md)): the same
+token is the caller at `/mcp` as on any route, and a tool call carries it to the route it reaches. The edge advertises no
+protected-resource metadata, so a client finds this server from the application, not from a `401` at `/mcp`. Once the
+identity lands in `context.User`, the **gate · constrain · project · origin · grant** chain ([SEC-0004](../decisions/SEC-0004-capability-authorization-gate-constrain-project.md) / [SEC-0005](../decisions/SEC-0005-governed-agent-access-grants-audit-door.md)) runs unchanged.
+
 **A token needs a named application.** Outside Development, until `Koan:Web:ApplicationUrl` is set or a URL is accepted, no
 bearer is taken on the pages or at `/mcp`: a caller's `Host` never chooses an audience. A cookie still signs in.
 
 ## Testing locally before a full client: `/oauth/dev-token`
 
-In **Development only** (a hard `404` everywhere else), `GET /oauth/dev-token` mints a real ES256 token for the current cookie user, audience-bound to your MCP resource:
+In **Development only** (a hard `404` everywhere else), `GET /oauth/dev-token` mints a real ES256 token for the current cookie user, for the application's own resource:
 
 ```bash
 # sign in via your app first (sets the Koan.cookie), then:
 curl -b cookies.txt "http://localhost:5000/oauth/dev-token"
-# → { "access_token": "...", "token_type": "Bearer", "expires_in": 3600, "resource": "http://localhost:5000/mcp" }
+# → { "access_token": "...", "token_type": "Bearer", "expires_in": 3600, "resource": "http://localhost:5000" }
 
-# present it to the Streamable HTTP edge — the bearer passes the resource-server gate (a 200, not a 401):
+# present it at /mcp — with Koan:Web:Auth:ResourceServer:Enabled the resource edge reads it there as on any route:
 curl -i -H "Authorization: Bearer <token>" -H "Accept: application/json, text/event-stream" \
   -X POST "http://localhost:5000/mcp" \
   -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"curl","version":"1"}}}'
@@ -215,7 +198,7 @@ This is the fast path to exercise the authenticated `/mcp` edge end-to-end witho
 
 - **Asymmetric signing.** Tokens are ES256, signed by a framework-managed key the verifier never holds ("whoever can verify must not be able to forge"). The key is auto-generated, **persisted encrypted-at-rest, auto-rotated** with JWKS overlap; a **fail-closed boot guard** refuses to start a production AS on an ephemeral key. (Development uses an ephemeral per-process key unless the application names a key ring folder, `Koan:Web:KeyRingDirectory`, in which case the keys persist there too and a local install's tokens outlive a restart.)
 - **Down-scope only.** A token's roles come from the user's **session**, never the request. Scopes are what was requested and what the person holds (SEC-0006 D6); the request can never widen authority. Granted scopes ride the RFC 9068 `scope` claim — the authorization grant the `[Access(has:scope:x)]` gate reads (not the inert `Koan.permission`).
-- **Audience-bound (RFC 8707).** Every token is bound to a specific resource and validated `aud == this resource` at the edge.
+- **Audience-bound (RFC 8707).** Every token is bound to a specific resource and validated `aud == this resource` by the resource edge.
 - **Revocable.** Refresh is backed by a SEC-0005 `AgentGrant` — the user (or an admin) can revoke it fleet-wide, and the next refresh fails closed. Each approval is its own grant, stating when it was issued (`IssuedAt`) and to which client (`ClientId`, and the `ClientName` the client registered, unverified), so a page lists a person's live approvals newest first with `AgentGrant.Approvals(personId, take)` and revokes one with `Remove()`: that connection stops refreshing, the client's next connection asks the person again, and the person's other approvals keep working. Grants issued before Koan recorded these answer null for them, are not listed, and never keep consent remembered.
 
 ## See also

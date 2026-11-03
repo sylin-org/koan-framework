@@ -45,6 +45,7 @@ public sealed class BaseUrlPathFixture : IAsyncLifetime
                 ["Koan:Data:Sources:Default:ConnectionString"] = "memory://base-url-path-tests",
                 ["Koan:BackgroundServices:Enabled"] = "false",
                 ["Koan:Web:ApplicationUrl"] = ApplicationUrl,
+                ["Koan:Web:Auth:ResourceServer:Enabled"] = "true",
             }))
             .ConfigureWebHostDefaults(web =>
             {
