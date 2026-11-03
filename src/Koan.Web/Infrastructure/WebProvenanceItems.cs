@@ -16,6 +16,13 @@ internal static class WebProvenanceItems
         DefaultValue: "true",
         DefaultConsumers: SecurityConsumers);
 
+    internal static readonly ProvenanceItem RefuseCrossSiteWrites = new(
+        ConfigurationConstants.Web.Section + ":" + ConfigurationConstants.Web.Keys.RefuseCrossSiteWrites,
+        "Refuse Cross-Site Writes",
+        "Refuses an unsafe request that a page of another site sent, at every endpoint, MCP's included (SEC-0039).",
+        DefaultValue: "false",
+        DefaultConsumers: SecurityConsumers);
+
     internal static readonly ProvenanceItem ProxiedApi = new(
         ConfigurationConstants.Web.Section + ":" + ConfigurationConstants.Web.Keys.IsProxiedApi,
         "Proxied API",

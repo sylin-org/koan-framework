@@ -16,6 +16,7 @@ public static class ConfigurationConstants
             public const string ObservedOriginLimit = nameof(ObservedOriginLimit);
             public const string KeyRingDirectory = nameof(KeyRingDirectory);
             public const string KeyRingApplicationName = nameof(KeyRingApplicationName);
+            public const string RefuseCrossSiteWrites = nameof(RefuseCrossSiteWrites);
         }
     }
 

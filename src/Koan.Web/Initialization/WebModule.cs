@@ -213,6 +213,17 @@ public sealed class WebModule : KoanModule
             sourceKey: secure.ResolvedKey,
             usedDefault: secure.UsedDefault);
 
+        var crossSite = Koan.Core.Configuration.ReadWithSource(
+            cfg,
+            $"{ConfigurationConstants.Web.Section}:{ConfigurationConstants.Web.Keys.RefuseCrossSiteWrites}",
+            false);
+        module.AddSetting(
+            WebProvenanceItems.RefuseCrossSiteWrites,
+            global::Koan.Core.Hosting.Bootstrap.ProvenancePublicationModeExtensions.FromConfigurationValue(crossSite),
+            crossSite.Value,
+            sourceKey: crossSite.ResolvedKey,
+            usedDefault: crossSite.UsedDefault);
+
         module.AddSetting(
             WebProvenanceItems.ProxiedApi,
             global::Koan.Core.Hosting.Bootstrap.ProvenancePublicationModeExtensions.FromConfigurationValue(proxied),

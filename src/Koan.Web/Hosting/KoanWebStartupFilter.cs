@@ -103,6 +103,11 @@ internal sealed class KoanWebStartupFilter(IOptions<KoanWebOptions> options, IOp
                         return next();
                     });
                 }
+                // SEC-0039: one check for every endpoint, MCP's and a tool call's own request included, before anything can answer.
+                if (opts.RefuseCrossSiteWrites)
+                {
+                    app.Use((ctx, next) => CrossSiteWrites.Refused(ctx.Request) ? CrossSiteWrites.Refuse(ctx) : next(ctx));
+                }
                 // Static/default files can terminate the pipeline, so register response headers first.
                 var webEnvironment = app.ApplicationServices.GetRequiredService<IWebHostEnvironment>();
                 if (opts.EnableStaticFiles && webEnvironment.WebRootFileProvider is not NullFileProvider)

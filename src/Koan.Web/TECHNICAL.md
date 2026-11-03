@@ -1,4 +1,4 @@
-﻿---
+---
 uid: reference.modules.Koan.web
 title: Koan.Web - Technical Reference
 description: Contracts, configuration, and architecture for Koan’s ASP.NET Core integration.
@@ -44,7 +44,7 @@ expansion no adapter can serve fails closed with `422`; a response past the safe
   origin observation, then
   `UsePathBase` with the base URL's path and a guard that answers 404 outside it. That runs before the exception handler, security headers, static files, the health alias
   and every contributor stage, so nothing is served at the root. `KoanWebBaseUrl.Resolve(HttpContext)` is what
-  Auth.Server (`Issuer` default), MCP (`ResourceUri` default, authorization-server and metadata URLs), OpenGraph
+  Auth.Server (`Issuer` default), OpenGraph
   (`og:url`, `og:image`, canonical), the atproto connector (`ClientId` default), the dev token's audience and the
   Test IdP's issuer read; without a configured value it returns the request's scheme, host and path base, warns once
   in Staging, Test and CI, and refuses in Production with a correction (the host still boots; only the consumer that
@@ -107,6 +107,11 @@ expansion no adapter can serve fails closed with `422`; a response past the safe
 - When `EnableSecureHeaders` is true and `IsProxiedApi` is false, the existing header middleware wraps
   default/static-file responses as well as controllers. Optional configured CSP and app-supplied header
   values retain the same behavior; static middleware cannot short-circuit header normalization.
+- `RefuseCrossSiteWrites` (SEC-0039, default false) adds one middleware right after the security headers, before static
+  files, routing and every endpoint, MCP's included: an unsafe request whose `Sec-Fetch-Site` is not `same-origin` or
+  `none`, or, with no `Sec-Fetch-Site`, whose `Origin` is not its own scheme and host (`null` included), answers 403
+  with kind `gated`. A request with neither header passes. A tool call's own request keeps `Sec-Fetch-Site` and
+  drops `Origin`, so it is judged as the call was.
 
 ## Usage guidance
 

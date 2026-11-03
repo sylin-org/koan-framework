@@ -78,6 +78,21 @@ public sealed class KoanWebOptions
     // Configure via: Koan:Web:IsProxiedApi=true (env: Koan__Web__IsProxiedApi=true)
     public bool IsProxiedApi { get; set; } = false;
 
+    /// <summary>
+    /// SEC-0039: refuse, with 403, an unsafe request (anything but <c>GET</c>, <c>HEAD</c>, <c>OPTIONS</c> and <c>TRACE</c>)
+    /// that a page of another site sent, at every endpoint, <c>/mcp</c> included. A browser sends a session cookie whoever
+    /// asks, and a sibling subdomain is <c>same-site</c> to <c>SameSite=Lax</c>, so this is what keeps another page from
+    /// acting as the person. <c>Sec-Fetch-Site</c> decides when present: <c>same-origin</c> and <c>none</c> pass, a sibling
+    /// subdomain is refused. Without it, an <c>Origin</c> must be this request's own scheme and host; <c>Origin: null</c> is
+    /// refused, which with Koan's <c>Referrer-Policy: no-referrer</c> happens to a same-origin post only where a browser sends
+    /// no <c>Sec-Fetch-Site</c>: plain HTTP on an address that is not loopback. A request with neither header is not a
+    /// browser's and passes. Every cross-site unsafe request is refused, with a cookie or without: a browser page of another
+    /// site posting to Koan's OAuth token endpoint is refused too. Not known: which MCP clients can set a <c>Cookie</c>
+    /// header, and what WebKit before 16.4 sends. Default false.
+    /// Configure via: Koan:Web:RefuseCrossSiteWrites (env: Koan__Web__RefuseCrossSiteWrites).
+    /// </summary>
+    public bool RefuseCrossSiteWrites { get; set; }
+
     // Optional Content-Security-Policy value. If null/empty, CSP is not set.
     // Example safe default for simple static content:
     // "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'"
