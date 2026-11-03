@@ -1,12 +1,14 @@
 using Microsoft.AspNetCore.Http;
+using Microsoft.Net.Http.Headers;
 
 namespace Koan.Web.Hosting;
 
 /// <summary>
-/// SEC-0039 — whether an unsafe request came from a page of another site, which a browser sends with this application's
-/// ambient credentials. <c>Sec-Fetch-Site</c> answers when the browser sends it, and only <c>same-origin</c> and <c>none</c>
-/// (the person typing an address) pass; else an <c>Origin</c> must be this request's own, <c>null</c> included as not.
-/// A request with neither header is not a browser's, and carries no ambient credential.
+/// SEC-0039 — whether an unsafe request that carries a cookie came from a page of another site. A forgery borrows an
+/// ambient credential, so a request with no cookie has nothing to borrow and is not judged. <c>Sec-Fetch-Site</c> answers
+/// when the browser sends it, and only <c>same-origin</c> and <c>none</c> (the person typing an address) pass; else an
+/// <c>Origin</c> must be this request's own, <c>null</c> included as not. A request with neither header is not a browser's.
+/// No Koan sign-in posts across sites: its OIDC, OAuth and atproto callbacks are redirects (<c>ResponseMode=query</c>).
 /// </summary>
 internal static class CrossSiteWrites
 {
@@ -16,6 +18,7 @@ internal static class CrossSiteWrites
     {
         var method = request.Method;
         if (HttpMethods.IsGet(method) || HttpMethods.IsHead(method) || HttpMethods.IsOptions(method) || HttpMethods.IsTrace(method)) return false;
+        if (!request.Headers.ContainsKey(HeaderNames.Cookie)) return false;
 
         var site = request.Headers[FetchSite].ToString();
         if (site.Length > 0) return site is not ("same-origin" or "none");

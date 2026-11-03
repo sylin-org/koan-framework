@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
@@ -216,7 +216,7 @@ public sealed class WebModule : KoanModule
         var crossSite = Koan.Core.Configuration.ReadWithSource(
             cfg,
             $"{ConfigurationConstants.Web.Section}:{ConfigurationConstants.Web.Keys.RefuseCrossSiteWrites}",
-            false);
+            true);
         module.AddSetting(
             WebProvenanceItems.RefuseCrossSiteWrites,
             global::Koan.Core.Hosting.Bootstrap.ProvenancePublicationModeExtensions.FromConfigurationValue(crossSite),

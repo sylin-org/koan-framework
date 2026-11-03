@@ -76,6 +76,15 @@ public sealed class StreamableHttpTransport
             return;
         }
 
+        // SEC-0039: a JSON-RPC message is JSON. A page of another site cannot send this content type without a preflight
+        // no CORS policy grants, so a form or a text/plain post never reaches a tool.
+        if (!context.Request.HasJsonContentType())
+        {
+            await WriteStatus(context, StatusCodes.Status415UnsupportedMediaType, "unsupported_media_type",
+                "A JSON-RPC message is sent as application/json.");
+            return;
+        }
+
         // 2025-06-18 removed batching: the body is a single JSON-RPC message.
         var payload = await ReadJsonBody(context);
         if (payload is null)

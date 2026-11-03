@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using Koan.Core.Hosting.Bootstrap;
 
 namespace Koan.Web.Infrastructure;
@@ -19,8 +19,8 @@ internal static class WebProvenanceItems
     internal static readonly ProvenanceItem RefuseCrossSiteWrites = new(
         ConfigurationConstants.Web.Section + ":" + ConfigurationConstants.Web.Keys.RefuseCrossSiteWrites,
         "Refuse Cross-Site Writes",
-        "Refuses an unsafe request that a page of another site sent, at every endpoint, MCP's included (SEC-0039).",
-        DefaultValue: "false",
+        "Refuses an unsafe request carrying a cookie that a page of another site sent, at every endpoint, MCP's included (SEC-0039).",
+        DefaultValue: "true",
         DefaultConsumers: SecurityConsumers);
 
     internal static readonly ProvenanceItem ProxiedApi = new(

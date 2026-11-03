@@ -419,15 +419,17 @@ public sealed class OneVerbTwoDoorsSpec(ForumFixture forum) : IClassFixture<Foru
         said["role"]!.Value<string>().Should().Be("gone");
     }
 
+    /// <summary>SEC-0039: the tool door answers a refused credential before any tool runs, as the route does before its action.</summary>
     [Fact]
     public async Task A_rejected_credential_is_not_a_visitor_on_either_door()
     {
         var route = await ReplyRoute("open", "t-open", Replying("from a bad token"), "rejected");
-        var tool = await ReplyTool("open", "t-open", Replying("from a bad token"), "rejected");
+        var tool = () => ReplyTool("open", "t-open", Replying("from a bad token"), "rejected");
 
-        Alike(route, tool);
         route.Status.Should().Be(401);
         route.Text.Should().NotBe(Reply.SignIn.Text, "the gate answered before the command was sent");
+        (await tool.Should().ThrowAsync<InvalidOperationException>()).Which.Message.Should().Contain("Unauthorized");
+        (await PostsWith("from a bad token")).Should().Be(0);
     }
 
     [Fact]

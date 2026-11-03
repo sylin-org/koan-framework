@@ -5,6 +5,7 @@ using Koan.Mcp.CodeMode.Execution;
 using Koan.Mcp.Diagnostics;
 using Koan.Mcp.Hosting;
 using Koan.Mcp.Options;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -74,6 +75,12 @@ internal static class McpEndpointMapping
 
             // A door the application closes answers as its own authentication does when nobody is signed in.
             if (options.RequireAuthentication) group.RequireAuthorization();
+            // A credential the caller presented and the application refused is answered as REST answers it, before any tool
+            // runs: a visitor's authority is not its. A session cookie that no longer holds is no result, so still a visitor.
+            group.AddEndpointFilter(async (efic, next) =>
+                efic.HttpContext.Features.Get<IAuthenticateResultFeature>()?.AuthenticateResult is { Failure: not null }
+                    ? (object?)Results.Challenge()
+                    : await next(efic));
 
             // AI-0037, SEC-0039 — one POST is one request, answered as JSON. No DELETE: there is no session to end, so
             // routing answers 405.

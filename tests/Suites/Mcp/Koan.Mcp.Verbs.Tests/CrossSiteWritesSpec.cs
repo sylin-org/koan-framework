@@ -6,31 +6,34 @@ using Xunit;
 
 namespace Koan.Mcp.Verbs.Tests;
 
-/// <summary>A host that refuses cross-site writes.</summary>
-public sealed class CrossSiteWritesFixture : ForumFixture
+/// <summary>A host that turns the cross-site check off.</summary>
+public sealed class CrossSiteWritesOffFixture : ForumFixture
 {
     protected override Dictionary<string, string?> Settings() => new()
     {
-        ["Koan:Web:RefuseCrossSiteWrites"] = "true",
+        ["Koan:Web:RefuseCrossSiteWrites"] = "false",
     };
 }
 
-/// <summary>SEC-0039: one check for unsafe requests from another site's page, at every endpoint, <c>/mcp</c> included.</summary>
-public sealed class CrossSiteWritesSpec(CrossSiteWritesFixture host) : IClassFixture<CrossSiteWritesFixture>
+/// <summary>SEC-0039: one check, on with nothing set, for an unsafe request carrying a cookie from another site's page, at every endpoint, <c>/mcp</c> included.</summary>
+public sealed class CrossSiteWritesSpec(ForumFixture host) : IClassFixture<ForumFixture>
 {
+    private const string Cookie = ".AspNetCore.Koan.cookie=whatever";
+
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
-    internal static async Task<HttpStatusCode> Send(string baseUrl, HttpMethod method, string path, string? site, string? origin)
+    internal static async Task<HttpStatusCode> Send(string baseUrl, HttpMethod method, string path, string? site, string? origin,
+        string? cookie = Cookie, string contentType = "application/json")
     {
-        using var client = new HttpClient(new HttpClientHandler { AllowAutoRedirect = false }) { BaseAddress = new Uri(baseUrl) };
+        using var client = new HttpClient(new HttpClientHandler { AllowAutoRedirect = false, UseCookies = false }) { BaseAddress = new Uri(baseUrl) };
         using var request = new HttpRequestMessage(method, path);
         if (method != HttpMethod.Get)
         {
-            // A cross-site page's simple request: text/plain needs no preflight, and the MCP edge never read the content type.
-            request.Content = new StringContent(new JObject { ["jsonrpc"] = "2.0", ["id"] = 1, ["method"] = "tools/list" }.ToString(), Encoding.UTF8, "text/plain");
+            request.Content = new StringContent(new JObject { ["jsonrpc"] = "2.0", ["id"] = 1, ["method"] = "tools/list" }.ToString(), Encoding.UTF8, contentType);
             request.Headers.Accept.ParseAdd("application/json");
             request.Headers.Accept.ParseAdd("text/event-stream");
         }
+        if (cookie is not null) request.Headers.TryAddWithoutValidation("Cookie", cookie);
         if (site is not null) request.Headers.TryAddWithoutValidation("Sec-Fetch-Site", site);
         if (origin is not null) request.Headers.TryAddWithoutValidation("Origin", origin.Replace("{self}", baseUrl));
         using var answer = await client.SendAsync(request, Ct);
@@ -46,9 +49,14 @@ public sealed class CrossSiteWritesSpec(CrossSiteWritesFixture host) : IClassFix
     [InlineData(null, "http://evil.example", HttpStatusCode.Forbidden)]
     [InlineData(null, "null", HttpStatusCode.Forbidden)]
     [InlineData(null, "{self}", HttpStatusCode.OK)]
-    [InlineData(null, null, HttpStatusCode.OK)] // not a browser, so no ambient credential
-    public async Task A_post_to_mcp_is_refused_from_another_sites_page(string? site, string? origin, HttpStatusCode status)
+    [InlineData(null, null, HttpStatusCode.OK)] // not a browser's
+    public async Task A_post_to_mcp_carrying_a_cookie_is_refused_from_another_sites_page(string? site, string? origin, HttpStatusCode status)
         => (await Send(host.BaseUrl, HttpMethod.Post, "/mcp", site, origin)).Should().Be(status);
+
+    /// <summary>A forgery borrows an ambient credential, so a request with none has nothing to borrow: a client posting to an OAuth token endpoint is one.</summary>
+    [Fact]
+    public async Task A_cross_site_post_with_no_cookie_is_not_judged()
+        => (await Send(host.BaseUrl, HttpMethod.Post, "/mcp", "cross-site", "http://evil.example", cookie: null)).Should().Be(HttpStatusCode.OK);
 
     [Fact]
     public async Task A_post_to_a_route_is_refused_alike_and_a_read_is_not()
@@ -56,12 +64,20 @@ public sealed class CrossSiteWritesSpec(CrossSiteWritesFixture host) : IClassFix
         (await Send(host.BaseUrl, HttpMethod.Post, "/request-spec/nothing", "cross-site", null)).Should().Be(HttpStatusCode.Forbidden);
         (await Send(host.BaseUrl, HttpMethod.Get, "/request-spec/read", "cross-site", "http://evil.example")).Should().Be(HttpStatusCode.OK);
     }
+
+    /// <summary>A JSON-RPC message is JSON: a form or text/plain, which a page of another site sends with no preflight, never reaches a tool.</summary>
+    [Theory]
+    [InlineData("text/plain")]
+    [InlineData("application/x-www-form-urlencoded")]
+    [InlineData("multipart/form-data")]
+    public async Task Mcp_takes_json_alone(string contentType)
+        => (await Send(host.BaseUrl, HttpMethod.Post, "/mcp", null, null, cookie: null, contentType: contentType)).Should().Be(HttpStatusCode.UnsupportedMediaType);
 }
 
-/// <summary>SEC-0039: nothing is refused until an application turns the check on.</summary>
-public sealed class CrossSiteWritesOffSpec(ForumFixture host) : IClassFixture<ForumFixture>
+/// <summary>SEC-0039: an application with a front end on another site turns the check off, and answers for that front end.</summary>
+public sealed class CrossSiteWritesOffSpec(CrossSiteWritesOffFixture host) : IClassFixture<CrossSiteWritesOffFixture>
 {
     [Fact]
-    public async Task Off_a_cross_site_post_reaches_mcp()
+    public async Task Off_a_cross_site_post_with_a_cookie_reaches_mcp()
         => (await CrossSiteWritesSpec.Send(host.BaseUrl, HttpMethod.Post, "/mcp", "cross-site", "http://evil.example")).Should().Be(HttpStatusCode.OK);
 }

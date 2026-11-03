@@ -368,3 +368,44 @@ public sealed class AddressedPagesSpec(AddressedFixture host) : IClassFixture<Ad
         accepted.StatusCode.Should().Be(HttpStatusCode.OK);
     }
 }
+
+/// <summary>SEC-0039: a credential the caller presented and the application refused is answered at <c>/mcp</c> as REST answers it, before any tool runs.</summary>
+public sealed class RejectedCredentialAtTheEdgeSpec(ResourceEdgeFixture host) : IClassFixture<ResourceEdgeFixture>
+{
+    private static CancellationToken Ct => TestContext.Current.CancellationToken;
+
+    private async Task<HttpResponseMessage> Mcp(string method, JObject parameters, string header, string value)
+    {
+        using var client = new HttpClient(new HttpClientHandler { AllowAutoRedirect = false, UseCookies = false }) { BaseAddress = new Uri(host.BaseUrl) };
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/mcp")
+        {
+            Content = new StringContent(new JObject { ["jsonrpc"] = "2.0", ["id"] = 1, ["method"] = method, ["params"] = parameters }.ToString(), Encoding.UTF8, "application/json"),
+        };
+        request.Headers.Accept.ParseAdd("application/json");
+        request.Headers.Accept.ParseAdd("text/event-stream");
+        request.Headers.TryAddWithoutValidation(header, value);
+        return await client.SendAsync(request, Ct);
+    }
+
+    [Theory]
+    [InlineData("tools/list", null)]
+    [InlineData("tools/call", "whoami_get")]
+    public async Task A_rejected_bearer_is_401_at_the_edge_as_on_the_route(string method, string? tool)
+    {
+        var route = await host.Route(HttpMethod.Get, "/data/articles", null, "Bearer not-a-token");
+        using var edge = await Mcp(method, tool is null ? new JObject() : new JObject { ["name"] = tool, ["arguments"] = new JObject() }, "Authorization", "Bearer not-a-token");
+
+        route.Status.Should().Be(401);
+        edge.StatusCode.Should().Be(HttpStatusCode.Unauthorized, await edge.Content.ReadAsStringAsync(Ct));
+        edge.Headers.WwwAuthenticate.ToString().Should().Be("Bearer error=\"invalid_token\"");
+    }
+
+    [Fact]
+    public async Task A_session_cookie_that_no_longer_holds_is_still_a_visitor_at_the_edge()
+    {
+        using var edge = await Mcp("tools/call", new JObject { ["name"] = "whoami_get", ["arguments"] = new JObject() }, "Cookie", ".AspNetCore.Koan.cookie=not-a-cookie");
+
+        edge.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await edge.Content.ReadAsStringAsync(Ct)).Should().NotContain("\"isError\":true");
+    }
+}
