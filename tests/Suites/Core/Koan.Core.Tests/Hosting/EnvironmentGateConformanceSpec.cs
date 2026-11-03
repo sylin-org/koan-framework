@@ -40,11 +40,9 @@ public sealed class EnvironmentGateConformanceSpec
                 (2, "Diagnostics: sampling and exporter defaults."),
             ["src/Koan.Web/Controllers/HealthController.cs"] =
                 (1, "Diagnostics: how much detail the health payload carries."),
-            ["src/Koan.Mcp/Hosting/HttpSseTransport.cs"] =
-                (1, "Transport-local heuristic: warns on plaintext in Production with no TLS-terminating "
-                  + "proxy in front (IsProduction && !InContainer). One concept in one pillar."),
             ["src/Koan.Mcp/Hosting/StreamableHttpTransport.cs"] =
-                (2, "Transport-local heuristic: the same plaintext warning, on two request paths."),
+                (1, "Transport-local heuristic: refuses plaintext in Production with no TLS-terminating "
+                  + "proxy in front (IsProduction && !InContainer). One concept in one pillar."),
             ["src/Koan.Data.Core/Axes/DataAxisPreflight.cs"] =
                 (1, "ARCH-0128 exception: a confirmed cross-tenant read is not a convenience, so nothing may "
                   + "unlock it. A KoanMagic gate would let Koan:AllowMagicInProduction unlock a data leak."),

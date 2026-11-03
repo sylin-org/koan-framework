@@ -28,7 +28,7 @@ public sealed class McpEdgeResourceSpec : IClassFixture<McpAuthRampFixture>
     private async Task<HttpResponseMessage> Stream(string? token)
     {
         using var client = _fx.NewClient();
-        using var request = new HttpRequestMessage(HttpMethod.Get, "/mcp/sse");
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/mcp/capabilities");
         if (token is not null) request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
         return await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, Quick);
     }

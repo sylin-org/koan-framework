@@ -12,7 +12,7 @@ namespace Koan.Mcp.Streamable.IntegrationTests;
 
 /// <summary>
 /// AI-0037 D-C — with the Streamable transport AND the Explorer console both enabled, the single core-owned
-/// <c>GET /mcp</c> content-negotiates: a browser reaches the console, an MCP client reaches the stream branch, and
+/// <c>GET /mcp</c> content-negotiates: a browser reaches the console, an MCP client is told there is no stream, and
 /// the POST endpoint serves Streamable. No <c>AmbiguousMatchException</c> — exactly one route owns the path.
 /// </summary>
 public sealed class StreamableWithExplorerSpec : IClassFixture<StreamableWithExplorerFixture>
@@ -49,21 +49,20 @@ public sealed class StreamableWithExplorerSpec : IClassFixture<StreamableWithExp
         var res = await client.SendAsync(req, Quick);
 
         res.StatusCode.Should().Be(HttpStatusCode.OK);
-        res.Headers.TryGetValues(SessionHeader, out _).Should().BeTrue("Streamable initialize mints the session id");
+        res.Content.Headers.ContentType!.MediaType.Should().Be("application/json");
     }
 
     [Fact]
-    public async Task An_mcp_client_get_reaches_the_stream_branch_not_the_console()
+    public async Task An_mcp_client_get_is_told_there_is_no_stream_not_handed_the_console()
     {
         using var client = _fx.NewClient();
-        // A stream GET with no session routes to the Streamable stream branch (400 missing-session), NOT the console
-        // and NOT an ambiguous-route 500 — proving the single route disambiguates by Accept.
+        // Not the console and not an ambiguous-route 500: the single route disambiguates by Accept.
         using var req = GetRequest(Route, accept: "text/event-stream");
         var res = await client.SendAsync(req, Quick);
 
-        res.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        res.StatusCode.Should().Be(HttpStatusCode.MethodNotAllowed);
         using var doc = JsonDocument.Parse(await res.Content.ReadAsStringAsync(Quick));
-        doc.RootElement.GetProperty("error").GetProperty("code").GetInt32().Should().Be(-32000);
+        doc.RootElement.GetProperty("error").GetString().Should().Be("no_stream");
     }
 
     [Fact]
@@ -76,7 +75,7 @@ public sealed class StreamableWithExplorerSpec : IClassFixture<StreamableWithExp
         using var doc = JsonDocument.Parse(await res.Content.ReadAsStringAsync(Quick));
         var transport = doc.RootElement.GetProperty("transport");
         transport.GetProperty("streamableHttp").GetBoolean().Should().BeTrue();
-        transport.GetProperty("legacySse").GetBoolean().Should().BeFalse();
+        transport.TryGetProperty("legacySse", out _).Should().BeFalse();
         transport.GetProperty("httpRoute").GetString().Should().Be("/mcp");
         transport.TryGetProperty("httpSse", out _).Should().BeFalse();
     }

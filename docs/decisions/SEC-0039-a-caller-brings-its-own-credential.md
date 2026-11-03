@@ -10,6 +10,7 @@ related:
   - SEC-0016
   - SEC-0025
   - ARCH-0141
+  - AI-0037
 supersedes: SEC-0037
 ---
 
@@ -50,6 +51,18 @@ else, so there is no token for the application to mint and no second audience fo
    description. A route tool offers no `dry_run`: its effects are the action's.
 4. **The protocol as written.** `ping` answers an empty object, an unknown tool is `-32602`, and the server speaks
    `2025-11-25` beside the three revisions before it.
+5. **No MCP session, as the only mode.** A tool call is already a fresh request, and each request is authorized as the
+   credential it carries (SEC-0016), so a session held nothing. Each `POST /mcp` stands alone and is answered as one
+   `application/json` object; `initialize` returns no `Mcp-Session-Id`, and one a client still sends means nothing. A `GET`
+   that is not a browser's answers `405` with `Allow: POST`, with no credential asked for, since there is no stream to
+   refuse one for; a `DELETE` answers `405` from routing. The session registry and its cap and idle timeout, the subject
+   check on a session, server push, resumption with `Last-Event-ID`, and the per-request SSE answer are gone, with the
+   transport options that tuned them. Nothing in Koan sent anything on a stream: `listChanged` was already false. The
+   deprecated `/sse` + `/rpc` pair needs a session by nature and is removed with `EnableLegacySseTransport`, as is the
+   validation that named it for the retired `EnableHttpSseTransport`. Any node can answer any request.
+6. **Code mode keeps its HTTP pieces.** `koan_code_execute` is unreachable over HTTP, since the HTTP dispatcher knows
+   entity and custom tools alone, but mapping `/mcp/sdk/definitions` is also what writes the `.d.ts` the code-mode sample
+   reads. Removing code mode's HTTP side means moving that write first; removing code mode is its own decision.
 
 ## Compatibility
 
@@ -64,6 +77,12 @@ else, so there is no token for the application to mint and no second audience fo
 - A tool's `annotations.title` is its name in words. A route tool's schema has no `dry_run`.
 - `ping` answers `{}` where it answered `"pong"`; an unknown tool is `-32602` where it was `-32601`; a client asking
   for `2025-11-25` is answered in kind.
+- **MCP over HTTP keeps no session.** A client that read `Mcp-Session-Id` reads none and goes on, as a standard client
+  does. A client that parsed the per-request SSE answer reads JSON, which the specification already required it to.
+  `EnableLegacySseTransport`, `MaxConcurrentSessions`, `SessionIdleTimeout`, `Transport.StreamableJsonResponse`,
+  `Transport.StreamReplayBufferSize`, `Transport.MaxRetainedStreamsPerSession`, `Transport.SseBufferSize` and
+  `Transport.SseKeepAliveInterval` are no longer read. `McpSessionManager`, `McpSession`, `McpSseStream`, `HttpSseTransport`
+  and `HttpSseHeaders` are removed; `McpSessionManager.RequestPrincipal` is `StreamableHttpTransport.RequestPrincipal`.
 
 ## Evidence
 
@@ -74,3 +93,8 @@ else, so there is no token for the application to mint and no second audience fo
 - `ToolAnnotationsSpec` (Koan.Mcp.Verbs.Tests) and `AnnotationDerivationSpec` (Koan.Mcp.Conformance.Tests): all four hints
   on every route and entity tool, what a route and a controller state, what an unstated mutating route leaves out, a title
   from the name.
+- `StreamableHttpTransportSpec`, `StreamableAuthSpec`, `StreamableWithExplorerSpec` and `StreamableAuthWithExplorerSpec`
+  (Koan.Mcp.Streamable.IntegrationTests): `initialize` answers JSON with no session id; `tools/list` stands alone; a stray
+  session id means nothing; a notification is 202; a `GET` and a `DELETE` are 405 and a stream `GET` asks for no
+  credential; `ping` is empty; an unknown tool is `-32602`; each request is its own bearer's, a scope downgrade honored at
+  once. `TransportContractSpec` (Koan.Mcp.Conformance.Tests): no session option and no legacy setting remain.

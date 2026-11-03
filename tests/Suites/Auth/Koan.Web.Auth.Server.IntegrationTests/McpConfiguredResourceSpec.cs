@@ -40,7 +40,7 @@ public sealed class McpConfiguredResourceSpec : IClassFixture<McpConfiguredResou
             TimeSpan.FromMinutes(5), audience: McpConfiguredResourceFixture.CanonicalResource);
 
         using var client = _fx.NewClient();
-        using var req = new HttpRequestMessage(HttpMethod.Get, "/mcp/sse");
+        using var req = new HttpRequestMessage(HttpMethod.Get, "/mcp/capabilities");
         req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
         var res = await client.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, Quick);
 
@@ -56,7 +56,7 @@ public sealed class McpConfiguredResourceSpec : IClassFixture<McpConfiguredResou
             TimeSpan.FromMinutes(5), audience: $"{_fx.BaseUrl}/mcp");
 
         using var client = _fx.NewClient();
-        using var req = new HttpRequestMessage(HttpMethod.Get, "/mcp/sse");
+        using var req = new HttpRequestMessage(HttpMethod.Get, "/mcp/capabilities");
         req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
         var res = await client.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, Quick);
 

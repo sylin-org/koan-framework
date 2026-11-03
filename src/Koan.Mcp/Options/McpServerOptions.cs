@@ -26,15 +26,7 @@ public sealed class McpServerOptions
     public bool EnableStreamableHttpTransport { get; set; } = false;
 
     /// <summary>
-    /// AI-0037 — opt-in for the DEPRECATED legacy HTTP+SSE transport (the 2-endpoint <c>{baseRoute}/sse</c> +
-    /// <c>{baseRoute}/rpc</c> 2024-11-05 shape), for clients that have not migrated to Streamable HTTP. Default
-    /// false — even when the HTTP master switch is on, Streamable is the default and legacy is explicit opt-in.
-    /// </summary>
-    public bool EnableLegacySseTransport { get; set; } = false;
-
-    /// <summary>
-    /// Base route for Streamable HTTP (for example, <c>/mcp</c>). The deprecated legacy transport,
-    /// when explicitly enabled, derives its <c>/sse</c> and <c>/rpc</c> routes from this value.
+    /// Base route for Streamable HTTP (for example, <c>/mcp</c>).
     /// </summary>
     public string HttpRoute { get; set; } = "/mcp";
 
@@ -58,16 +50,6 @@ public sealed class McpServerOptions
         get => _requireAuthentication ?? KoanEnv.Gate.LooksDeployed();
         set => _requireAuthentication = value;
     }
-
-    /// <summary>
-    /// Maximum concurrent HTTP sessions allowed.
-    /// </summary>
-    public int MaxConcurrentSessions { get; set; } = 100;
-
-    /// <summary>
-    /// Maximum idle duration before a session is reclaimed.
-    /// </summary>
-    public TimeSpan SessionIdleTimeout { get; set; } = TimeSpan.FromMinutes(30);
 
     /// <summary>
     /// Enables CORS for MCP over HTTP.

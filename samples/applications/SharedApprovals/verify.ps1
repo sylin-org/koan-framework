@@ -90,12 +90,10 @@ function Mcp-Request([string]$Base, [hashtable]$Headers, [string]$Method, $Param
     $body = @{ jsonrpc = '2.0'; method = $Method; params = $Parameters }
     if ($null -ne $Id) { $body.id = $Id }
     $response = Invoke-WebRequest -Uri "$Base/mcp" -Method POST -ContentType 'application/json' -Headers $Headers -Body ($body | ConvertTo-Json -Depth 20 -Compress) -TimeoutSec 20
-    if ($Method -eq 'initialize') { $Headers['Mcp-Session-Id'] = [string]$response.Headers['Mcp-Session-Id'][0] }
     if ($null -eq $Id) { return }
     $content = if ($response.Content -is [byte[]]) { [Text.Encoding]::UTF8.GetString($response.Content) } else { $response.Content }
-    $messages = @($content -split "`n" | Where-Object { $_.StartsWith('data: ') } | ForEach-Object { $_.Substring(6) | ConvertFrom-Json -AsHashtable })
-    $message = $messages | Where-Object { $_.id -eq $Id } | Select-Object -Last 1
-    if ($null -eq $message -or $message.ContainsKey('error')) { throw "MCP $Method failed: $content" }
+    $message = $content | ConvertFrom-Json -AsHashtable
+    if ($null -eq $message -or $message.id -ne $Id -or $message.ContainsKey('error')) { throw "MCP $Method failed: $content" }
     return $message.result
 }
 

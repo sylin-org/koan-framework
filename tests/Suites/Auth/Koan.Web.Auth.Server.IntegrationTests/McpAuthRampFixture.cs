@@ -50,11 +50,11 @@ public sealed class McpAuthRampFixture : IAsyncLifetime
                     s.AddKoan();
                     s.AddKoanWeb();
                     s.AddKoanControllersFrom<TestSignInController>();
-                    // Turn the legacy MCP HTTP/SSE edge on and require auth so the SEC-0006 gates engage even in
-                    // Development. (AI-0037: /sse+/rpc is now the explicit legacy opt-in; Streamable is the default.)
+                    // Turn the MCP HTTP edge on and require auth so the SEC-0006 gates engage even in
+                    // Development.
                     s.Configure<McpServerOptions>(o =>
                     {
-                        o.EnableLegacySseTransport = true;
+                        o.EnableStreamableHttpTransport = true;
                         o.RequireAuthentication = true;
                     });
                 });

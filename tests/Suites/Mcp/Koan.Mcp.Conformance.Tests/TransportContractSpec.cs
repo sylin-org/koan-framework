@@ -20,10 +20,7 @@ public sealed class TransportContractSpec : IClassFixture<ConformanceFixture>
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["Koan:Mcp:EnableStreamableHttpTransport"] = "true",
-                ["Koan:Mcp:EnableLegacySseTransport"] = "true",
                 ["Koan:Mcp:HttpRoute"] = "/agent",
-                ["Koan:Mcp:MaxConcurrentSessions"] = "12",
-                ["Koan:Mcp:SessionIdleTimeout"] = "00:07:00"
             })
             .Build();
         var services = new ServiceCollection();
@@ -32,13 +29,12 @@ public sealed class TransportContractSpec : IClassFixture<ConformanceFixture>
 
         var options = provider.GetRequiredService<IOptions<McpServerOptions>>().Value;
         options.EnableStreamableHttpTransport.Should().BeTrue();
-        options.EnableLegacySseTransport.Should().BeTrue();
         options.HttpRoute.Should().Be("/agent");
-        options.MaxConcurrentSessions.Should().Be(12);
-        options.SessionIdleTimeout.Should().Be(TimeSpan.FromMinutes(7));
 
+        // SEC-0039: no session, and no transport that needs one.
         var names = typeof(McpServerOptions).GetProperties().Select(property => property.Name).ToArray();
-        names.Should().NotContain(["EnableHttpSseTransport", "StreamableHttpEnabled", "HttpSseRoute", "MaxConcurrentConnections", "SseConnectionTimeout"]);
+        names.Should().NotContain(["EnableHttpSseTransport", "EnableLegacySseTransport", "StreamableHttpEnabled", "HttpSseRoute", "MaxConcurrentConnections",
+            "SseConnectionTimeout", "MaxConcurrentSessions", "SessionIdleTimeout"]);
         typeof(McpServerOptions).Assembly.GetType("Koan.Mcp.McpTransportMode").Should().BeNull();
     }
 
@@ -53,7 +49,7 @@ public sealed class TransportContractSpec : IClassFixture<ConformanceFixture>
             .ToArray();
 
         keys.Should().Contain("Koan:Mcp:EnableStreamableHttpTransport");
-        keys.Should().Contain("Koan:Mcp:EnableLegacySseTransport");
+        keys.Should().NotContain("Koan:Mcp:EnableLegacySseTransport");
         keys.Should().NotContain("Koan:Mcp:EnableHttpSseTransport");
         keys.Should().NotContain("Koan:Mcp:HttpSseRoute");
     }
@@ -67,7 +63,5 @@ public sealed class TransportContractSpec : IClassFixture<ConformanceFixture>
         report.Transports.Should().ContainSingle();
         report.Transports[0].Kind.Should().Be("streamable-http");
         report.Transports[0].Endpoint.Should().Be("/mcp");
-        report.Transports[0].StreamEndpoint.Should().BeNull();
-        report.Transports[0].SubmitEndpoint.Should().BeNull();
     }
 }

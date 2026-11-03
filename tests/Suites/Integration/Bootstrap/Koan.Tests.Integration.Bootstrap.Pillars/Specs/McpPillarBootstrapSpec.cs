@@ -14,9 +14,8 @@ namespace Koan.Tests.Integration.Bootstrap.Pillars.Specs;
 /// </summary>
 /// <remarks>
 /// <para>
-/// The Mcp pillar registers two hosted services: <c>StdioTransport</c> and the unified
-/// <c>McpSessionManager</c> (AI-0037 Ph3b collapsed the legacy <c>HttpSseSessionManager</c>
-/// onto it). <c>StdioTransport</c>'s
+/// The Mcp pillar registers the hosted <c>StdioTransport</c> (the HTTP transport keeps no
+/// session, so nothing of it is hosted). <c>StdioTransport</c>'s
 /// <c>ExecuteAsync</c> checks <c>EnableStdioTransport</c> AND the registered-entity count;
 /// with neither set in a clean test bootstrap, it short-circuits to "disabled / idle"
 /// without touching <c>Console.In</c>. Safe offline.

@@ -13,8 +13,8 @@ using static Koan.Mcp.Streamable.IntegrationTests.StreamableTestHelpers;
 namespace Koan.Mcp.Streamable.IntegrationTests;
 
 /// <summary>
-/// AI-0037 + SEC-0006 — the authenticated transport: the <c>Mcp-Session-Id</c> is not a bearer capability. A session
-/// established by one principal cannot be driven by another authenticated caller who learns its id.
+/// AI-0037 + SEC-0016, SEC-0039 — the authenticated transport: each request is authorized as the bearer it carries, and
+/// nothing a request before it carried is kept.
 /// </summary>
 public sealed class StreamableAuthSpec : IClassFixture<StreamableAuthFixture>
 {
@@ -25,80 +25,56 @@ public sealed class StreamableAuthSpec : IClassFixture<StreamableAuthFixture>
 
     private static CancellationToken Quick => new CancellationTokenSource(TimeSpan.FromSeconds(15)).Token;
 
-    private static object InitParams => new
-    {
-        protocolVersion = "2025-06-18",
-        capabilities = new { },
-        clientInfo = new { name = "streamable-auth-spec", version = "1.0" },
-    };
-
     /// <summary>Mint an ES256 token for <paramref name="subject"/>, bound to this host's MCP resource (RFC 8707 aud).</summary>
-    private string Token(string subject)
-    {
-        var issuer = _fx.Services.GetRequiredService<IIssuer>();
-        return issuer.Issue(new TrustClaims { Subject = subject }, TimeSpan.FromMinutes(5), audience: _fx.Resource);
-    }
-
     private string Token(string subject, params string[] scopes)
     {
         var issuer = _fx.Services.GetRequiredService<IIssuer>();
         return issuer.Issue(new TrustClaims { Subject = subject, Scopes = scopes }, TimeSpan.FromMinutes(5), audience: _fx.Resource);
     }
 
-    private async Task<string> InitializeAs(HttpClient client, string token)
-    {
-        using var req = PostRequest(Route, Rpc("initialize", id: 1, @params: InitParams));
-        req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
-        var res = await client.SendAsync(req, Quick);
-        res.StatusCode.Should().Be(HttpStatusCode.OK, "an aud-bound bearer reaches the edge and initialize mints the session");
-        res.Headers.TryGetValues(SessionHeader, out var ids).Should().BeTrue();
-        return System.Linq.Enumerable.Single(ids!);
-    }
-
     [Fact]
-    public async Task The_session_owner_can_drive_the_session()
+    public async Task A_request_with_its_own_bearer_stands_alone()
     {
         using var client = _fx.NewClient();
-        var alice = Token("alice");
-        var sessionId = await InitializeAs(client, alice);
+        using var req = PostRequest(Route, Rpc("tools/list", id: 2));
+        req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", Token("alice"));
 
-        using var req = PostRequest(Route, Rpc("tools/list", id: 2), sessionId);
-        req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", alice);
         var res = await client.SendAsync(req, Quick);
 
         res.StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
-    // SEC-0016: each request runs as the principal it carries. A refreshed token with fewer scopes reduces authority at
-    // once, without re-initializing.
+    [Fact]
+    public async Task A_request_with_no_bearer_is_challenged()
+    {
+        using var client = _fx.NewClient();
+        using var req = PostRequest(Route, Rpc("tools/list", id: 2));
+
+        var res = await client.SendAsync(req, Quick);
+
+        res.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        res.Headers.WwwAuthenticate.ToString().Should().Contain("resource_metadata");
+    }
+
+    // SEC-0016: each request runs as the principal it carries. A refreshed token with fewer scopes reduces authority at once.
     [Fact]
     public async Task A_scope_downgrade_between_requests_is_honored()
     {
         using var client = _fx.NewClient();
-        var sessionId = await InitializeAs(client, Token("carol", "items:read", "items:write"));
-
         var body = Rpc("tools/call", id: 2, @params: new { name = "ledgerbook_upsert", arguments = new { model = new { entry = "x" } } });
-        using var req = PostRequest(Route, body, sessionId, accept: "application/json, text/event-stream", protocolVersion: "2025-06-18");
-        req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", Token("carol", "items:read"));
-        var res = await client.SendAsync(req, Quick);
+
+        using var wide = PostRequest(Route, body, protocolVersion: "2025-06-18");
+        wide.Headers.Authorization = new AuthenticationHeaderValue("Bearer", Token("carol", "items:read", "items:write"));
+        var allowed = await (await client.SendAsync(wide, Quick)).Content.ReadAsStringAsync(Quick);
+
+        using var narrow = PostRequest(Route, body, protocolVersion: "2025-06-18");
+        narrow.Headers.Authorization = new AuthenticationHeaderValue("Bearer", Token("carol", "items:read"));
+        var res = await client.SendAsync(narrow, Quick);
         var text = await res.Content.ReadAsStringAsync(Quick);
 
+        allowed.Should().NotContain("\"isError\":true", "the write scope is in the token that request carries");
         res.StatusCode.Should().Be(HttpStatusCode.OK, text);
         text.Should().Contain("\"isError\":true", "the write scope is gone from the token this request carries");
         text.Should().Contain("forbidden");
-    }
-
-    [Fact]
-    public async Task A_different_principal_cannot_drive_another_principals_session()
-    {
-        using var client = _fx.NewClient();
-        var sessionId = await InitializeAs(client, Token("alice"));
-
-        // Bob is fully authenticated (valid, aud-bound) but is NOT the session owner → 403, not execution under alice.
-        using var req = PostRequest(Route, Rpc("tools/list", id: 2), sessionId);
-        req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", Token("bob"));
-        var res = await client.SendAsync(req, Quick);
-
-        res.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 }

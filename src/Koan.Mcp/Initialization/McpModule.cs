@@ -48,14 +48,6 @@ public sealed class McpModule : KoanModule
             sourceKey: enableStreamable.ResolvedKey,
             usedDefault: enableStreamable.UsedDefault);
 
-        var enableLegacy = Configuration.ReadWithSource(configuration, ConfigurationConstants.FullKey(ConfigurationConstants.Keys.EnableLegacySseTransport), false);
-        module.AddSetting(
-            McpProvenanceItems.EnableLegacySseTransport,
-            FromConfigurationValue(enableLegacy),
-            enableLegacy.Value,
-            sourceKey: enableLegacy.ResolvedKey,
-            usedDefault: enableLegacy.UsedDefault);
-
         var requireAuth = Configuration.ReadWithSource<bool?>(configuration, ConfigurationConstants.FullKey(ConfigurationConstants.Keys.RequireAuthentication), null);
         if (!requireAuth.UsedDefault)
         {

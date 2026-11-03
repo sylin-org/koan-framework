@@ -123,7 +123,6 @@ public sealed class McpSurfaceProjector
             {
                 ["stdio"] = options.EnableStdioTransport,
                 ["streamableHttp"] = options.EnableStreamableHttpTransport,
-                ["legacySse"] = options.EnableLegacySseTransport,
                 ["httpRoute"] = string.IsNullOrWhiteSpace(options.HttpRoute) ? "/mcp" : options.HttpRoute.TrimEnd('/'),
             },
             ["entities"] = entities,

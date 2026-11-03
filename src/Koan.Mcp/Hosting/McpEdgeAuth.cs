@@ -1,4 +1,3 @@
-using System.Security.Claims;
 using System.Threading.Tasks;
 using Koan.Mcp.CustomTools;
 using Koan.Mcp.Options;
@@ -17,7 +16,7 @@ namespace Koan.Mcp.Hosting;
 /// mechanism Web Auth's resource edge for ordinary requests shares (SEC-0025), so it owns its own challenge: a
 /// resource server must emit an RFC 9728 <c>WWW-Authenticate</c> pointing at its protected-resource metadata, which
 /// the shared bearer scheme cannot know. On success the bearer identity is placed in <see cref="HttpContext.User"/>
-/// — from there the existing OriginStamp → session → SEC-0004/0005 chain runs unchanged (D3).
+/// — from there the existing OriginStamp → SEC-0004/0005 chain runs unchanged (D3).
 /// </summary>
 internal static class McpEdgeAuth
 {
@@ -69,21 +68,6 @@ internal static class McpEdgeAuth
         context.Features.Set<IAuthenticateResultFeature>(new RouteToolInvoker.Authenticated(result));
         return true;
     }
-
-    /// <summary>
-    /// SEC-0006 — the bearer identity on an <c>/mcp/rpc</c> POST must be the same subject that established the
-    /// session on the SSE handshake. The session id alone is not a capability: a different authenticated caller
-    /// must not be able to inject RPC into another user's session and have it run under that user's principal.
-    /// </summary>
-    public static bool SamePrincipal(ClaimsPrincipal caller, ClaimsPrincipal sessionOwner)
-    {
-        var a = Subject(caller);
-        var b = Subject(sessionOwner);
-        return !string.IsNullOrEmpty(a) && string.Equals(a, b, StringComparison.Ordinal);
-    }
-
-    private static string? Subject(ClaimsPrincipal p)
-        => p.FindFirst("sub")?.Value ?? p.FindFirst(ClaimTypes.NameIdentifier)?.Value;
 
     private static Task WriteNoApplicationUrl(HttpContext context)
     {

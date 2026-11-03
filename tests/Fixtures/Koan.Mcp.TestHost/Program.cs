@@ -12,7 +12,7 @@ builder.Services.AddKoanWeb();
 builder.Services.Configure<McpServerOptions>(o =>
 {
     o.Exposure = McpExposureMode.Full;
-    o.EnableLegacySseTransport = true; // required for /mcp/rpc
+    o.EnableStreamableHttpTransport = true; // maps the code-mode SDK, which writes its definitions
 });
 
 var app = builder.Build();

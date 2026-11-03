@@ -82,17 +82,6 @@ public sealed class McpCapabilityReporter : IMcpCapabilityReporter
                 RequireAuthentication = options.RequireAuthentication
             });
         }
-        if (options.EnableLegacySseTransport)
-        {
-            transports.Add(new McpTransportDescription
-            {
-                Kind = "legacy-sse",
-                StreamEndpoint = Combine(route, "sse"),
-                SubmitEndpoint = Combine(route, "rpc"),
-                CapabilityEndpoint = options.PublishCapabilityEndpoint ? Combine(route, "capabilities") : null,
-                RequireAuthentication = options.RequireAuthentication
-            });
-        }
 
         var tools = _registry.Registrations
             .SelectMany(registration => registration.Tools.Select(tool => new McpCapabilityTool
@@ -135,8 +124,6 @@ public sealed record McpTransportDescription
 {
     public required string Kind { get; init; }
     public string? Endpoint { get; init; }
-    public string? StreamEndpoint { get; init; }
-    public string? SubmitEndpoint { get; init; }
     public string? CapabilityEndpoint { get; init; }
     public bool RequireAuthentication { get; init; }
 }

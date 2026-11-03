@@ -149,11 +149,6 @@ public class ForumFixture : IAsyncLifetime
                     }
 
                     services.TryAddEnumerable(ServiceDescriptor.Scoped<IAuthorizationProvider, CensusRule>());
-                    services.Configure<McpServerOptions>(options =>
-                    {
-                        options.Transport.StreamableJsonResponse = true;
-                        options.MaxConcurrentSessions = 10000; // each call here opens a session of its own
-                    });
                     Compose(services);
                 });
                 web.Configure(_ => { });
@@ -197,9 +192,7 @@ public class ForumFixture : IAsyncLifetime
     {
         using var client = Client(user);
         var ct = TestContext.Current.CancellationToken;
-        using var initialize = await client.SendAsync(Envelope("initialize", new JObject { ["protocolVersion"] = "2025-06-18" }, null), ct);
-        var session = initialize.Headers.GetValues("Mcp-Session-Id").Single();
-        using var response = await client.SendAsync(Envelope("tools/call", new JObject { ["name"] = name, ["arguments"] = arguments }, session), ct);
+        using var response = await client.SendAsync(Envelope("tools/call", new JObject { ["name"] = name, ["arguments"] = arguments }), ct);
         return await response.Content.ReadAsStringAsync(ct);
     }
 
@@ -244,7 +237,7 @@ public class ForumFixture : IAsyncLifetime
         return new Answer(status, problem["kind"]?.Value<string>(), said, true, null, problem["gate"]?.Value<string>(), problem["next"]?.Value<string>());
     }
 
-    /// <summary>A real <c>tools/call</c> over Streamable HTTP, in a session of the caller's own.</summary>
+    /// <summary>A real <c>tools/call</c> over Streamable HTTP, a request of its own.</summary>
     public async Task<Answer> Tool(string name, JObject arguments, string? user)
     {
         var result = await Call(name, arguments, user);
@@ -266,17 +259,14 @@ public class ForumFixture : IAsyncLifetime
     {
         using var client = Client(user);
         var ct = TestContext.Current.CancellationToken;
-        using var initialize = await client.SendAsync(Envelope("initialize", new JObject { ["protocolVersion"] = "2025-06-18" }, null), ct);
-        if (!initialize.IsSuccessStatusCode) throw new InvalidOperationException($"initialize answered {initialize.StatusCode}: {await initialize.Content.ReadAsStringAsync(ct)} {initialize.Headers.WwwAuthenticate} on {client.BaseAddress}");
-        var session = initialize.Headers.GetValues("Mcp-Session-Id").Single();
-        using var response = await client.SendAsync(Envelope(method, parameters, session), ct);
+        using var response = await client.SendAsync(Envelope(method, parameters), ct);
         var body = await response.Content.ReadAsStringAsync(ct);
-        if (!response.IsSuccessStatusCode) throw new InvalidOperationException($"{method} answered {response.StatusCode}: {body} {response.Headers.WwwAuthenticate}");
+        if (!response.IsSuccessStatusCode) throw new InvalidOperationException($"{method} answered {response.StatusCode}: {body} {response.Headers.WwwAuthenticate} on {client.BaseAddress}");
         var reply = JObject.Parse(body);
         return reply["result"] ?? throw new InvalidOperationException($"{method} answered {body}");
     }
 
-    private static HttpRequestMessage Envelope(string method, JObject parameters, string? session)
+    private static HttpRequestMessage Envelope(string method, JObject parameters)
     {
         var request = new HttpRequestMessage(HttpMethod.Post, "/mcp")
         {
@@ -285,7 +275,6 @@ public class ForumFixture : IAsyncLifetime
         request.Headers.Accept.ParseAdd("application/json");
         request.Headers.Accept.ParseAdd("text/event-stream");
         request.Headers.TryAddWithoutValidation("MCP-Protocol-Version", "2025-06-18");
-        if (session is not null) request.Headers.TryAddWithoutValidation("Mcp-Session-Id", session);
         return request;
     }
 }

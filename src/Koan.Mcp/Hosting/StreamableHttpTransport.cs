@@ -1,13 +1,11 @@
 using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Threading;
+using System.Security.Claims;
 using System.Threading.Tasks;
 using Koan.Core;
 using Koan.Mcp.Options;
-using Koan.Web.Sse;
-using Koan.Web.Sse.Formatting;
+using Koan.Web.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -19,48 +17,47 @@ using Newtonsoft.Json.Linq;
 namespace Koan.Mcp.Hosting;
 
 /// <summary>
-/// AI-0037 — the MCP Streamable HTTP transport (spec 2025-06-18). A single endpoint at <c>{baseRoute}</c> serves:
+/// AI-0037, SEC-0039 — the MCP Streamable HTTP transport, with no session. A single endpoint at <c>{baseRoute}</c>:
 /// <list type="bullet">
-/// <item><b>POST</b> — one client→server JSON-RPC message; a notification is acked <c>202</c> with no body, a
-/// request is answered EITHER as a per-request <c>text/event-stream</c> (default, carries the response then closes)
-/// OR a single <c>application/json</c> object (opt-in).</item>
-/// <item><b>GET</b> — opens the session's single standalone server-push SSE stream (one per session → <c>409</c>),
-/// resumable via <c>Last-Event-ID</c> which replays that stream's buffered tail.</item>
-/// <item><b>DELETE</b> — terminates the session.</item>
+/// <item><b>POST</b> — one client→server JSON-RPC message, standing alone: a notification is acked <c>202</c> with no body,
+/// a request is answered as one <c>application/json</c> object. A <c>Mcp-Session-Id</c> a client still sends means nothing.</item>
+/// <item><b>GET</b> — a browser is handed to the <see cref="IMcpConsoleRenderer"/> when one is registered; anything else is
+/// <c>405</c>, the specification's answer from an endpoint that offers no stream.</item>
 /// </list>
-/// Every request dispatches through the shared <see cref="McpRpcDispatcher"/> (one dispatch+gating core for all
-/// transports — "one projection or it drifts", SEC-0004) and is scoped to an <see cref="McpSession"/> minted on
-/// <c>initialize</c>. The session id is NOT a bearer capability: a non-initialize request must come from the same
-/// principal that established the session (<see cref="McpEdgeAuth.SamePrincipal"/>). Replaces the deprecated
-/// 2024-11-05 HTTP+SSE pair (<see cref="HttpSseTransport"/>).
+/// Every request dispatches through the shared <see cref="McpRpcDispatcher"/> as the principal its own credential and
+/// connection name (SEC-0016). A tool call is already a fresh request, so nothing is kept between requests.
 /// </summary>
 public sealed class StreamableHttpTransport
 {
-    private const string SessionIdHeader = "Mcp-Session-Id";
     private const string ProtocolVersionHeader = "MCP-Protocol-Version";
-    private const string LastEventIdHeader = "Last-Event-ID";
 
-    private readonly McpSessionManager _sessions;
     private readonly McpServer _server;
     private readonly McpRpcDispatcher _dispatcher;
     private readonly IOptionsMonitor<McpServerOptions> _options;
-    private readonly TimeProvider _timeProvider;
     private readonly ILogger<StreamableHttpTransport> _logger;
 
     public StreamableHttpTransport(
-        McpSessionManager sessions,
         McpServer server,
         McpRpcDispatcher dispatcher,
         IOptionsMonitor<McpServerOptions> options,
-        TimeProvider timeProvider,
         ILogger<StreamableHttpTransport> logger)
     {
-        _sessions = sessions ?? throw new ArgumentNullException(nameof(sessions));
         _server = server ?? throw new ArgumentNullException(nameof(server));
         _dispatcher = dispatcher ?? throw new ArgumentNullException(nameof(dispatcher));
         _options = options ?? throw new ArgumentNullException(nameof(options));
-        _timeProvider = timeProvider ?? TimeProvider.System;
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    }
+
+    /// <summary>
+    /// SEC-0016: the principal one HTTP request is authorized as: the credential it carries (the bearer the edge
+    /// authenticated, or the default scheme's user), stamped with the origin tier of its own connection. SEC-0004 origin: a
+    /// remote (HTTP) caller is never <c>local</c>; it is <c>internal</c> only from a declared trusted network.
+    /// </summary>
+    public static ClaimsPrincipal RequestPrincipal(HttpContext context)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        var originOptions = context.RequestServices.GetService<IOptions<OriginOptions>>()?.Value ?? OriginOptions.Empty;
+        return OriginStamp.Apply(context.User ?? new ClaimsPrincipal(), OriginResolver.FromHttpContext(context, originOptions));
     }
 
     // ---- POST {baseRoute} : a single client→server JSON-RPC message ------------------------------------------------
@@ -92,34 +89,11 @@ public sealed class StreamableHttpTransport
             return;
         }
 
-        var isInitialize = string.Equals(envelope.Method, "initialize", StringComparison.Ordinal);
-
-        McpSession session;
-        if (isInitialize)
+        // initialize is exempt from the protocol-version header: it is where the version is negotiated, in the JSON body.
+        if (!string.Equals(envelope.Method, "initialize", StringComparison.Ordinal) && !ValidateProtocolVersion(context, out var protocolError))
         {
-            // initialize is exempt from the protocol-version header (it is where the version is negotiated, in the
-            // JSON body) and mints the session whose id the client echoes thereafter.
-            var created = _sessions.Create(context);
-            if (created is null)
-            {
-                await WriteStatus(context, StatusCodes.Status429TooManyRequests, "max_sessions_exceeded",
-                    "The maximum number of concurrent MCP sessions has been reached.");
-                return;
-            }
-            session = created;
-            context.Response.Headers[SessionIdHeader] = session.Id;
-        }
-        else
-        {
-            if (!ValidateProtocolVersion(context, out var protocolError))
-            {
-                await WriteStatus(context, StatusCodes.Status400BadRequest, "unsupported_protocol_version", protocolError);
-                return;
-            }
-            var resolved = await ResolveSessionOrWrite(context, options, envelope.Id);
-            if (resolved is null) return;
-            session = resolved;
-            session.Touch();
+            await WriteStatus(context, StatusCodes.Status400BadRequest, "unsupported_protocol_version", protocolError);
+            return;
         }
 
         // A JSON-RPC notification (no id) yields no response → ack with 202 and no body (spec).
@@ -129,48 +103,18 @@ public sealed class StreamableHttpTransport
             return;
         }
 
-        // SEC-0016: authorize the request as the credential and connection it carries; the session binds only the subject.
-        var principal = isInitialize ? session.User : McpSessionManager.RequestPrincipal(context);
-        var handler = _server.CreateHandler();
-
-        if (options.Transport.StreamableJsonResponse)
-        {
-            var response = await _dispatcher.DispatchAsync(envelope, principal, handler, context.RequestAborted);
-            context.Response.StatusCode = StatusCodes.Status200OK;
-            context.Response.ContentType = "application/json";
-            await context.Response.WriteAsync(response?.ToString(Formatting.None) ?? string.Empty, context.RequestAborted);
-            return;
-        }
-
-        // Default: answer on a per-request SSE stream carrying the single response (event-id stamped for resumption),
-        // then close. The streaming shape is what later lets a handler emit interim notifications before its result.
-        var stream = session.OpenRequestStream();
-        JObject? rpcResponse;
-        try
-        {
-            rpcResponse = await _dispatcher.DispatchAsync(envelope, principal, handler, context.RequestAborted);
-        }
-        catch (OperationCanceledException)
-        {
-            session.CompleteRequestStream(stream);
-            return;
-        }
-
-        if (rpcResponse is not null) stream.EnqueueMessage(rpcResponse);
-        session.CompleteRequestStream(stream);
-
-        var result = Sse.Stream(stream.Read(context.RequestAborted));
-        await result.ExecuteAsync(context);
+        var response = await _dispatcher.DispatchAsync(envelope, RequestPrincipal(context), _server.CreateHandler(), context.RequestAborted);
+        context.Response.StatusCode = StatusCodes.Status200OK;
+        context.Response.ContentType = "application/json";
+        await context.Response.WriteAsync(response?.ToString(Formatting.None) ?? string.Empty, context.RequestAborted);
     }
 
-    // ---- GET {baseRoute} : content-negotiated — the SSE stream (MCP client) OR the console (browser) -------------
+    // ---- GET {baseRoute} : the console (browser), and otherwise no stream ------------------------------------------
 
     /// <summary>
-    /// The core owns the bare <c>GET {baseRoute}</c> (AI-0037 D-C). It negotiates: an explicit
-    /// <c>text/event-stream</c> request is the Streamable server-push stream (bearer-gated when auth is required);
-    /// a browser (<c>text/html</c> / <c>?format=html</c>) is delegated to the registered
-    /// <see cref="IMcpConsoleRenderer"/> (anonymous — the WEB-0072 discoverable human face). Mapped OUTSIDE the
-    /// auth group precisely so the console branch is not bearer-gated.
+    /// The core owns the bare <c>GET {baseRoute}</c> (AI-0037 D-C). A browser (<c>text/html</c> / <c>?format=html</c>) is
+    /// delegated to the registered <see cref="IMcpConsoleRenderer"/> (anonymous — the WEB-0072 discoverable human face).
+    /// Anything else is told there is no stream to open.
     /// </summary>
     public async Task HandleGet(HttpContext context)
     {
@@ -185,148 +129,27 @@ public sealed class StreamableHttpTransport
         }
 
         var format = context.Request.Query["format"].ToString();
-        var explicitEventStream = AcceptsEventStreamExplicit(context.Request);
         var wantsConsole = string.Equals(format, "html", StringComparison.OrdinalIgnoreCase)
             || (!string.Equals(format, "json", StringComparison.OrdinalIgnoreCase) && AcceptsHtml(context.Request));
-
-        // STREAM branch — an MCP client explicitly requesting the SSE stream.
-        if (explicitEventStream)
+        if (wantsConsole && context.RequestServices.GetService<IMcpConsoleRenderer>() is { } renderer)
         {
-            if (!options.EnableStreamableHttpTransport)
-            {
-                context.Response.Headers.Allow = "GET, POST, DELETE";
-                await WriteStatus(context, StatusCodes.Status405MethodNotAllowed, "stream_not_offered",
-                    "The Streamable HTTP transport is not enabled on this endpoint.");
-                return;
-            }
-            var baseRoute = ResolveBaseRoute(options);
-            if (options.RequireAuthentication
-                && !await McpEdgeAuth.EnsureAuthorized(context, baseRoute, requireAuth: true, options))
-            {
-                return; // EnsureAuthorized wrote the 401 + WWW-Authenticate
-            }
-            await StreamServerPushAsync(context, options);
-            return;
-        }
-
-        // CONSOLE branch — a browser (or ?format=html). Anonymous; delegated to the renderer seam.
-        if (wantsConsole)
-        {
-            var renderer = context.RequestServices.GetService<IMcpConsoleRenderer>();
-            if (renderer is null)
-            {
-                context.Response.StatusCode = StatusCodes.Status404NotFound;
-                return;
-            }
             await renderer.RenderConsoleAsync(context, ResolveBaseRoute(options));
             return;
         }
 
-        context.Response.StatusCode = StatusCodes.Status404NotFound;
-    }
-
-    /// <summary>The Streamable server-push SSE stream (the event-stream branch of <see cref="HandleGet"/>). Assumes
-    /// Origin + auth + content-negotiation already passed.</summary>
-    private async Task StreamServerPushAsync(HttpContext context, McpServerOptions options)
-    {
-        if (KoanEnv.IsProduction && !KoanEnv.InContainer && !context.Request.IsHttps)
+        if (!options.EnableStreamableHttpTransport)
         {
-            await WriteStatus(context, StatusCodes.Status400BadRequest, "https_required",
-                "Streamable HTTP transport requires HTTPS in non-containerized production environments.");
+            context.Response.StatusCode = StatusCodes.Status404NotFound;
             return;
         }
-        if (!ValidateProtocolVersion(context, out var protocolError))
-        {
-            await WriteStatus(context, StatusCodes.Status400BadRequest, "unsupported_protocol_version", protocolError);
-            return;
-        }
-
-        var session = await ResolveSessionOrWrite(context, options, null);
-        if (session is null) return;
-        session.Touch();
-
-        var lastEventId = context.Request.Headers[LastEventIdHeader].ToString();
-        var resuming = !string.IsNullOrEmpty(lastEventId);
-
-        McpSseStream getStream;
-        IReadOnlyList<SseEnvelope> replay = Array.Empty<SseEnvelope>();
-        if (resuming)
-        {
-            // Resumption replays ONLY the named stream's buffered tail (never cross-stream), then continues live on
-            // the standalone GET stream. Replace any stale GET stream the dropped connection left registered.
-            var streamId = McpSseStream.StreamIdOf(lastEventId);
-            if (streamId is not null && session.TryGetStream(streamId, out var prior))
-            {
-                replay = prior.ReplayAfter(lastEventId);
-            }
-            session.CloseGetStream();
-            getStream = session.TryOpenGetStream()
-                ?? throw new InvalidOperationException("GET stream could not be opened after close.");
-        }
-        else
-        {
-            var opened = session.TryOpenGetStream();
-            if (opened is null)
-            {
-                // The spec permits only one standalone server-push stream per session.
-                await WriteStatus(context, StatusCodes.Status409Conflict, "stream_exists",
-                    "A server-push stream is already open for this session.");
-                return;
-            }
-            getStream = opened;
-        }
-
-        try
-        {
-            await WriteServerPushStream(context, replay, getStream, context.RequestAborted);
-        }
-        catch (OperationCanceledException)
-        {
-            // client disconnected — normal.
-        }
-        finally
-        {
-            session.CloseGetStream();
-        }
-    }
-
-    // ---- DELETE {baseRoute} : terminate the session ----------------------------------------------------------------
-
-    public async Task HandleDelete(HttpContext context)
-    {
-        if (context is null) throw new ArgumentNullException(nameof(context));
-        var options = _options.CurrentValue;
-        if (!await PreflightAsync(context, options)) return;
-
-        var sid = context.Request.Headers[SessionIdHeader].ToString();
-        if (string.IsNullOrWhiteSpace(sid))
-        {
-            await WriteStatus(context, StatusCodes.Status400BadRequest, "missing_session",
-                "Mcp-Session-Id header is required.");
-            return;
-        }
-
-        if (!_sessions.TryGet(sid, out var session))
-        {
-            await WriteStatus(context, StatusCodes.Status404NotFound, "session_not_found",
-                "Session not found or already terminated.");
-            return;
-        }
-        if (options.RequireAuthentication && !McpEdgeAuth.SamePrincipal(context.User, session.User))
-        {
-            _logger.LogWarning("Rejected MCP Streamable DELETE: caller does not own session {SessionId}.", sid);
-            context.Response.StatusCode = StatusCodes.Status403Forbidden;
-            return;
-        }
-
-        _sessions.Terminate(sid);
-        context.Response.StatusCode = StatusCodes.Status200OK;
+        context.Response.Headers.Allow = "POST";
+        await WriteStatus(context, StatusCodes.Status405MethodNotAllowed, "no_stream", "This server keeps no session and pushes nothing: POST each request on its own.");
     }
 
     // ---- shared plumbing -------------------------------------------------------------------------------------------
 
-    /// <summary>Enabled + HTTPS-in-prod + Origin (DNS-rebinding) checks common to every method. Writes the failure
-    /// response and returns false when a check fails.</summary>
+    /// <summary>Enabled + HTTPS-in-prod + Origin (DNS-rebinding) checks. Writes the failure response and returns false
+    /// when a check fails.</summary>
     private async Task<bool> PreflightAsync(HttpContext context, McpServerOptions options)
     {
         if (!options.EnableStreamableHttpTransport)
@@ -359,37 +182,6 @@ public sealed class StreamableHttpTransport
         return true;
     }
 
-    /// <summary>Resolve the session named by <c>Mcp-Session-Id</c>, enforcing same-principal ownership. Writes the
-    /// JSON-RPC-shaped error (or a 403) and returns null on failure.</summary>
-    private async Task<McpSession?> ResolveSessionOrWrite(HttpContext context, McpServerOptions options, JToken? rpcId)
-    {
-        var sid = context.Request.Headers[SessionIdHeader].ToString();
-        if (string.IsNullOrWhiteSpace(sid))
-        {
-            // -32000 + 400 = "you must initialize first" (no session id on a non-initialize request).
-            await WriteJsonRpcError(context, StatusCodes.Status400BadRequest, rpcId, -32000,
-                "Mcp-Session-Id header is required.");
-            return null;
-        }
-        if (!_sessions.TryGet(sid, out var session))
-        {
-            // -32001 + 404 = the re-init signal: the client re-POSTs initialize with NO session id.
-            await WriteJsonRpcError(context, StatusCodes.Status404NotFound, rpcId, -32001,
-                "Session not found or terminated.");
-            return null;
-        }
-        // SEC-0006 — the session id is not a bearer capability: a non-initialize request must come from the same
-        // subject that established the session, so a caller who learns a session id cannot drive another subject's
-        // session. The request itself is authorized as its own principal (SEC-0016).
-        if (options.RequireAuthentication && !McpEdgeAuth.SamePrincipal(context.User, session.User))
-        {
-            _logger.LogWarning("Rejected MCP Streamable request: caller does not own session {SessionId}.", sid);
-            context.Response.StatusCode = StatusCodes.Status403Forbidden;
-            return null;
-        }
-        return session;
-    }
-
     private static bool OriginAllowed(HttpContext context, McpServerOptions options)
     {
         // DNS-rebinding guard: a browser always sets Origin. When an allow-list is configured AND an Origin is
@@ -416,23 +208,6 @@ public sealed class StreamableHttpTransport
         var accept = request.Headers.Accept;
         if (accept.Count == 0) return false; // the spec requires the client to advertise both
         return AcceptIncludes(accept, "application/json") && AcceptIncludes(accept, "text/event-stream");
-    }
-
-    /// <summary>The bare GET is dual-purpose, so the stream branch requires an EXPLICIT <c>text/event-stream</c> in
-    /// Accept (NOT the lenient empty→stream rule) — a browser sending <c>*/*</c> or no Accept must fall to the
-    /// console branch, never the SSE stream.</summary>
-    private static bool AcceptsEventStreamExplicit(HttpRequest request)
-    {
-        foreach (var raw in request.Headers.Accept)
-        {
-            if (string.IsNullOrEmpty(raw)) continue;
-            foreach (var part in raw.Split(','))
-            {
-                if (string.Equals(part.Split(';')[0].Trim(), "text/event-stream", StringComparison.OrdinalIgnoreCase))
-                    return true;
-            }
-        }
-        return false;
     }
 
     /// <summary>The console (HTML) negotiation, ported verbatim from the Explorer: <c>text/html</c> present AND both
@@ -501,45 +276,5 @@ public sealed class StreamableHttpTransport
         return context.Response.WriteAsJsonAsync(
             message is null ? (object)new { error } : new { error, message },
             cancellationToken: context.RequestAborted);
-    }
-
-    private static Task WriteJsonRpcError(HttpContext context, int httpStatus, JToken? id, int code, string message)
-    {
-        context.Response.StatusCode = httpStatus;
-        context.Response.ContentType = "application/json";
-        var body = McpRpcDispatcher.CreateError(id, code, message);
-        return context.Response.WriteAsync(body.ToString(Formatting.None), context.RequestAborted);
-    }
-
-    /// <summary>
-    /// Write the standalone server-push SSE stream: the 200 headers are flushed immediately (with an SSE keep-alive
-    /// comment) so the client sees the stream open even before any message arrives — a long-lived stream may push
-    /// nothing for a while. Then any resumption replay, then the live frames. Unlike the per-request POST response
-    /// (which always carries one data event and so flushes naturally), this stream must establish itself eagerly.
-    /// </summary>
-    private static async Task WriteServerPushStream(HttpContext context, IReadOnlyList<SseEnvelope> replay, McpSseStream live, CancellationToken cancellationToken)
-    {
-        var response = context.Response;
-        response.StatusCode = StatusCodes.Status200OK;
-        response.ContentType = "text/event-stream";
-        response.Headers.CacheControl = "no-cache";
-        response.Headers.Pragma = "no-cache";
-        response.Headers.Connection = "keep-alive";
-        response.Headers["X-Accel-Buffering"] = "no";
-
-        await response.WriteAsync(": connected\n\n", cancellationToken); // SSE comment — establishes the stream, ignored by clients
-        await response.Body.FlushAsync(cancellationToken);
-
-        foreach (var envelope in replay)
-        {
-            await response.WriteAsync(SseFormatter.ToWireFormat(envelope), cancellationToken);
-            await response.Body.FlushAsync(cancellationToken);
-        }
-
-        await foreach (var envelope in live.Read(cancellationToken).WithCancellation(cancellationToken))
-        {
-            await response.WriteAsync(SseFormatter.ToWireFormat(envelope), cancellationToken);
-            await response.Body.FlushAsync(cancellationToken);
-        }
     }
 }

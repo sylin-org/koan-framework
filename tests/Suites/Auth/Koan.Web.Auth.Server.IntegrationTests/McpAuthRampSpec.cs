@@ -42,7 +42,7 @@ public sealed class McpAuthRampSpec : IClassFixture<McpAuthRampFixture>
     public async Task Mcp_without_a_token_challenges_with_resource_metadata()
     {
         using var client = _fx.NewClient();
-        var res = await client.GetAsync("/mcp/sse", HttpCompletionOption.ResponseHeadersRead, Quick);
+        var res = await client.GetAsync("/mcp/capabilities", HttpCompletionOption.ResponseHeadersRead, Quick);
 
         res.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
         var challenge = res.Headers.WwwAuthenticate.ToString();
@@ -59,7 +59,7 @@ public sealed class McpAuthRampSpec : IClassFixture<McpAuthRampFixture>
             TimeSpan.FromMinutes(5), audience: "koan://some/other/resource");
 
         using var client = _fx.NewClient();
-        using var req = new HttpRequestMessage(HttpMethod.Get, "/mcp/sse");
+        using var req = new HttpRequestMessage(HttpMethod.Get, "/mcp/capabilities");
         req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", wrongAud);
         var res = await client.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, Quick);
 
@@ -94,14 +94,13 @@ public sealed class McpAuthRampSpec : IClassFixture<McpAuthRampFixture>
         var accessToken = tokenDoc.RootElement.GetProperty("access_token").GetString();
         accessToken.Should().NotBeNullOrEmpty();
 
-        // 3. present it to the MCP edge — auth + audience PASS, so we reach the live SSE transport.
-        //    ResponseHeadersRead is intentional: an SSE response remains open and must not be buffered to EOF.
-        using var req = new HttpRequestMessage(HttpMethod.Get, "/mcp/sse");
+        // 3. present it to the MCP edge — auth + audience PASS, so we reach what the edge answers.
+        using var req = new HttpRequestMessage(HttpMethod.Get, "/mcp/capabilities");
         req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
         var edgeRes = await client.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, Quick);
 
         edgeRes.StatusCode.Should().Be(HttpStatusCode.OK);
         edgeRes.Headers.Should().NotContain(h => h.Key == "WWW-Authenticate");
-        edgeRes.Content.Headers.ContentType!.MediaType.Should().Be("text/event-stream");
+        edgeRes.Content.Headers.ContentType!.MediaType.Should().Be("application/json");
     }
 }

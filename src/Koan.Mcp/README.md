@@ -58,26 +58,19 @@ Koan Web, declare the intent in configuration:
 }
 ```
 
-An earlier two-endpoint SSE transport (`GET /mcp/sse` plus `POST /mcp/rpc`) stays off unless
-`EnableLegacySseTransport` is explicitly enabled.
-
 ## Streamable HTTP
 
-The default base route is `/mcp`:
+The default base route is `/mcp`, and there is no session: a tool call is already a fresh request ([SEC-0039](../../docs/decisions/SEC-0039-a-caller-brings-its-own-credential.md)).
 
 | Request | Meaning |
 |---|---|
-| `POST /mcp` | Send one JSON-RPC message, including the initial `initialize` request and tool calls. |
-| `GET /mcp` | Open the optional resumable server-push stream for an established session. It is not the initialization handshake. |
-| `DELETE /mcp` | Terminate the session named by `Mcp-Session-Id`. |
+| `POST /mcp` | Send one JSON-RPC message, `initialize` and tool calls alike, answered as one JSON object. |
+| `GET /mcp` | A browser reaches the console when one is registered; anything else is `405`, as there is no stream. |
+| `DELETE /mcp` | `405`: there is no session to end. |
 
-The first `POST /mcp` carries `initialize` without a session header. Its response mints
-`Mcp-Session-Id`; echo that header on later requests and send the negotiated
-`MCP-Protocol-Version`. A normal MCP client performs this negotiation—application developers do not
-write JSON-RPC handlers.
-
-The `EnableLegacySseTransport` option exposes the earlier `GET /mcp/sse` plus `POST /mcp/rpc` shape
-as well; both HTTP shapes share the same dispatcher, session, authorization, and projection core.
+After `initialize`, send the negotiated `MCP-Protocol-Version`. A `Mcp-Session-Id` a client still sends
+means nothing. A normal MCP client performs this negotiation—application developers do not write
+JSON-RPC handlers.
 
 ## Names
 
@@ -165,7 +158,5 @@ Model Context Protocol integration for Koan entity endpoints: discovery, schema,
 
 ## Transport options
 
-`EnableStreamableHttpTransport` enables the Streamable HTTP edge; `EnableLegacySseTransport`
-additionally exposes the earlier two-endpoint shape for clients that use it. Transport enablement is
-validated at startup: the retired `Koan:Mcp:EnableHttpSseTransport` key fails options validation with
-a correction naming the current keys, and no transport is enabled implicitly by any other setting.
+`EnableStreamableHttpTransport` enables the Streamable HTTP edge, the one HTTP transport. No transport
+is enabled implicitly by any other setting.

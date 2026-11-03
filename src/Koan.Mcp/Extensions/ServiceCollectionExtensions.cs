@@ -22,11 +22,7 @@ internal static class McpServiceRegistration
         if (services is null) throw new ArgumentNullException(nameof(services));
 
         services.AddOptions<McpServerOptions>()
-            .BindConfiguration(ConfigurationConstants.Section)
-            .Validate<IConfiguration>((_, configuration) =>
-                    configuration[ConfigurationConstants.FullKey(ConfigurationConstants.Keys.RetiredHttpSseTransport)] is null,
-                "Koan:Mcp:EnableHttpSseTransport is retired. Remove it and set EnableStreamableHttpTransport; set EnableLegacySseTransport explicitly if legacy clients still require it.")
-            .ValidateOnStart();
+            .BindConfiguration(ConfigurationConstants.Section);
 
         services.TryAddSingleton<SchemaBuilder>();
         services.TryAddSingleton<DescriptorMapper>();
@@ -65,12 +61,8 @@ internal static class McpServiceRegistration
 
         // AI-0037 — the shared, transport-agnostic JSON-RPC dispatch core (every HTTP surface routes through it).
         services.TryAddSingleton<McpRpcDispatcher>();
-        // AI-0037 — the unified MCP HTTP session registry + the two transports that ride it: the modern Streamable
-        // HTTP transport and the deprecated legacy /sse+/rpc shim (Ph3b collapsed both onto ONE session model).
-        services.TryAddSingleton<McpSessionManager>();
-        services.AddHostedService(sp => sp.GetRequiredService<McpSessionManager>());
+        // AI-0037, SEC-0039 — the Streamable HTTP transport, which keeps no session.
         services.TryAddSingleton<StreamableHttpTransport>();
-        services.TryAddSingleton<HttpSseTransport>();
         services.TryAddSingleton<IMcpCapabilityReporter, McpCapabilityReporter>();
 
         services.AddCors();

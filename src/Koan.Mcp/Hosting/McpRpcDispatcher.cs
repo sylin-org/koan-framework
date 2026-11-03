@@ -20,9 +20,9 @@ namespace Koan.Mcp.Hosting;
 /// AI-0037 — the transport-agnostic MCP JSON-RPC dispatch core. Owns the method switch
 /// (<c>initialize</c> / <c>tools/list</c> / <c>tools/call</c> / <c>resources/*</c> / <c>ping</c>) AND the
 /// SEC-0004 visibility + access gating, producing a JSON-RPC response <see cref="JObject"/> (or <c>null</c> for a
-/// method that yields no response) from a request envelope + the caller principal. Every HTTP surface (Streamable
-/// HTTP, the legacy SSE shim) routes through here so the security-sensitive logic cannot drift between transports
-/// — the "one projection or it drifts" discipline (SEC-0004) applied to the transport edge.
+/// method that yields no response) from a request envelope + the caller principal. Every HTTP surface routes through
+/// here so the security-sensitive logic cannot drift between transports — the "one projection or it drifts" discipline
+/// (SEC-0004) applied to the transport edge.
 /// </summary>
 public sealed class McpRpcDispatcher
 {
@@ -53,9 +53,8 @@ public sealed class McpRpcDispatcher
 
     /// <summary>
     /// Dispatch one JSON-RPC request envelope under <paramref name="principal"/> (never null at a remote edge — an
-    /// anonymous caller is a concrete empty principal, never STDIO local-trust) using a per-session
-    /// <paramref name="handler"/>. Returns the JSON-RPC response object; the caller routes it to its transport
-    /// (SSE enqueue, HTTP body, stdout).
+    /// anonymous caller is a concrete empty principal, never STDIO local-trust) using a per-request
+    /// <paramref name="handler"/>. Returns the JSON-RPC response object; the caller routes it to its transport.
     /// </summary>
     public async Task<JObject?> DispatchAsync(JsonRpcEnvelope envelope, ClaimsPrincipal principal, McpRpcHandler handler, CancellationToken cancellationToken)
     {

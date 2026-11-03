@@ -185,7 +185,7 @@ In **Development only** (a hard `404` everywhere else), `GET /oauth/dev-token` m
 curl -b cookies.txt "http://localhost:5000/oauth/dev-token"
 # → { "access_token": "...", "token_type": "Bearer", "expires_in": 3600, "resource": "http://localhost:5000/mcp" }
 
-# present it to the Streamable HTTP edge — the bearer passes the resource-server gate (a 200 + Mcp-Session-Id, not a 401):
+# present it to the Streamable HTTP edge — the bearer passes the resource-server gate (a 200, not a 401):
 curl -i -H "Authorization: Bearer <token>" -H "Accept: application/json, text/event-stream" \
   -X POST "http://localhost:5000/mcp" \
   -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"curl","version":"1"}}}'

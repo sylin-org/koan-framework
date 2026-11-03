@@ -10,8 +10,8 @@ using static Koan.Mcp.Streamable.IntegrationTests.StreamableTestHelpers;
 namespace Koan.Mcp.Streamable.IntegrationTests;
 
 /// <summary>
-/// AI-0037 D-C / review finding 2 — when auth is required, the dual-purpose <c>GET /mcp</c> gates ONLY the stream
-/// branch; the console stays anonymous (the discoverable human face must not 401).
+/// AI-0037 D-C / review finding 2 — when auth is required, the console on <c>GET /mcp</c> stays anonymous (the
+/// discoverable human face must not 401).
 /// </summary>
 public sealed class StreamableAuthWithExplorerSpec : IClassFixture<StreamableAuthWithExplorerFixture>
 {
@@ -33,14 +33,15 @@ public sealed class StreamableAuthWithExplorerSpec : IClassFixture<StreamableAut
         res.Content.Headers.ContentType!.MediaType.Should().Be("text/html");
     }
 
+    /// <summary>SEC-0039: there is no stream to refuse a credential for, so none is asked for.</summary>
     [Fact]
-    public async Task The_stream_branch_of_the_same_route_is_bearer_gated()
+    public async Task A_stream_get_on_the_same_route_is_told_there_is_none_and_asked_for_no_credential()
     {
         using var client = _fx.NewClient();
         using var req = GetRequest(Route, accept: "text/event-stream"); // no bearer
         var res = await client.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, Quick);
 
-        res.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
-        res.Headers.WwwAuthenticate.ToString().Should().Contain("Bearer");
+        res.StatusCode.Should().Be(HttpStatusCode.MethodNotAllowed);
+        res.Headers.WwwAuthenticate.Should().BeEmpty();
     }
 }

@@ -12,9 +12,9 @@ using static Koan.Mcp.Streamable.IntegrationTests.StreamableTestHelpers;
 namespace Koan.Mcp.Streamable.IntegrationTests;
 
 /// <summary>
-/// AI-0037 — the MCP Streamable HTTP transport (spec 2025-06-18) end-to-end over real Kestrel: the single-endpoint
-/// POST/GET/DELETE contract, session lifecycle (mint on initialize, resolve, terminate), content negotiation, the
-/// per-request SSE response, the single standalone GET stream, and Last-Event-ID resumption replay.
+/// AI-0037, SEC-0039 — the MCP Streamable HTTP transport end-to-end over real Kestrel, with no session: each POST stands
+/// alone and is answered as one JSON object, a notification is 202, content negotiation and the protocol version are
+/// checked, and a GET or a DELETE is told there is nothing to open or end.
 /// </summary>
 public sealed class StreamableHttpTransportSpec : IClassFixture<StreamableHttpFixture>
 {
@@ -32,37 +32,32 @@ public sealed class StreamableHttpTransportSpec : IClassFixture<StreamableHttpFi
         clientInfo = new { name = "streamable-spec", version = "1.0" },
     };
 
-    /// <summary>POST initialize and return (sessionId, the parsed initialize SSE event).</summary>
-    private async Task<(string SessionId, SseEvent Event)> Initialize(HttpClient client)
+    private static async Task<JsonDocument> Json(HttpResponseMessage response)
     {
-        using var req = PostRequest(Route, Rpc("initialize", id: 1, @params: InitParams));
-        var res = await client.SendAsync(req, Quick);
-        res.StatusCode.Should().Be(HttpStatusCode.OK);
-        res.Content.Headers.ContentType!.MediaType.Should().Be("text/event-stream");
-        res.Headers.TryGetValues(SessionHeader, out var ids).Should().BeTrue("initialize must mint a session id");
-        var sessionId = ids!.Single();
-        var body = await res.Content.ReadAsStringAsync(Quick);
-        var evt = ParseSse(body).Single();
-        return (sessionId, evt);
+        response.Content.Headers.ContentType!.MediaType.Should().Be("application/json");
+        return JsonDocument.Parse(await response.Content.ReadAsStringAsync(Quick));
     }
 
     [Fact]
-    public async Task Initialize_mints_a_session_and_negotiates_the_protocol_version()
+    public async Task Initialize_answers_plain_json_with_no_session_and_negotiates_the_protocol_version()
     {
         using var client = _fx.NewClient();
-        var (sessionId, evt) = await Initialize(client);
+        using var req = PostRequest(Route, Rpc("initialize", id: 1, @params: InitParams));
 
-        sessionId.Should().MatchRegex("^[0-9a-f]{32}$");
-        using var doc = JsonDocument.Parse(evt.Data);
+        var res = await client.SendAsync(req, Quick);
+
+        res.StatusCode.Should().Be(HttpStatusCode.OK);
+        res.Headers.Contains("Mcp-Session-Id").Should().BeFalse("there is no session");
+        using var doc = await Json(res);
         var result = doc.RootElement.GetProperty("result");
         result.GetProperty("protocolVersion").GetString().Should().Be("2025-06-18");
         result.TryGetProperty("serverInfo", out _).Should().BeTrue();
     }
 
-    /// <summary>The TypeScript SDK asks for a revision past this server's and then says what it was answered on every request.</summary>
+    /// <summary>The TypeScript SDK asks for the revision it knows best and then says what it was answered on every request.</summary>
     [Theory]
-    [InlineData("2025-11-25", "2025-06-18")]
-    [InlineData("1999-01-01", "2025-06-18")]
+    [InlineData("2025-11-25", "2025-11-25")]
+    [InlineData("1999-01-01", "2025-11-25")]
     [InlineData("2025-03-26", "2025-03-26")]
     public async Task Initialize_answers_a_version_it_speaks_and_the_next_request_may_say_it(string asked, string answered)
     {
@@ -75,28 +70,25 @@ public sealed class StreamableHttpTransportSpec : IClassFixture<StreamableHttpFi
         }));
         var opened = await client.SendAsync(init, Quick);
         opened.StatusCode.Should().Be(HttpStatusCode.OK);
-        var sessionId = opened.Headers.GetValues(SessionHeader).Single();
-        using var doc = JsonDocument.Parse(ParseSse(await opened.Content.ReadAsStringAsync(Quick)).Single().Data);
+        using var doc = await Json(opened);
         doc.RootElement.GetProperty("result").GetProperty("protocolVersion").GetString().Should().Be(answered);
 
-        using var next = PostRequest(Route, Rpc("notifications/initialized"), sessionId, protocolVersion: answered);
+        using var next = PostRequest(Route, Rpc("notifications/initialized"), protocolVersion: answered);
         var answer = await client.SendAsync(next, Quick);
 
         answer.StatusCode.Should().Be(HttpStatusCode.Accepted);
     }
 
     [Fact]
-    public async Task Tools_list_within_the_session_returns_the_entity_tools()
+    public async Task Tools_list_stands_alone_and_returns_the_entity_tools()
     {
         using var client = _fx.NewClient();
-        var (sessionId, _) = await Initialize(client);
+        using var req = PostRequest(Route, Rpc("tools/list", id: 2));
 
-        using var req = PostRequest(Route, Rpc("tools/list", id: 2), sessionId);
         var res = await client.SendAsync(req, Quick);
-        res.StatusCode.Should().Be(HttpStatusCode.OK);
 
-        var evt = ParseSse(await res.Content.ReadAsStringAsync(Quick)).Single();
-        using var doc = JsonDocument.Parse(evt.Data);
+        res.StatusCode.Should().Be(HttpStatusCode.OK);
+        using var doc = await Json(res);
         var tools = doc.RootElement.GetProperty("result").GetProperty("tools");
         tools.GetArrayLength().Should().BeGreaterThan(0);
         tools.EnumerateArray().Select(t => t.GetProperty("name").GetString())
@@ -104,12 +96,25 @@ public sealed class StreamableHttpTransportSpec : IClassFixture<StreamableHttpFi
     }
 
     [Fact]
+    public async Task A_session_id_a_client_still_sends_means_nothing()
+    {
+        using var client = _fx.NewClient();
+        using var req = PostRequest(Route, Rpc("tools/list", id: 2));
+        req.Headers.TryAddWithoutValidation("Mcp-Session-Id", "deadbeefdeadbeefdeadbeefdeadbeef");
+
+        var res = await client.SendAsync(req, Quick);
+
+        res.StatusCode.Should().Be(HttpStatusCode.OK);
+        using var doc = await Json(res);
+        doc.RootElement.TryGetProperty("result", out _).Should().BeTrue();
+    }
+
+    [Fact]
     public async Task A_notification_is_acked_202_with_no_body()
     {
         using var client = _fx.NewClient();
-        var (sessionId, _) = await Initialize(client);
+        using var req = PostRequest(Route, Rpc("notifications/initialized")); // no id → notification
 
-        using var req = PostRequest(Route, Rpc("notifications/initialized"), sessionId); // no id → notification
         var res = await client.SendAsync(req, Quick);
 
         res.StatusCode.Should().Be(HttpStatusCode.Accepted);
@@ -126,103 +131,62 @@ public sealed class StreamableHttpTransportSpec : IClassFixture<StreamableHttpFi
     }
 
     [Fact]
-    public async Task A_non_initialize_post_without_a_session_id_is_400_not_initialized()
-    {
-        using var client = _fx.NewClient();
-        using var req = PostRequest(Route, Rpc("tools/list", id: 2));
-        var res = await client.SendAsync(req, Quick);
-
-        res.StatusCode.Should().Be(HttpStatusCode.BadRequest);
-        using var doc = JsonDocument.Parse(await res.Content.ReadAsStringAsync(Quick));
-        doc.RootElement.GetProperty("error").GetProperty("code").GetInt32().Should().Be(-32000);
-    }
-
-    [Fact]
-    public async Task An_unknown_session_is_404_the_reinit_signal()
-    {
-        using var client = _fx.NewClient();
-        using var req = PostRequest(Route, Rpc("tools/list", id: 2), sessionId: "deadbeefdeadbeefdeadbeefdeadbeef");
-        var res = await client.SendAsync(req, Quick);
-
-        res.StatusCode.Should().Be(HttpStatusCode.NotFound);
-        using var doc = JsonDocument.Parse(await res.Content.ReadAsStringAsync(Quick));
-        doc.RootElement.GetProperty("error").GetProperty("code").GetInt32().Should().Be(-32001);
-    }
-
-    [Fact]
     public async Task An_unsupported_protocol_version_is_400()
     {
         using var client = _fx.NewClient();
-        var (sessionId, _) = await Initialize(client);
-
-        using var req = PostRequest(Route, Rpc("tools/list", id: 2), sessionId, protocolVersion: "1999-01-01");
+        using var req = PostRequest(Route, Rpc("tools/list", id: 2), protocolVersion: "1999-01-01");
         var res = await client.SendAsync(req, Quick);
         res.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
 
+    /// <summary>The specification's ping answers an empty object, and a client's schema refuses anything else.</summary>
     [Fact]
-    public async Task Delete_terminates_the_session_then_it_is_unknown()
+    public async Task Ping_answers_empty()
     {
         using var client = _fx.NewClient();
-        var (sessionId, _) = await Initialize(client);
+        using var ping = PostRequest(Route, Rpc("ping", id: 2), protocolVersion: "2025-06-18");
 
-        using var del = GetRequestlessDelete(sessionId);
-        var delRes = await client.SendAsync(del, Quick);
-        delRes.StatusCode.Should().Be(HttpStatusCode.OK);
+        var answer = await client.SendAsync(ping, Quick);
 
-        using var after = PostRequest(Route, Rpc("tools/list", id: 3), sessionId);
-        var afterRes = await client.SendAsync(after, Quick);
-        afterRes.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        using var doc = await Json(answer);
+        doc.RootElement.GetProperty("result").ValueKind.Should().Be(JsonValueKind.Object);
+        doc.RootElement.GetProperty("result").EnumerateObject().Should().BeEmpty();
+    }
+
+    /// <summary>An unknown tool is an invalid parameter (-32602) in the specification; -32601 says the method is what it does not know.</summary>
+    [Fact]
+    public async Task An_unknown_tool_is_an_invalid_parameter()
+    {
+        using var client = _fx.NewClient();
+        using var call = PostRequest(Route, Rpc("tools/call", id: 2, @params: new { name = "no_such_tool", arguments = new { } }), protocolVersion: "2025-06-18");
+
+        var answer = await client.SendAsync(call, Quick);
+
+        using var doc = await Json(answer);
+        doc.RootElement.GetProperty("error").GetProperty("code").GetInt32().Should().Be(-32602);
     }
 
     [Fact]
-    public async Task Only_one_standalone_GET_stream_is_allowed_per_session()
+    public async Task A_get_is_told_there_is_no_stream()
     {
         using var client = _fx.NewClient();
-        var (sessionId, _) = await Initialize(client);
+        using var req = GetRequest(Route);
 
-        // Open the first GET stream and hold it (headers read; body keeps streaming).
-        using var get1 = GetRequest(Route, sessionId);
-        var res1 = await client.SendAsync(get1, HttpCompletionOption.ResponseHeadersRead, Quick);
-        res1.StatusCode.Should().Be(HttpStatusCode.OK);
-        res1.Content.Headers.ContentType!.MediaType.Should().Be("text/event-stream");
+        var res = await client.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, Quick);
 
-        // A second concurrent standalone GET is rejected.
-        using var get2 = GetRequest(Route, sessionId);
-        var res2 = await client.SendAsync(get2, HttpCompletionOption.ResponseHeadersRead, Quick);
-        res2.StatusCode.Should().Be(HttpStatusCode.Conflict);
-
-        res1.Dispose();
+        res.StatusCode.Should().Be(HttpStatusCode.MethodNotAllowed);
+        res.Content.Headers.Allow.Should().Equal("POST");
     }
 
     [Fact]
-    public async Task A_resumption_GET_replays_the_named_streams_buffered_tail()
+    public async Task A_delete_has_no_session_to_end()
     {
         using var client = _fx.NewClient();
-        var (sessionId, initEvt) = await Initialize(client);
+        using var req = new HttpRequestMessage(HttpMethod.Delete, Route);
+        req.Headers.TryAddWithoutValidation("Mcp-Session-Id", "deadbeefdeadbeefdeadbeefdeadbeef");
 
-        // The initialize response rode the first per-request stream; its event id is "r1.1". Resume from "r1.0" so
-        // the replay includes that event, proving Last-Event-ID → per-stream tail replay over HTTP.
-        initEvt.Id.Should().NotBeNull();
-        var streamId = initEvt.Id!.Split('.')[0];
-        var lastEventId = $"{streamId}.0";
+        var res = await client.SendAsync(req, Quick);
 
-        using var get = GetRequest(Route, sessionId, lastEventId: lastEventId);
-        var res = await client.SendAsync(get, HttpCompletionOption.ResponseHeadersRead, Quick);
-        res.StatusCode.Should().Be(HttpStatusCode.OK);
-
-        await using var stream = await res.Content.ReadAsStreamAsync(Quick);
-        var replayed = await ReadOneEvent(stream, Quick);
-
-        replayed.Id.Should().Be(initEvt.Id);
-        using var doc = JsonDocument.Parse(replayed.Data);
-        doc.RootElement.GetProperty("result").GetProperty("protocolVersion").GetString().Should().Be("2025-06-18");
-    }
-
-    private static HttpRequestMessage GetRequestlessDelete(string sessionId)
-    {
-        var req = new HttpRequestMessage(HttpMethod.Delete, Route);
-        req.Headers.TryAddWithoutValidation(SessionHeader, sessionId);
-        return req;
+        res.StatusCode.Should().Be(HttpStatusCode.MethodNotAllowed);
     }
 }

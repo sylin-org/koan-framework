@@ -1,10 +1,10 @@
-﻿---
+---
 type: GUIDE
 domain: mcp
 title: "MCP over HTTP"
 audience: [developers, architects, ai-agents]
 status: current
-last_updated: 2026-09-10
+last_updated: 2026-11-02
 framework_version: v1.0.0
 validation:
   date_last_tested: 2026-07-19
@@ -27,11 +27,11 @@ or `[McpTool]` surface, and `Koan:Mcp:EnableStreamableHttpTransport=true`. What 
 Streamable HTTP endpoint -- `/mcp` unless you move it -- carrying the tools and resources *that
 caller* may use.
 
-A working exchange looks like this: the client initializes, receives a session id, discovers only the
-tools its identity can invoke, calls them through `POST /mcp`, and can read the same runtime facts an
-operator sees. Everything that goes wrong does so nameably -- a rejected protocol version, a missing or
-expired session, content negotiation the endpoint cannot satisfy, a tool that is not available, or a
-caller the gate denies.
+A working exchange looks like this: the client initializes, discovers only the tools its identity can
+invoke, calls them through `POST /mcp`, and can read the same runtime facts an operator sees. Each
+request stands alone: there is no session, and each is answered as the caller its own credential names.
+Everything that goes wrong does so nameably -- a rejected protocol version, content negotiation the
+endpoint cannot satisfy, a tool that is not available, or a caller the gate denies.
 
 ## Shortest supported path
 
@@ -85,19 +85,19 @@ handle. Application code declares entities and leaves the wiring to the module.
 
 ## Streamable HTTP sequence
 
-The same base route handles the complete session:
+One base route, and every request on its own (SEC-0039):
 
 | Request | Required intent | Result |
 |---|---|---|
-| `POST /mcp` with `initialize` | Start protocol negotiation without a session header | `200`; response includes `Mcp-Session-Id` |
-| `POST /mcp` with a request | Send `tools/list`, `tools/call`, `resources/*`, or `ping` | JSON-RPC response as per-request SSE, or JSON when configured |
+| `POST /mcp` with `initialize` | Negotiate the protocol version | `200` with one JSON object; no session id |
+| `POST /mcp` with a request | Send `tools/list`, `tools/call`, `resources/*`, or `ping` | `200` with one JSON-RPC response object |
 | `POST /mcp` with a notification | Send a message with no JSON-RPC id | `202` with no body |
-| `GET /mcp` | Open the optional standalone server-push stream | Resumable SSE; one open GET stream per session |
-| `DELETE /mcp` | End the current session | `200`; later use of the id returns `404` |
+| `GET /mcp` | Anything but a browser | `405`, `Allow: POST`: there is no stream to open |
+| `DELETE /mcp` | Anything | `405`: there is no session to end |
 
 For `POST`, send `Accept: application/json, text/event-stream`. The first request carries the
-protocol version in `initialize.params`. Later requests echo both `Mcp-Session-Id` and
-`MCP-Protocol-Version`.
+protocol version in `initialize.params`; later requests send `MCP-Protocol-Version`. A `Mcp-Session-Id`
+a client still sends means nothing.
 
 ```bash
 curl -i -X POST http://localhost:5000/mcp \
@@ -106,19 +106,17 @@ curl -i -X POST http://localhost:5000/mcp \
   -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"probe","version":"1.0"}}}'
 ```
 
-Read `Mcp-Session-Id` from the response headers, then list tools:
+Then list tools, in a request of its own:
 
 ```bash
 curl -X POST http://localhost:5000/mcp \
   -H "Content-Type: application/json" \
   -H "Accept: application/json, text/event-stream" \
-  -H "Mcp-Session-Id: <session-id>" \
   -H "MCP-Protocol-Version: 2025-06-18" \
   -d '{"jsonrpc":"2.0","id":2,"method":"tools/list"}'
 ```
 
-A normal MCP client performs this negotiation. Application code should not implement JSON-RPC or
-session handling.
+A normal MCP client performs this negotiation. Application code should not implement JSON-RPC.
 
 ## Tool authoring and discovery
 
@@ -198,29 +196,21 @@ See [OAuth server](oauth-server-howto.md) for token acquisition and
 |---|---:|---|
 | `EnableStdioTransport` | `true` | Host the local process-owned transport |
 | `EnableStreamableHttpTransport` | `false` | Host the primary Streamable HTTP edge |
-| `EnableLegacySseTransport` | `false` | Host the earlier `/sse` + `/rpc` two-endpoint edge for clients that use it |
 | `HttpRoute` | `/mcp` | Shared base route for MCP over HTTP |
 | `RequireAuthentication` | environment-derived | Require a remote authenticated principal |
 | `ResourceUri` | unset | Explicit OAuth resource/audience identifier; unset, it is the base URL (`Koan:Web:ApplicationUrl`, else the accepted URL) + `HttpRoute` |
-| `MaxConcurrentSessions` | `100` | Bound active HTTP sessions |
-| `SessionIdleTimeout` | `30 minutes` | Reclaim idle sessions after this interval |
 | `EnableCors` | `false` | Enable the MCP CORS policy |
 | `AllowedOrigins` | empty | Origins admitted when CORS is enabled |
-| `Transport.StreamableJsonResponse` | `false` | Return JSON instead of per-request SSE for request POSTs |
-| `Transport.StreamReplayBufferSize` | `256` | Recent events retained per stream for resume |
-| `Transport.MaxRetainedStreamsPerSession` | `64` | Bound completed request streams retained per session |
 
 ## Failure interpretation
 
 | Observation | Meaning | Action |
 |---|---|---|
-| `400`, error `-32000` | Non-initialize request has no session | Initialize first and echo the session id |
 | `400` after negotiation | Unsupported protocol contract | Send the negotiated `MCP-Protocol-Version` |
 | `401` | Remote authentication failed | Follow the protected-resource challenge or fix bearer configuration |
 | `403` or a structured short-circuit | Caller lacks business authority | Correct grants; do not retry unchanged |
-| `404`, error `-32001` | Session expired or was terminated | Re-initialize and replace the session id |
+| `405` on `GET` or `DELETE /mcp` | There is no stream and no session | POST each request on its own |
 | `406` | POST does not accept the supported response media types | Send both JSON and event-stream in `Accept` |
-| `409` on `GET /mcp` | A standalone GET stream is already open | Reuse or close the existing stream |
 | Tool absent from `tools/list` | Not composed, disabled, or not permitted for this caller | Inspect `koan://self`, `koan://facts`, and access configuration |
 
 ## Verified evidence and limits
@@ -231,13 +221,12 @@ Run the current real-host Streamable HTTP evidence from a source checkout:
 dotnet test tests/Suites/Mcp/Koan.Mcp.Streamable.IntegrationTests/Koan.Mcp.Streamable.IntegrationTests.csproj -c Release
 ```
 
-The suite covers negotiation, content handling, session mint/resolve/terminate, authorization,
-Explorer coexistence, server push, and resumption. The broader conformance suite covers tool schema,
-access projection, resources, dry-run behavior, and Entity execution.
+The suite covers negotiation, content handling, requests that stand alone, authorization and Explorer
+coexistence. The broader conformance suite covers tool schema, access projection, resources, dry-run
+behavior, and Entity execution.
 
-Current evidence does not certify multi-node session sharing, every reverse proxy, every MCP client,
-or exactly-once custom-tool effects. Sessions are process-owned; a distributed deployment must route
-a session consistently or re-initialize after it moves.
+Current evidence does not certify every reverse proxy, every MCP client, or exactly-once custom-tool
+effects. Nothing is kept between requests, so any node can answer any request.
 
 See [AI-0037](../decisions/AI-0037-mcp-streamable-http-transport.md) for the transport decision and
 the [MCP module contract](../../src/Koan.Mcp/README.md) for the shortest application-facing summary.

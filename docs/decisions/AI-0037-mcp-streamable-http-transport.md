@@ -1,5 +1,9 @@
 # AI-0037 — MCP Streamable HTTP transport (break-and-rebuild)
 
+> **Amended by [SEC-0039](SEC-0039-a-caller-brings-its-own-credential.md) (2026-11-02):** the transport keeps no session.
+> Each `POST` stands alone and is answered as one JSON object; a `GET` that is not a browser's and a `DELETE` answer `405`;
+> the session registry, server push, resumption and the deprecated `/sse` + `/rpc` pair are removed.
+
 - **Status**: Accepted (Phases 1–3 implemented + adversarially reviewed + green; Phase 4 = doc-surface follow-ups)
 - **Date**: 2026-06-20
 - **Supersedes**: AI-0013 (MCP HTTP+SSE deployment) — the transport surface

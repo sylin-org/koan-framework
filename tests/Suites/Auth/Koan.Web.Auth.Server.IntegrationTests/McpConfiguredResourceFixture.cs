@@ -52,7 +52,7 @@ public sealed class McpConfiguredResourceFixture : IAsyncLifetime
                     s.AddKoanWeb();
                     s.Configure<McpServerOptions>(o =>
                     {
-                        o.EnableLegacySseTransport = true; // AI-0037: /sse is now the explicit legacy opt-in
+                        o.EnableStreamableHttpTransport = true;
                         o.RequireAuthentication = true;
                         o.ResourceUri = CanonicalResource; // fixed, host-independent
                     });

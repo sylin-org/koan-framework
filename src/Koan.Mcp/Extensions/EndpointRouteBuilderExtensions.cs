@@ -1,11 +1,10 @@
 using System;
-using System.Linq;
+using System.Collections.Generic;
 using Koan.Mcp.CodeMode.Sdk;
 using Koan.Mcp.CodeMode.Execution;
 using Koan.Mcp.Diagnostics;
 using Koan.Mcp.Hosting;
 using Koan.Mcp.Options;
-using Koan.Mcp;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -25,15 +24,12 @@ internal static class McpEndpointMapping
         var optionsMonitor = services.GetRequiredService<IOptionsMonitor<McpServerOptions>>();
         var options = optionsMonitor.CurrentValue;
 
-        // AI-0037 D-C — route ownership. The CORE owns the bare GET {baseRoute}: an MCP client (text/event-stream)
-        // gets the Streamable server-push stream; a browser (text/html) is delegated to the IMcpConsoleRenderer
-        // seam (the WEB-0072 human console). Streamable HTTP is the primary HTTP transport; the
-        // deprecated legacy /sse+/rpc pair is a separate opt-in (EnableLegacySseTransport).
+        // AI-0037 D-C — route ownership. The CORE owns the bare GET {baseRoute}: a browser (text/html) is delegated to the
+        // IMcpConsoleRenderer seam (the WEB-0072 human console), and anything else is told there is no stream (SEC-0039).
         var streamableOn = options.EnableStreamableHttpTransport;
-        var legacyOn = options.EnableLegacySseTransport;
         var rendererPresent = services.GetService<IMcpConsoleRenderer>() is not null;
 
-        if (!streamableOn && !legacyOn && !rendererPresent)
+        if (!streamableOn && !rendererPresent)
         {
             return endpoints;
         }
@@ -46,6 +42,7 @@ internal static class McpEndpointMapping
         var configuredResource = options.ResourceUri;
         // An application that exposes tools alone gets no code mode's SDK, published or written, whatever CodeMode:Enabled says.
         var codeModeOn = McpExposure.ExposesCode(McpExposure.Resolve(options));
+        var streamable = services.GetRequiredService<StreamableHttpTransport>();
 
         void ApplyCors(IEndpointConventionBuilder builder)
         {
@@ -55,28 +52,21 @@ internal static class McpEndpointMapping
                 {
                     policy.WithOrigins(options.AllowedOrigins)
                           .AllowCredentials()
-                          .WithHeaders("Authorization", "Content-Type", HttpSseHeaders.SessionId, "Mcp-Session-Id", "MCP-Protocol-Version", "Last-Event-ID")
-                          .WithExposedHeaders("Mcp-Session-Id")
-                          .WithMethods("GET", "POST", "DELETE", "OPTIONS");
+                          .WithHeaders("Authorization", "Content-Type", "MCP-Protocol-Version")
+                          .WithMethods("GET", "POST", "OPTIONS");
                 });
             }
         }
 
         // The bare GET {baseRoute} — mapped on the ROOT builder (OUTSIDE the auth group) so the console (HTML)
-        // branch stays anonymous (the discoverable human face); HandleGet bearer-gates only the SSE-stream branch
-        // inline. Mounted when Streamable is on (the stream) OR a console renderer is registered (the human face).
-        if (streamableOn || rendererPresent)
-        {
-            var streamable = services.GetRequiredService<StreamableHttpTransport>();
-            var bareGet = endpoints.MapGet(baseRoute, context => streamable.HandleGet(context))
-                .WithName("KoanMcpBareGet")
-                .WithMetadata(new ProducesResponseTypeAttribute(typeof(void), StatusCodes.Status200OK, "text/event-stream"))
-                .ExcludeFromDescription();
-            ApplyCors(bareGet);
-        }
+        // branch stays anonymous (the discoverable human face).
+        var bareGet = endpoints.MapGet(baseRoute, context => streamable.HandleGet(context))
+            .WithName("KoanMcpBareGet")
+            .ExcludeFromDescription();
+        ApplyCors(bareGet);
 
-        // The authenticated route group — POST/DELETE (Streamable), /sse+/rpc (legacy), well-known, capabilities, health.
-        if (streamableOn || legacyOn)
+        // The authenticated route group — POST, capabilities, health, and the public well-known metadata beside it.
+        if (streamableOn)
         {
             var capabilityReporter = services.GetService<IMcpCapabilityReporter>();
             var group = endpoints.MapGroup(baseRoute);
@@ -112,45 +102,18 @@ internal static class McpEndpointMapping
             .WithMetadata(new ProducesResponseTypeAttribute(typeof(object), StatusCodes.Status200OK, "application/json"))
             .ExcludeFromDescription();
 
-            // AI-0037 — the current Streamable HTTP transport. The bare GET is on the root builder (above); POST +
-            // DELETE live in the authenticated group.
-            if (streamableOn)
-            {
-                var streamable = services.GetRequiredService<StreamableHttpTransport>();
-
-                group.MapPost("", context => streamable.HandlePost(context))
-                    .WithName("KoanMcpStreamablePost")
-                    .WithMetadata(new ProducesResponseTypeAttribute(typeof(void), StatusCodes.Status200OK, "text/event-stream"));
-
-                group.MapDelete("", context => streamable.HandleDelete(context))
-                    .WithName("KoanMcpStreamableDelete")
-                    .WithMetadata(new ProducesResponseTypeAttribute(typeof(void), StatusCodes.Status200OK, "application/json"));
-            }
-
-            // Legacy 2024-11-05 HTTP+SSE transport (deprecated, opt-in): the {baseRoute}/sse + {baseRoute}/rpc pair.
-            if (legacyOn)
-            {
-                var transport = services.GetRequiredService<HttpSseTransport>();
-
-                group.MapGet("sse", context => transport.AcceptStream(context))
-                    .WithName("KoanMcpSseStream")
-                    .WithMetadata(new ProducesResponseTypeAttribute(typeof(void), StatusCodes.Status200OK, "text/event-stream"));
-
-                group.MapPost("rpc", async context =>
-                {
-                    var result = await transport.SubmitRequest(context);
-                    await result.ExecuteAsync(context);
-                })
-                    .WithName("KoanMcpRpcSubmit")
-                    .WithMetadata(new ProducesResponseTypeAttribute(typeof(IResult), StatusCodes.Status202Accepted, "application/json"));
-            }
+            // AI-0037, SEC-0039 — one POST is one request, answered as JSON. No DELETE: there is no session to end, so
+            // routing answers 405.
+            group.MapPost("", context => streamable.HandlePost(context))
+                .WithName("KoanMcpStreamablePost")
+                .WithMetadata(new ProducesResponseTypeAttribute(typeof(void), StatusCodes.Status200OK, "application/json"));
 
             if (options.PublishCapabilityEndpoint && capabilityReporter is not null)
             {
                 group.MapGet("capabilities", async context =>
                 {
                     // SEC-0018: the tools this request's principal may call, not the registry.
-                    var document = await capabilityReporter.GetCapabilitiesFor(McpSessionManager.RequestPrincipal(context), context.RequestAborted);
+                    var document = await capabilityReporter.GetCapabilitiesFor(StreamableHttpTransport.RequestPrincipal(context), context.RequestAborted);
                     await context.Response.WriteAsJsonAsync(document, cancellationToken: context.RequestAborted);
                 })
                 .WithName("KoanMcpCapabilities")
@@ -217,7 +180,7 @@ internal static class McpEndpointMapping
                         var gates = context.RequestServices.GetRequiredService<Koan.Web.Authorization.IAccessGateCache>();
                         using var visibility = Koan.Mcp.Execution.McpVerbVisibility.For(
                             context.RequestServices.GetRequiredService<IServiceScopeFactory>(), gates,
-                            McpSessionManager.RequestPrincipal(context));
+                            StreamableHttpTransport.RequestPrincipal(context));
                         var visible = new List<McpEntityRegistration>();
                         foreach (var registration in registry.Registrations)
                         {

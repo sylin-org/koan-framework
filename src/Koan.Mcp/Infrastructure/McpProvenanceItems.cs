@@ -30,13 +30,6 @@ internal static class McpProvenanceItems
         DefaultValue: BoolString(Defaults.EnableStreamableHttpTransport),
         DefaultConsumers: TransportConsumers);
 
-    internal static readonly ProvenanceItem EnableLegacySseTransport = new(
-        ConfigurationConstants.FullKey(ConfigurationConstants.Keys.EnableLegacySseTransport),
-        "Enable Legacy SSE Transport",
-        "Hosts the deprecated MCP HTTP/SSE compatibility transport.",
-        DefaultValue: BoolString(Defaults.EnableLegacySseTransport),
-        DefaultConsumers: TransportConsumers);
-
     internal static readonly ProvenanceItem RequireAuthentication = new(
         ConfigurationConstants.FullKey(ConfigurationConstants.Keys.RequireAuthentication),
         "Require Authentication",

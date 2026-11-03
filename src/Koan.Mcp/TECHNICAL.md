@@ -72,14 +72,11 @@ not an operational warning.
 ## Transports
 
 STDIO is enabled by default. When `EnableStreamableHttpTransport` is true, Koan hosts modern Streamable
-HTTP on the single `HttpRoute` (`/mcp` by default): client JSON-RPC, including `initialize`, uses
-`POST`; an established session may use `GET` for resumable server push and `DELETE` for termination.
-The initialize response mints `Mcp-Session-Id`, which the client echoes with the negotiated
-`MCP-Protocol-Version` on subsequent requests.
-
-`EnableLegacySseTransport` separately opts into the earlier `/mcp/sse` plus `/mcp/rpc` shape.
-Both HTTP shapes delegate to the same dispatcher, session, authorization, and projection core.
-Transport choices are host-level options; every enabled edge projects the same governed capability
+HTTP on the single `HttpRoute` (`/mcp` by default) with no session (SEC-0039): each `POST` carries one
+JSON-RPC message, `initialize` included, is authorized as its own credential, and is answered as one
+JSON object; a `GET` that is not a browser's and a `DELETE` answer `405`. Nothing is kept between
+requests, so there is no server push, no resumption and no `listChanged`. HTTP and STDIO delegate to
+the same dispatcher, authorization, and projection core. Transport choices are host-level options; every enabled edge projects the same governed capability
 surface. Application-owned inputs, Entity results, custom-tool results, and Code Mode objects share
 one camelCase JSON contract while protocol envelopes retain their specification-defined names.
 
@@ -96,12 +93,6 @@ Conditional field access and stronger MCP exclusions still apply before values r
 - Runtime facts: `/docs/engineering/runtime-facts.md`
 - ARCH-0111: `/docs/decisions/ARCH-0111-unified-runtime-facts.md`
 - MCP conformance suite: `/tests/Suites/Mcp/Koan.Mcp.Conformance.Tests/`
-
-## Transport options validation
-
-Transport enablement is validated at startup. The retired `Koan:Mcp:EnableHttpSseTransport` key fails
-options validation with a correction naming `EnableStreamableHttpTransport` and
-`EnableLegacySseTransport`; no transport is enabled implicitly by an unrecognized key.
 
 ## Rejected mutation deltas
 

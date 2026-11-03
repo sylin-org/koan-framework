@@ -17,10 +17,8 @@ namespace Koan.Mcp.Streamable.IntegrationTests;
 
 /// <summary>
 /// AI-0037 + SEC-0006 — the same composition as <see cref="StreamableHttpFixture"/> but with the MCP edge requiring
-/// authentication (the trust-fabric ES256 bearer). Used to prove the transport's central security property: the
-/// <c>Mcp-Session-Id</c> is NOT a bearer capability — a non-initialize request must come from the same principal
-/// that established the session, so a different authenticated caller who learns the id cannot inject RPC under the
-/// owner's identity.
+/// authentication (the trust-fabric ES256 bearer). Used to prove that each request is authorized as the bearer it
+/// carries.
 /// </summary>
 public sealed class StreamableAuthFixture : IAsyncLifetime
 {
