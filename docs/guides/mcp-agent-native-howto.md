@@ -203,7 +203,7 @@ public sealed class NoteArchiveController : ControllerBase
 }
 ```
 
-A tool call goes through the application's whole pipeline, so `[Authorize]`, a route constraint, `[EnableRateLimiting]` and your own middleware answer it as they answer a request. `Answer` maps a command's outcome once: invalid 400, absent 404 in one sentence, gated 401 or 403, conflict 409, and the action says what success answers. Every client reads that answer as a `Problem` in `application/problem+json`; an application that renders pages claims `Problem` with its own formatter (ARCH-0143). A gated reason can carry a stable word: `Reason.Gated("sign-in", "Sign in to write here.")`. A value that cannot bind is refused with its field named. With no MCP module the route is all there is.
+A tool call goes through the application's whole pipeline, so `[Authorize]`, a route constraint, `[EnableRateLimiting]` and your own middleware answer it as they answer a request. `Answer` maps a command's outcome once: invalid 400, absent 404 in one sentence, gated 401 or 403, conflict 409, and the action says what success answers. Every client reads that answer as a `Problem` in `application/problem+json`. An application that renders pages registers an ordinary `text/html` output formatter that writes `Problem` and sets `MvcOptions.RespectBrowserAcceptHeader`, so a browser that asks for HTML reads its page and every other client still reads the document (ARCH-0143). A gated reason can carry a stable word: `Reason.Gated("sign-in", "Sign in to write here.")`. A value that cannot bind is refused with its field named. With no MCP module the route is all there is.
 
 When a verb has no route on purpose, expose a public static method.
 

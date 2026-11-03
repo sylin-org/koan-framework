@@ -57,11 +57,11 @@ public static class Answers
             case Outcome<TResult>.Failed { Landed: DataCommitOutcome.NotDispatched } failed:
                 Log(http, failed.Cause);
                 http.Response.Headers.RetryAfter = "1";
-                return new Problem(StatusCodes.Status503ServiceUnavailable, "It never ran, so it is safe to send again.").ToResult();
+                return new Problem(StatusCodes.Status503ServiceUnavailable, "It never ran, so nothing was done and it is safe to send again.").ToResult();
             case Outcome<TResult>.Failed failed:
                 Log(http, failed.Cause);
                 return new Problem(StatusCodes.Status500InternalServerError,
-                    failed.Landed == DataCommitOutcome.Unknown ? "It may or may not have landed." : "It failed, and nothing landed.").ToResult();
+                    failed.Landed == DataCommitOutcome.Unknown ? "It may or may not have been done, so look before sending it again." : "It failed, and nothing was done.").ToResult();
             default:
                 throw new InvalidOperationException($"A command answered {outcome}.");
         }

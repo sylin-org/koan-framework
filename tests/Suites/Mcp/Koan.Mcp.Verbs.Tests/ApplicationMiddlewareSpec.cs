@@ -1,5 +1,6 @@
 using System.Net;
 using System.Security.Claims;
+using System.Text;
 using System.Text.Encodings.Web;
 using AwesomeAssertions;
 using Koan.Core;
@@ -318,7 +319,11 @@ public sealed class ApplicationMiddlewareSpec
         try
         {
             var builder = NewApplication(path);
-            builder.Services.Configure<MvcOptions>(mvc => mvc.OutputFormatters.Insert(0, new OwnPage()));
+            builder.Services.Configure<MvcOptions>(mvc =>
+            {
+                mvc.RespectBrowserAcceptHeader = true;
+                mvc.OutputFormatters.Add(new OwnPage());
+            });
             await using var app = builder.Build();
             await app.StartAsync(Ct);
             using var client = app.GetTestClient();
@@ -327,6 +332,7 @@ public sealed class ApplicationMiddlewareSpec
             browser.Headers.TryAddWithoutValidation("Accept", "text/html,application/xhtml+xml,*/*;q=0.8");
             using var page = await client.SendAsync(browser, Ct);
             page.StatusCode.Should().Be(HttpStatusCode.Conflict);
+            page.Content.Headers.ContentType!.MediaType.Should().Be("text/html");
             (await page.Content.ReadAsStringAsync(Ct)).Should().Be("own: conflict: Already there.");
 
             using var json = await client.PostAsync("/middleware-seen/conflict", null, Ct);
@@ -339,17 +345,21 @@ public sealed class ApplicationMiddlewareSpec
         }
     }
 
-    /// <summary>An application's page for a refusal: it claims a <see cref="Problem"/> for a request that asks for HTML.</summary>
-    private sealed class OwnPage : IOutputFormatter
+    /// <summary>An application's page for a refusal: an ordinary <c>text/html</c> formatter that writes a <see cref="Problem"/>.</summary>
+    private sealed class OwnPage : TextOutputFormatter
     {
-        public bool CanWriteResult(OutputFormatterCanWriteContext context)
-            => context.Object is Problem && context.HttpContext.Request.Headers.Accept.ToString().Contains("text/html");
+        public OwnPage()
+        {
+            SupportedMediaTypes.Add("text/html");
+            SupportedEncodings.Add(Encoding.UTF8);
+        }
 
-        public Task WriteAsync(OutputFormatterWriteContext context)
+        protected override bool CanWriteType(Type? type) => type == typeof(Problem);
+
+        public override Task WriteResponseBodyAsync(OutputFormatterWriteContext context, Encoding selectedEncoding)
         {
             var problem = (Problem)context.Object!;
-            context.HttpContext.Response.ContentType = "text/html";
-            return context.HttpContext.Response.WriteAsync($"own: {problem.Kind}: {problem.Detail}");
+            return context.HttpContext.Response.WriteAsync($"own: {problem.Kind}: {problem.Detail}", selectedEncoding);
         }
     }
 

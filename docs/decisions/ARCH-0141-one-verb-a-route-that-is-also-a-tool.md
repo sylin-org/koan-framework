@@ -12,7 +12,7 @@ related:
   - SEC-0011
   - SEC-0017
   - WEB-0083
-amended_by: ARCH-0142, SEC-0039
+amended_by: ARCH-0142, SEC-0039, ARCH-0143
 ---
 
 # ARCH-0141: One verb is one route, and a tool call is a request to it
@@ -20,6 +20,9 @@ amended_by: ARCH-0142, SEC-0039
 > **Amended by [ARCH-0142](ARCH-0142-the-realignment-finished.md) (2026-11-02): `Answer` answers a browser with a page, every tool name follows rule 12's words, and `_meta` and the list's shape are the specification's.** Rule 2's edge result is one of the places a principal becomes the request's authentication result.
 
 > **Amended by [SEC-0039](SEC-0039-a-caller-brings-its-own-credential.md) (2026-11-02), keeping this from [SEC-0037](SEC-0037-an-edge-that-is-part-of-the-application.md):** rule 2's rejected credential is one a caller presented. A Koan session cookie that no longer holds is a visitor.
+
+> **Amended by [ARCH-0143](ARCH-0143-one-refusal-shape.md) (2026-11-03): a refusal is one `Problem`, and a reason names no next step.** Rule 8's `Reason.Said` is `Answers.Nothing`, and rule 9's
+> `next`, with its mention in rule 10, no longer holds: the problem carries `kind`, `gate` and a sentence, and the address to go to next is the surface's.
 
 ## Context
 

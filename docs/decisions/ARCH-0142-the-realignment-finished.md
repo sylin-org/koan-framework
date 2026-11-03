@@ -13,12 +13,17 @@ related:
   - ARCH-0141
 amended_by:
   - DATA-0168
+  - ARCH-0143
 ---
 
 # ARCH-0142: A table exists before the host says started, a page and an API share one answer, and what a scope wrote is not told until it stands
 
 > **Amended by [DATA-0168](DATA-0168-a-read-starts-no-write.md) (2026-11-03): `CommandExtensions.TriesWaiting` is gone, with `TrySend`.** Item 4, its entry among
 > the new public concepts and its line in the measurements no longer hold.
+
+> **Amended by [ARCH-0143](ARCH-0143-one-refusal-shape.md) (2026-11-03): a string is never a reason, and Koan renders no HTML.** Item 2, string comparison with a reason, and item 3, its
+> HTML negotiation, `IProblemView`, the plain page and a gate's heading as the problem's title, no longer hold, with their lines under
+> Compatibility. A refusal is one `Problem` in `application/problem+json`, and a page for it is the application's formatter.
 
 ## Context
 

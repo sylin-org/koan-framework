@@ -9,7 +9,7 @@ Turn Koan entities into controller-first ASP.NET Core APIs, with shared policy, 
 
 - `EntityController<TEntity, TKey>` and the string-key `EntityController<TEntity>` convenience surface
 - attribute-routed ASP.NET Core MVC integration
-- `[Tool]` on a controller or action, which makes a route also a tool where `Koan.Mcp` is present, and `this.Answer(outcome, done)` or `this.Refused(reason)`, a route's one answer to a command (ARCH-0141): a `Problem` as `application/problem+json`, which an application that renders pages claims with its own formatter (ARCH-0143)
+- `[Tool]` on a controller or action, which makes a route also a tool where `Koan.Mcp` is present, and `this.Answer(outcome, done)` or `this.Refused(reason)`, a route's one answer to a command (ARCH-0141): a `Problem` as `application/problem+json`; an application that renders pages registers an ordinary `text/html` output formatter that writes `Problem` and sets `RespectBrowserAcceptHeader`, and a browser reads its page (ARCH-0143)
 - middleware an application adds in `Program` runs for a route, after authorization and before the endpoint; a default CORS policy runs before authentication with no call of yours; a fallback belongs on `app.MapFallback`, because a terminal `app.Run` answers every route (ARCH-0142)
 - health and optional OpenAPI wiring
 - static-file middleware only when the host supplies a real web-root provider

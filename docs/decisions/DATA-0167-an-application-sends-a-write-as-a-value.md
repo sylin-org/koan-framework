@@ -13,6 +13,7 @@ related:
 amended_by:
   - ARCH-0142
   - DATA-0168
+  - ARCH-0143
 ---
 
 # DATA-0167: An application sends a write as a value, and it runs in a hold of its own, in the sender's flow
@@ -22,6 +23,9 @@ amended_by:
 > **Amended by [DATA-0168](DATA-0168-a-read-starts-no-write.md) (2026-11-03): `TrySend` and `ICommandWatcher` are gone.** Items 7 and 9, their lines under
 > Ergonomics, Compatibility and Evidence, and the announcement in commit order no longer hold. A write is sent with `Send` by whoever asks for it, and work that
 > follows a commit registers `AfterCommit`.
+
+> **Amended by [ARCH-0143](ARCH-0143-one-refusal-shape.md) (2026-11-03): a plain string no longer converts to an invalid reason.** Item 3's implicit conversion no longer holds: an invalid
+> reason is `Reason.Invalid(text)`, and equality is the record's.
 
 ## Context
 
