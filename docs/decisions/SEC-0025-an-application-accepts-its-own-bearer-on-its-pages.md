@@ -11,15 +11,14 @@ related:
   - SEC-0016
   - SEC-0023
   - WEB-0078
-amended_by: SEC-0037
+amended_by: SEC-0039
 ---
 
 # SEC-0025: An application accepts its own bearer on its pages
 
-> **Amended by [SEC-0037](SEC-0037-an-edge-that-is-part-of-the-application.md) (2026-11-02):** with
-> `Koan:Mcp:AcceptApplicationBearer` a token for the application is good at `/mcp` too (rule 4). A token for `/mcp` is
-> still refused on the pages, and without the setting nothing here changes. Rule 2's base URL holds a token only when it is
-> configured or accepted, or in Development: elsewhere, until one exists, no token is for the application (its rule 7).
+> **Amended by [SEC-0039](SEC-0039-a-caller-brings-its-own-credential.md) (2026-11-02):** rule 2's base URL holds a token
+> only when it is configured or accepted, or in Development: elsewhere, until one exists, no token is for the application.
+> [SEC-0037](SEC-0037-an-edge-that-is-part-of-the-application.md)'s second audience at `/mcp` is gone, so rule 4 stands as written.
 
 ## Context
 

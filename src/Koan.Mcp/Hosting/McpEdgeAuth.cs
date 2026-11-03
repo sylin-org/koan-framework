@@ -49,16 +49,15 @@ internal static class McpEdgeAuth
         // the RFC 8707 audience must name this resource: an authentic token for another resource (a sibling API, the
         // application's own pages, a service-mesh aud=koan token) is rejected here — the confused-deputy fix. A
         // conformant client re-authorizes with resource=<this> on the challenge. No token at all is a plain challenge.
-        // SEC-0037: an application that says this edge is part of it names one resource more, its own. With no name at all
-        // no token could pass, and a 401 would send a standard client through OAuth for one, again and again: it is told why.
-        var accepted = McpResourceIdentity.Accepted(context, baseRoute, options);
-        if (accepted.Length == 0)
+        // With no name for this edge no token could pass, and a 401 would send a standard client through OAuth for one, again
+        // and again: it is told why.
+        if (McpResourceIdentity.Audience(context, baseRoute, options) is not { } resource)
         {
             await WriteNoApplicationUrl(context);
             return false;
         }
 
-        var result = await KoanBearerResource.Authenticate(context, accepted);
+        var result = await KoanBearerResource.Authenticate(context, resource);
         if (!result.Succeeded || result.Principal?.Identity?.IsAuthenticated != true)
         {
             if (result.None) await WriteChallenge(context, baseRoute, "unauthorized");

@@ -1,4 +1,4 @@
-﻿---
+---
 type: GUIDE
 domain: web
 title: "Embedded OAuth 2.1 Authorization Server (the MCP auth on-ramp)"
@@ -173,43 +173,8 @@ base URL (or `Koan:Web:Auth:ResourceServer:Resource`), its subject is the person
 token that is not accepted answers 401 with `Bearer error="invalid_token"`. The authorization server's own
 authorize and consent endpoints keep deciding by the person's session alone ([SEC-0026](../decisions/SEC-0026-the-authorization-server-decides-by-the-session.md)). See [SEC-0025](../decisions/SEC-0025-an-application-accepts-its-own-bearer-on-its-pages.md).
 
-## One token for the pages and the tools
-
-A client that reads the pages and calls the tools holds one token when the MCP edge says it is part of the application:
-
-```jsonc
-"Koan": {
-  "Mcp": { "EnableStreamableHttpTransport": true, "AcceptApplicationBearer": true },
-  "Web": { "Auth": { "ResourceServer": { "Enabled": true } } }
-}
-```
-
-A token for the application's resource is then accepted at `/mcp` too. The edge still advertises `{base}/mcp`, so a client
-that knows only the edge authorizes for that and holds a token good there and on no route; a client that wants both doors
-asks for `resource` set to the base URL. A token for the application also reaches tools with no route (`[McpTool]`, an
-entity's tools), as far as its subject may. See [SEC-0037](../decisions/SEC-0037-an-edge-that-is-part-of-the-application.md).
-
-## A token for an account your application verified
-
-At a door where an account proved itself some other way, the application asks for the token the server's flows mint:
-
-```csharp
-await HttpContext.SignInAsync(AuthenticationExtensions.CookieScheme, person); // AtprotoServiceAuth.SignIn answers its person
-var token = await AccessToken.For(HttpContext, person, ct);
-return token is null ? StatusCode(StatusCodes.Status403Forbidden) : Ok(new { access_token = token.Value, token_type = "Bearer", expires_in = (int)token.Lifetime.TotalSeconds });
-```
-
-**Sign in first, and pass the principal you signed in.** Under Koan.Identity a subject with no row has no standing, so a new
-account gets no token until it has signed in; sign-in also runs your admission, roles and ban, and settles a linked subject
-on its person's id. The answer is `StatusCode`, not `Forbid()`, which forwards to the cookie scheme and redirects.
-
-It is for the application's own resource and lasts `AccessTokenLifetime`. It carries the principal's subject, name, email,
-roles and scopes, with the subject's standing over the name and the roles, and is null for a subject who may not act. It has
-no refresh token: the account proves itself again. A door that itself admits a stale bearer carries `[ResourceServerExempt]`.
-
 **A token needs a named application.** Outside Development, until `Koan:Web:ApplicationUrl` is set or a URL is accepted, no
-bearer is taken on the pages or at `/mcp`, and `AccessToken.For` refuses: a caller's `Host` never chooses an audience.
-A cookie still signs in.
+bearer is taken on the pages or at `/mcp`: a caller's `Host` never chooses an audience. A cookie still signs in.
 
 ## Testing locally before a full client: `/oauth/dev-token`
 

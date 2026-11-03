@@ -1,4 +1,3 @@
-using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -85,18 +84,15 @@ public sealed partial class AtprotoServiceAuth
 
     /// <summary>
     /// Signs in the DID <paramref name="proof"/> proved, as the callback of a browser's sign-in ends: the same claims, the
-    /// same external identity linked, and the same cookie, through every sign-in contributor. Answers the person as sign-in
-    /// settled them, for <c>AccessToken.For</c>.
+    /// same external identity linked, and the same cookie, through every sign-in contributor.
     /// </summary>
     /// <exception cref="ArgumentException"><paramref name="proof"/> proved nothing.</exception>
-    public async Task<ClaimsPrincipal> SignIn(HttpContext context, AtprotoServiceAuthResult proof)
+    public async Task SignIn(HttpContext context, AtprotoServiceAuthResult proof)
     {
         ArgumentNullException.ThrowIfNull(context);
         if (!proof.Verified) throw new ArgumentException("Only a verified token signs anyone in.", nameof(proof));
         if (identities is not null) await identities.Link(AtprotoSessions.External(proof.Did!, proof.Handle), context.RequestAborted);
-        var person = AtprotoSessions.Principal(proof.Did!, proof.Handle);
-        await context.SignInAsync(AuthenticationExtensions.CookieScheme, person);
-        return person;
+        await context.SignInAsync(AuthenticationExtensions.CookieScheme, AtprotoSessions.Principal(proof.Did!, proof.Handle));
     }
 
     private AtprotoServiceAuthResult Refused(AtprotoServiceAuthOutcome outcome)

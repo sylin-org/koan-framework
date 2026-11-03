@@ -1,10 +1,7 @@
 using System;
-using System.Linq;
-using Koan.Mcp.Infrastructure;
 using Koan.Mcp.Options;
 using Koan.Web.Hosting;
 using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Koan.Mcp.Hosting;
@@ -32,23 +29,14 @@ public static class McpResourceIdentity
             : Base(ctx) + baseRoute;
 
     /// <summary>
-    /// SEC-0037 — the names a token's audience may have here: this edge's, and with <see cref="McpServerOptions.AcceptApplicationBearer"/>
-    /// the resource the application's ordinary routes accept, <c>Koan:Web:Auth:ResourceServer:Resource</c> when set, else the
-    /// base URL. This package does not reference Koan.Web.Auth, so it reads the key the resource edge binds rather than its
-    /// own idea of the application. A base URL only a request's <c>Host</c> could give names nothing outside Development
-    /// (<see cref="KoanWebBaseUrl.Audience"/>), though <see cref="Resolve"/> still answers with it for discovery.
+    /// The name a token's audience must have here: <see cref="McpServerOptions.ResourceUri"/>, else the application's base URL
+    /// plus the route. A base URL only a request's <c>Host</c> could give names nothing outside Development
+    /// (<see cref="KoanWebBaseUrl.Audience"/>), so then this is null, though <see cref="Resolve"/> still answers with it for discovery.
     /// </summary>
-    internal static string[] Accepted(HttpContext ctx, string baseRoute, McpServerOptions options)
-    {
-        var services = ctx.RequestServices;
-        var application = services.GetService<KoanWebBaseUrl>()?.Audience(ctx);
-        var own = !string.IsNullOrWhiteSpace(options.ResourceUri)
+    internal static string? Audience(HttpContext ctx, string baseRoute, McpServerOptions options)
+        => !string.IsNullOrWhiteSpace(options.ResourceUri)
             ? options.ResourceUri.TrimEnd('/')
-            : application is null ? null : application + baseRoute;
-        if (options.AcceptApplicationBearer && services.GetService<IConfiguration>()?[ConfigurationConstants.ApplicationResource] is { Length: > 0 } configured)
-            application = configured;
-        return [.. new[] { own, options.AcceptApplicationBearer ? application : null }.OfType<string>()];
-    }
+            : ctx.RequestServices.GetService<KoanWebBaseUrl>()?.Audience(ctx) is { } application ? application + baseRoute : null;
 
     /// <summary>The Authorization Server base (the application's base URL) — where RFC 8414 metadata + the AS endpoints live.</summary>
     public static string AuthorizationServer(HttpContext ctx) => Base(ctx);

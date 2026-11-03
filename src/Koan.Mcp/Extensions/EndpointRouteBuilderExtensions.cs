@@ -101,8 +101,8 @@ internal static class McpEndpointMapping
             {
                 var doc = new
                 {
-                    // SEC-0037: what a token here must name, so a client that follows this gets one the edge takes.
-                    resource = McpResourceIdentity.Accepted(context, baseRoute, options).FirstOrDefault() ?? McpResourceIdentity.Resolve(context, baseRoute, configuredResource),
+                    // What a token here must name, so a client that follows this gets one the edge takes.
+                    resource = McpResourceIdentity.Audience(context, baseRoute, options) ?? McpResourceIdentity.Resolve(context, baseRoute, configuredResource),
                     authorization_servers = new[] { McpResourceIdentity.AuthorizationServer(context) },
                     bearer_methods_supported = new[] { "header" },
                 };

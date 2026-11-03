@@ -4,9 +4,6 @@ internal static class ConfigurationConstants
 {
     public const string Section = "Koan:Mcp";
 
-    /// <summary>The key Web Auth's resource edge binds for the application's resource (SEC-0025).</summary>
-    public const string ApplicationResource = "Koan:Web:Auth:ResourceServer:Resource";
-
     public static class Keys
     {
         public const string EnableStdioTransport = nameof(EnableStdioTransport);
@@ -14,7 +11,6 @@ internal static class ConfigurationConstants
         public const string EnableStreamableHttpTransport = nameof(EnableStreamableHttpTransport);
         public const string EnableLegacySseTransport = nameof(EnableLegacySseTransport);
         public const string RequireAuthentication = nameof(RequireAuthentication);
-        public const string AcceptApplicationBearer = nameof(AcceptApplicationBearer);
         public const string HttpRoute = nameof(HttpRoute);
         public const string PublishCapabilityEndpoint = nameof(PublishCapabilityEndpoint);
         public const string AllowedEntities = nameof(AllowedEntities);

@@ -2,7 +2,7 @@
 id: SEC-0037
 slug: an-edge-that-is-part-of-the-application
 domain: Security
-status: Accepted
+status: superseded
 date: 2026-11-02
 title: An MCP edge that is part of the application takes the application's bearer
 related:
@@ -10,9 +10,15 @@ related:
   - SEC-0025
   - SEC-0026
   - ARCH-0141
+superseded_by: SEC-0039
 ---
 
 # SEC-0037: An MCP edge that is part of the application takes the application's bearer
+
+> **Overturned by [SEC-0039](SEC-0039-a-caller-brings-its-own-credential.md) (2026-11-02).** It rests on a premise that is
+> wrong: that something acts on a person's behalf with a token the application mints for it. A person signs in with their own
+> credentials, and an agent with its own. Rules 1 to 5 are gone, with `AcceptApplicationBearer` and `AccessToken`. Rules 6 to 9
+> stood on their own and are kept, restated in SEC-0039. What follows is the record as it was decided.
 
 Amends [SEC-0025](SEC-0025-an-application-accepts-its-own-bearer-on-its-pages.md) rule 4 and narrows, by the application's
 own word, [SEC-0006](SEC-0006-embedded-oauth-authorization-server.md) D2.

@@ -55,7 +55,8 @@ internal sealed class ResourceServerHandler(
 
     protected override async Task<AuthenticateResult> HandleAuthenticateAsync()
     {
-        var result = await KoanBearerResource.Authenticate(Context, Resource is { } resource ? [resource] : []).ConfigureAwait(false);
+        if (Resource is not { } resource) return AuthenticateResult.Fail("Nothing names this application yet, so no token is for it. Set Koan:Web:ApplicationUrl or accept a URL.");
+        var result = await KoanBearerResource.Authenticate(Context, resource).ConfigureAwait(false);
         return result.None ? AuthenticateResult.Fail("The Authorization header carries an empty bearer token.") : result;
     }
 

@@ -12,14 +12,14 @@ related:
   - SEC-0011
   - SEC-0017
   - WEB-0083
-amended_by: ARCH-0142
+amended_by: ARCH-0142, SEC-0039
 ---
 
 # ARCH-0141: One verb is one route, and a tool call is a request to it
 
 > **Amended by [ARCH-0142](ARCH-0142-the-realignment-finished.md) (2026-11-02): `Answer` answers a browser with a page, every tool name follows rule 12's words, and `_meta` and the list's shape are the specification's.** Rule 2's edge result is one of the places a principal becomes the request's authentication result.
 
-> **Amended by [SEC-0037](SEC-0037-an-edge-that-is-part-of-the-application.md) (2026-11-02):** rule 2's rejected credential is one a caller presented. A Koan session cookie that no longer holds is a visitor.
+> **Amended by [SEC-0039](SEC-0039-a-caller-brings-its-own-credential.md) (2026-11-02), keeping this from [SEC-0037](SEC-0037-an-edge-that-is-part-of-the-application.md):** rule 2's rejected credential is one a caller presented. A Koan session cookie that no longer holds is a visitor.
 
 ## Context
 

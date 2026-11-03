@@ -441,7 +441,7 @@ internal static class OAuthProtocolEndpoints
         return grant.Id;
     }
 
-    internal sealed record GrantedIdentity(string Subject, string? Name, string? Email, List<string> Roles, List<string> Scopes);
+    private sealed record GrantedIdentity(string Subject, string? Name, string? Email, List<string> Roles, List<string> Scopes);
 
     /// <summary>
     /// Who a token is minted for now, not when they approved: the subject's standing replaces what was captured then, and
@@ -451,17 +451,13 @@ internal static class OAuthProtocolEndpoints
     /// </summary>
     private static async Task<GrantedIdentity?> Current(HttpContext ctx, GrantedIdentity captured)
     {
-        if (await Standing(ctx.RequestServices, captured, ctx.RequestAborted) is { } current) return current;
-        await JsonError(ctx, StatusCodes.Status400BadRequest, "invalid_grant", "The grant is no longer valid.");
-        return null;
-    }
-
-    /// <summary>The subject as their standing has them now, or null when they may not act.</summary>
-    internal static async Task<GrantedIdentity?> Standing(IServiceProvider services, GrantedIdentity captured, CancellationToken ct)
-    {
-        var standing = await services.GetRequiredService<SubjectStandings>().Of(captured.Subject, ct);
+        var standing = await ctx.RequestServices.GetRequiredService<SubjectStandings>().Of(captured.Subject, ctx.RequestAborted);
         if (standing is null) return captured;
-        if (!standing.Active) return null;
+        if (!standing.Active)
+        {
+            await JsonError(ctx, StatusCodes.Status400BadRequest, "invalid_grant", "The grant is no longer valid.");
+            return null;
+        }
 
         return captured with
         {
@@ -473,7 +469,16 @@ internal static class OAuthProtocolEndpoints
     private static async Task IssueTokens(HttpContext ctx, AuthServerOptions options, GrantedIdentity id,
         string clientId, string resource, string familyId, string grantId, DateTimeOffset now)
     {
-        var access = Mint(ctx.RequestServices, options, id, clientId, resource);
+        var issuer = ctx.RequestServices.GetRequiredService<IIssuer>();
+        var access = issuer.Issue(new TrustClaims
+        {
+            Subject = id.Subject,
+            Name = id.Name,
+            Email = id.Email,
+            Roles = id.Roles,
+            Scopes = id.Scopes, // the granted scopes are the authorization grant → the RFC 9068 `scope` claim
+            Extra = new Dictionary<string, IReadOnlyList<string>> { ["client_id"] = new[] { clientId } },
+        }, options.AccessTokenLifetime, audience: resource);
 
         var body = new Dictionary<string, object?>
         {
@@ -510,19 +515,6 @@ internal static class OAuthProtocolEndpoints
 
         await ctx.Response.WriteAsJsonAsync(body, cancellationToken: ctx.RequestAborted);
     }
-
-    /// <summary>The access token of <paramref name="id"/> for <paramref name="resource"/>, for the server's lifetime; a
-    /// token the application issued itself names no client.</summary>
-    internal static string Mint(IServiceProvider services, AuthServerOptions options, GrantedIdentity id, string? clientId, string resource)
-        => services.GetRequiredService<IIssuer>().Issue(new TrustClaims
-        {
-            Subject = id.Subject,
-            Name = id.Name,
-            Email = id.Email,
-            Roles = id.Roles,
-            Scopes = id.Scopes, // the granted scopes are the authorization grant → the RFC 9068 `scope` claim
-            Extra = clientId is null ? null : new Dictionary<string, IReadOnlyList<string>> { ["client_id"] = new[] { clientId } },
-        }, options.AccessTokenLifetime, audience: resource);
 
     // ---- helpers --------------------------------------------------------------------------------------
 

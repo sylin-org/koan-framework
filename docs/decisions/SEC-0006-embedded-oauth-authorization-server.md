@@ -43,10 +43,9 @@ The AS **must not** be built on the existing `SharedKeyIssuer` (HS256 symmetric)
 **D2 — Audience binding (RFC 8707): per-resource `aud`, validated at the edge.**
 *This also fixes a bug that is live today.* The MCP edge validates only `IsAuthenticated` + required scopes; the bearer scheme validates a single fixed `IIssuer.Audience`. So **any** same-issuer token (a sibling resource, a service token) is already accepted at the MCP tool surface — a confused deputy. Decision: require + bind the OAuth `resource` parameter at `/oauth/authorize` and `/oauth/token`, stamp the **canonical MCP resource URI** into the token `aud` (`IIssuer.Issue` gains an audience path — overload or explicit `aud`), and make the **MCP edge validate `aud == this resource`**, not just the issuer's default audience. Ship D2 **with** the AS — never after.
 
-> **Amended 2026-11-02 ([SEC-0037](SEC-0037-an-edge-that-is-part-of-the-application.md)).** An application may say its MCP
-> edge is part of it (`Koan:Mcp:AcceptApplicationBearer`), and the edge then answers to the application's resource as well
-> as its own. A token for anything else is still refused, which is the confused deputy this decision closes. D6's
-> intersection of what was requested and what the person holds is what the code does from that decision on.
+> **Amended 2026-11-02 ([SEC-0039](SEC-0039-a-caller-brings-its-own-credential.md)).** D6's intersection of what was
+> requested and what the person holds is what the code does. [SEC-0037](SEC-0037-an-edge-that-is-part-of-the-application.md)'s
+> second audience at the MCP edge, which this note once recorded, is overturned: D2 stands as written.
 
 **D3 — Wire `Koan.bearer` into the MCP route (the single highest-leverage change).**
 `EndpointRouteBuilderExtensions` calls `RequireAuthorization()` against the default scheme (`Koan.cookie`), so an MCP client's `Authorization: Bearer …` is **never validated into `context.User`** today — an issued token is inert at the edge. Decision: the `/mcp` group authenticates with **`Koan.bearer`** (per-route scheme or a combined cookie+bearer policy). Once the bearer identity lands in `context.User`, the existing `OriginStamp` → `HttpSseSession.User` → `HttpSseRpcBridge` → SEC-0004/0005 chain enforces it unchanged — **no downstream work**.

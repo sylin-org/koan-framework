@@ -718,5 +718,7 @@
       href: SEC-0035-signing-out-takes-a-post.md
     - name: SEC-0036 A role change is a hold, on a route that offers one
       href: SEC-0036-a-role-change-joins-a-hold.md
-    - name: SEC-0037 An MCP edge that is part of the application takes the application's bearer
+    - name: SEC-0037 An MCP edge that is part of the application takes the application's bearer (overturned)
       href: SEC-0037-an-edge-that-is-part-of-the-application.md
+    - name: SEC-0039 A caller brings its own credential, and SEC-0037 is overturned
+      href: SEC-0039-a-caller-brings-its-own-credential.md
