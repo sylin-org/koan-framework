@@ -99,7 +99,10 @@ business operation so unusual routing stays visible and restores automatically.
 | `EntityContext.Source("Published")` | use one configured named source | move the default or copy existing data |
 | `EntityContext.Adapter("mongo")` | deliberately override the elected adapter | infer a package or guarantee provider parity |
 | `EntityContext.Partition("north")` | route to one physical/logical partition | authorize a tenant |
-| `EntityContext.Transaction("publish")` | coordinate supported work inside one Koan transaction | promise cross-provider atomicity |
+| `EntityContext.Transaction("publish")` | defer supported work and commit it in one native transaction where the one route it targets declares `write.atomicCommit` (SQLite), sequentially elsewhere | provide cross-route or cross-provider atomicity |
+| `EntityContext.Transaction("publish", TransactionGuarantee.Atomic)` | require that native transaction, refusing any operation that cannot join it | make a provider atomic that is not |
+| `await EntityContext.Hold("publish", ct)` | hold that native transaction from the start of the scope where the route declares `write.heldTransaction` (SQLite): reads see the scope's writes, writes act when issued, and other writers wait | hold it for long, or cover a second route |
+| `await new Publish(id).Send(ct)` with `Publish : ICommand<T>` | run the write in a hold of its own, in the sender's flow, and answer with an `Outcome<T>`, on a route that declares `write.heldTransaction` (SQLite) | cover a second route, or end its own hold |
 | `Tenant.Use("acme")` | apply the ambient tenant boundary across participating pillars | create or authenticate the tenant |
 | `EntityContext.NoCache()` / `RefreshCache()` | bypass or refresh the Entity cache for this scope | change durable truth |
 

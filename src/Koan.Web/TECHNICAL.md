@@ -29,6 +29,8 @@ expansion no adapter can serve fails closed with `422`; a response past the safe
   Entity discriminator policy enters request binding. PUT prepares the same field admission/settings
   before materializing its route-authoritative body and then enters ordinary endpoint authorization.
 - `IWebContextContributor` and `WebContext` for ordered, scoped request-context decisions
+- `KoanWebPipeline`, `InProcessRequest` and `InProcessAnswer`: the host's whole pipeline answering one request in process, as the
+  caller of the request in hand or as nobody, with one rule for the headers it carries (ARCH-0144)
 - Transformers for payload shaping (see WEB-0035)
 - `GET /.well-known/Koan/facts` projects `IKoanRuntimeFacts.Current` through `KoanFactJson`.
 
@@ -162,6 +164,10 @@ expansion no adapter can serve fails closed with `422`; a response past the safe
   without replacing a newer attached process owner.
 - Exiting pipeline construction restores the prior ambient host. This ownership boundary does not
   change middleware, contributor, endpoint, or startup-filter ordering.
+- `KoanWebPipeline` decorates ASP.NET's `IApplicationBuilderFactory`, so it holds the pipeline the host built, outside every
+  middleware and startup filter, on a generic host and on `WebApplication` alike. `WebModule` registers it with
+  `IHttpContextAccessor`, and wraps a global limiter so that a request it makes passes inside the outer request's permit; the
+  startup filter leaves such a request out of the observed origins (ARCH-0144).
 
 ## Deployment and topology
 

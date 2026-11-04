@@ -2,14 +2,12 @@ using System.Security.Claims;
 using System.Text;
 using Koan.Mcp.Execution;
 using Koan.Mcp.Hosting;
-using Koan.Web.Authorization;
 using Koan.Web.Controllers;
 using Koan.Web.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Extensions;
 using Microsoft.AspNetCore.Http.Metadata;
 using Microsoft.AspNetCore.Routing.Patterns;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -17,25 +15,18 @@ using Newtonsoft.Json.Linq;
 namespace Koan.Mcp.CustomTools;
 
 /// <summary>
-/// A tool call as a request (ARCH-0141). The arguments become a path, a query and a JSON body, and the request goes through the application's whole
-/// pipeline, on a flow of its own as a request from a server is: routing, authentication, authorization, the limiter, its own middleware, the filters, the
-/// action. Nothing here decides what a route would. The request is the caller's, its own credential included and its transport headers left out, so the
-/// application's authentication finds the caller as it finds them on any route (SEC-0039); with no request behind the call (STDIO) it is the principal given.
-/// This is the MCP surface's one mapping: a status of 400 and over is a failed call, and the answer's <c>kind</c>, or else its status, is the <c>errorCode</c>.
+/// A tool call as a request (ARCH-0141): the arguments become a path, a query and a JSON body, and Koan.Web's pipeline answers it through the
+/// application's whole pipeline as the caller of the request in hand (ARCH-0144): routing, authentication, authorization, the limiter, its own
+/// middleware, the filters, the action. Nothing here decides what a route would. This is the MCP surface's one mapping: a status of 400 and
+/// over is a failed call, and the answer's <c>kind</c>, or else its status, is the <c>errorCode</c>.
 /// </summary>
-internal sealed class RouteToolInvoker(RoutePipeline pipeline, IServiceScopeFactory scopes, ILogger<RouteToolInvoker> logger,
-    IHttpContextAccessor? accessor = null, KoanWebBaseUrl? baseUrl = null)
+internal sealed class RouteToolInvoker(KoanWebPipeline pipeline, ILogger<RouteToolInvoker> logger)
 {
-    /// <summary>What only the HTTP connection means, or what the edge has already spent.</summary>
-    private static readonly HashSet<string> Withheld = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "Accept", "Accept-Encoding", "Content-Type", "Content-Length", "Transfer-Encoding", "Connection", "Upgrade", "Expect", "Host", "Origin",
-        "Mcp-Session-Id", "MCP-Protocol-Version", "Last-Event-ID",
-    };
+    /// <summary>The headers of MCP's own transport, which mean nothing to a route.</summary>
+    private static readonly string[] Transport = ["Mcp-Session-Id", "MCP-Protocol-Version", "Last-Event-ID"];
 
     public async Task<McpRpcHandler.CallToolResult> Invoke(McpCustomTool tool, JObject? arguments, ClaimsPrincipal? user, CancellationToken ct)
     {
-        if (pipeline.Request is not { } serve) return Failed(tool, StatusCodes.Status503ServiceUnavailable, "This process serves no requests.");
         var route = tool.Route ?? throw new ArgumentException($"{tool.Name} has no route.", nameof(tool));
         var fields = (JObject?)arguments?.DeepClone() ?? new JObject();
         fields.Remove(McpDryRun.ArgumentName);
@@ -80,46 +71,16 @@ internal sealed class RouteToolInvoker(RoutePipeline pipeline, IServiceScopeFact
         if (route.Action.EndpointMetadata.OfType<IRequestSizeLimitMetadata>().LastOrDefault()?.MaxRequestBodySize is { } limit && body.Length > limit)
             return Failed(tool, StatusCodes.Status413PayloadTooLarge, $"The arguments are larger than the {limit} bytes this takes.");
 
-        var outer = accessor?.HttpContext;
-        var origin = outer is null && baseUrl?.Current is { } current ? new Uri(current) : null;
-        await using var scope = scopes.CreateAsyncScope();
-        using var answer = new MemoryStream();
-        var http = new DefaultHttpContext { RequestServices = scope.ServiceProvider, User = outer is null ? user ?? new ClaimsPrincipal() : new ClaimsPrincipal(), RequestAborted = ct };
-        if (outer is not null)
-            foreach (var (name, value) in outer.Request.Headers)
-                if (!Withheld.Contains(name)) http.Request.Headers[name] = value;
-        http.Request.Method = route.HttpMethod;
-        // With no connection there is no scheme to go by; a request from this process is as safe as one on TLS.
-        http.Request.Scheme = outer?.Request.Scheme ?? origin?.Scheme ?? Uri.UriSchemeHttps;
-        http.Request.Host = outer?.Request.Host ?? (origin is null ? new HostString("localhost") : new HostString(origin.Authority));
-        http.Request.Path = PathString.FromUriComponent((outer?.Request.PathBase ?? baseUrl?.PathBase ?? default).ToUriComponent() + path);
-        http.Request.QueryString = query.ToQueryString();
-        http.Request.Headers.Accept = "application/json";
-        if (!HttpMethods.IsGet(route.HttpMethod) && !HttpMethods.IsHead(route.HttpMethod))
-        {
-            http.Request.ContentType = "application/json";
-            http.Request.ContentLength = body.Length;
-            http.Request.Body = new MemoryStream(body);
-        }
-
-        http.Response.Body = answer;
-        http.Connection.RemoteIpAddress = outer?.Connection.RemoteIpAddress;
-        http.Features.Set(route);
-        // With a connection, the origin is the connection's, as on any request; with none, the principal's.
-        if (outer is null && OriginStamp.TierOf(http.User) is { } tier) http.Features.Set(new OriginFeature(tier));
+        var sends = !HttpMethods.IsGet(route.HttpMethod) && !HttpMethods.IsHead(route.HttpMethod);
+        var request = new InProcessRequest(route.HttpMethod, (path.Length > 0 ? path.ToString() : "/") + query.ToQueryString()) { Body = sends ? body : default, Principal = user };
+        request.Headers.Accept = "application/json";
+        if (sends) request.Headers.ContentType = "application/json";
+        request.Features.Set(route);
+        foreach (var name in Transport) request.Withheld.Add(name);
 
         try
         {
-            Task served;
-            using (ExecutionContext.SuppressFlow())
-                served = Task.Run(async () =>
-                {
-                    if (accessor is not null) accessor.HttpContext = http;
-                    try { await serve(http); }
-                    finally { if (accessor is not null) accessor.HttpContext = null; }
-                }, CancellationToken.None);
-            await served.ConfigureAwait(false);
-            return Result(tool, http, Encoding.UTF8.GetString(answer.ToArray()));
+            return Result(tool, await pipeline.Send(request, ct).ConfigureAwait(false));
         }
         catch (Exception failure) when (!ct.IsCancellationRequested)
         {
@@ -143,9 +104,10 @@ internal sealed class RouteToolInvoker(RoutePipeline pipeline, IServiceScopeFact
         _ => token.ToString(Formatting.None),
     };
 
-    private static McpRpcHandler.CallToolResult Result(McpCustomTool tool, HttpContext http, string text)
+    private static McpRpcHandler.CallToolResult Result(McpCustomTool tool, InProcessAnswer answer)
     {
-        var status = http.Response.StatusCode;
+        var status = answer.Status;
+        var text = Encoding.UTF8.GetString(answer.Body.Span);
         var json = TryJson(text);
         if (status >= StatusCodes.Status400BadRequest)
         {
@@ -154,7 +116,7 @@ internal sealed class RouteToolInvoker(RoutePipeline pipeline, IServiceScopeFact
         }
 
         var meta = new JObject { ["status"] = status };
-        var location = http.Response.Headers.Location.ToString();
+        var location = answer.Headers.Location.ToString();
         if (location.Length > 0) meta["location"] = location;
         // An answer with nothing to read says where it went. Only an object is structured: clients' schemas refuse anything else, and the text carries the rest.
         var empty = string.IsNullOrWhiteSpace(text);

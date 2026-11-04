@@ -41,11 +41,10 @@ storage, and agent projections that attach to the same type, start at
 > the application promises against the selected provider; a working `Save` proves only that a
 > store answered.
 >
-> The store provisions on first use. On the very first boot of a fresh deployment,
-> `/health/ready` reports the elected source Unhealthy ("An active Data source is unavailable")
-> until the first Entity operation creates it - an orchestrator that gates traffic on readiness
-> waits forever. Warm the store at startup or tolerate the window; every later boot is ready
-> immediately.
+> A default route that offers holds (SQLite) makes every discovered entity's table at start, so the host
+> reports started with its schema settled. Any other store, an entity naming its own source, and a
+> partition's table provision at first use. Health only looks: an unprovisioned managed store reads ready,
+> and an orchestrator gating traffic on `/health/ready` is not left waiting.
 
 ## Choose by topology
 

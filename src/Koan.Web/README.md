@@ -216,6 +216,42 @@ encryptor adds one through ASP.NET's `IDataProtectionBuilder`.
 - Contributed predicates are request-lifetime read visibility. They do not authorize writes, secure raw storage/SQL,
   or travel into durable jobs; those boundaries must establish or re-resolve their own application authority.
 
+## A request answered in process
+
+`KoanWebPipeline` answers a request of the application here, through its whole pipeline — routing, authentication,
+authorization, the limiter, its middleware, filters, binders and formatters — as that request would be answered over HTTP:
+
+```csharp
+public sealed class DraftsController(KoanWebPipeline pipeline) : ControllerBase
+{
+    [HttpGet("/drafts/{id}/preview")]
+    public async Task<IActionResult> Preview(string id, CancellationToken ct)
+    {
+        var page = new InProcessRequest(HttpMethods.Get, $"/drafts/{id}") { Headers = { Accept = "text/html" } };
+        var answer = await pipeline.Send(page, ct);
+        return File(answer.Body.ToArray(), answer.Headers.ContentType.ToString());
+    }
+}
+```
+
+- **The address** is a path and query under the application's base URL; the path base is added for you. An address that
+  is not a path is refused.
+- **Who reads it.** By default, the caller of the request in hand: its own `Cookie` and `Authorization` are carried and
+  the application's authentication reads them, as on any route. With no request in hand (a STDIO tool call, a command-line
+  verb), `Principal` is the reader. `AsNobody = true` reads as a visitor: nothing of the request in hand reaches it but its
+  scheme and host. A credential among the headers you give is refused; a request is never read as anyone else.
+- **What it carries of the request in hand:** every header except its connection's, its body's and its own answer's —
+  `Host`, the hop-by-hop and forwarding headers, every `Content-*`, `Accept`, `Accept-Encoding`, the conditionals, `Range`
+  and `Origin`. Give `Accept` and `Content-Type` yourself, and name your transport's own headers in `Withheld`.
+- **Values handed in process** go in `Features` and become features of the inner `HttpContext`, which an action or a
+  formatter reads; the inner request has its own DI scope, `Items` and execution flow, and the caller's
+  `IHttpContextAccessor` is as it was afterwards.
+- **The answer** is the status, the headers and the body, buffered whole. An exception nothing in the pipeline handled
+  reaches you; with `WithExceptionHandler()` the application's handler answers it first. `OnStarting` and `OnCompleted`
+  callbacks never fire. A process that serves no web requests answers `503`.
+- A request made in process runs inside the outer request's limiter permit and is not an observed origin. A limit a route
+  names still binds it. See [ARCH-0144](https://github.com/sylin-org/koan-framework/blob/main/docs/decisions/ARCH-0144-one-request-answered-in-process.md).
+
 ## Technical reference
 
 - [Koan.Web technical reference](https://github.com/sylin-org/koan-framework/blob/main/src/Koan.Web/TECHNICAL.md)

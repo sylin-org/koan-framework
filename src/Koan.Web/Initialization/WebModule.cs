@@ -47,6 +47,16 @@ public sealed class WebModule : KoanModule
             sp.GetRequiredService<IOptions<Options.KoanWebOptions>>().Value.ObservedOriginLimit,
             sp.GetService<TimeProvider>(),
             sp.GetService<ILogger<Hosting.KoanWebOrigins>>()));
+        // ARCH-0144: the host's whole pipeline, held by decorating ASP.NET's own builder factory so it sits outside every middleware and
+        // startup filter, answers a request made in process; a global limiter counts the request in hand once.
+        services.AddHttpContextAccessor();
+        services.TryAddSingleton<Hosting.KoanWebPipeline>();
+        services.Replace(ServiceDescriptor.Singleton<Microsoft.AspNetCore.Hosting.Builder.IApplicationBuilderFactory>(
+            sp => sp.GetRequiredService<Hosting.KoanWebPipeline>()));
+        services.PostConfigure<Microsoft.AspNetCore.RateLimiting.RateLimiterOptions>(limiter =>
+        {
+            if (limiter.GlobalLimiter is { } global) limiter.GlobalLimiter = new Hosting.OneCountLimiter(global);
+        });
         // WEB-0079: where the Data Protection key ring lives. One owner reads Koan:Web:KeyRingDirectory; when it is set
         // the ring persists there under the application name the folder remembers, and Start proves the folder usable
         // before anything is protected. The owner supplies defaults the application's own configuration overrides: the

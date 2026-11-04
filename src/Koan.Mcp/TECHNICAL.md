@@ -29,8 +29,8 @@ decision. Normalized `QueryOptions.Shape` and `IncludeRelationships` let applica
 
 Discovery supplies the surface -- `[McpEntity]` entities, `[McpTool]` workflows and `[Tool]` routes -- and the caller's
 identity and grants decide which of it exists for that session. A route tool is an `McpCustomTool` with a `Route`:
-`RouteToolInvoker` makes the request in process and sends it through the host's whole pipeline, which `RoutePipeline` holds, so there is no
-second definition to keep alike, and `McpToolStartCheck` stops the host at start over two tools of one name (ARCH-0141). What the caller receives back is MCP
+`RouteToolInvoker` maps a call to a request and the answer to a result, and `Koan.Web`'s `KoanWebPipeline` answers that request in process
+through the host's whole pipeline as the caller (ARCH-0144), so there is no second definition to keep alike, and `McpToolStartCheck` stops the host at start over two tools of one name (ARCH-0141). What the caller receives back is MCP
 tools and resources, JSON-RPC results, and transport health, with a structured failure rather than a
 silent omission for an invalid envelope, an unavailable tool, a denied grant, or a transport fault.
 

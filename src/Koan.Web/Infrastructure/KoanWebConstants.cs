@@ -57,6 +57,11 @@ public static class KoanWebConstants
         public const string ContentSecurityPolicy = "Content-Security-Policy";
         public const string XXssProtection = "X-XSS-Protection"; // deprecated; remove if present
         public const string KoanTraceId = "Koan-Trace-Id";
+
+        // ARCH-0144: what the header rule of a request made in process names beyond ASP.NET's own constants.
+        public const string Forwarded = "Forwarded";
+        public const string ProxyConnection = "Proxy-Connection";
+        public const string ContentPrefix = "Content-";
     }
 
     public static class Policies

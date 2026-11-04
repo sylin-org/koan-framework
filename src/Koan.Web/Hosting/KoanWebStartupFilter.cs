@@ -60,7 +60,8 @@ internal sealed class KoanWebStartupFilter(IOptions<KoanWebOptions> options, IOp
                 var origins = app.ApplicationServices.GetRequiredService<KoanWebOrigins>();
                 app.Use((ctx, next) =>
                 {
-                    origins.Note(ctx.Request);
+                    // ARCH-0144: a request the pipeline made in process arrived on no origin.
+                    if (ctx.Features.Get<InProcessMark>() is null) origins.Note(ctx.Request);
                     return next(ctx);
                 });
                 if (baseUrl.PathBase.HasValue)

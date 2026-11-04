@@ -31,16 +31,8 @@ internal static class McpServiceRegistration
         services.TryAddSingleton<Koan.Mcp.CustomTools.McpCustomToolRegistry>();
         services.TryAddSingleton<Koan.Mcp.CustomTools.McpCustomToolInvoker>();
         services.TryAddSingleton<Koan.Mcp.CustomTools.RouteToolInvoker>();
-        services.AddHttpContextAccessor();
-        services.TryAddSingleton<Koan.Mcp.CustomTools.RoutePipeline>();
-        services.Replace(ServiceDescriptor.Singleton<Microsoft.AspNetCore.Hosting.Builder.IApplicationBuilderFactory>(
-            provider => provider.GetRequiredService<Koan.Mcp.CustomTools.RoutePipeline>()));
         services.AddHostedService<Koan.Mcp.CustomTools.McpToolStartCheck>();
         services.TryAddEnumerable(ServiceDescriptor.Singleton<Microsoft.AspNetCore.Routing.MatcherPolicy, Koan.Mcp.CustomTools.NamedActionPolicy>());
-        services.PostConfigure<Microsoft.AspNetCore.RateLimiting.RateLimiterOptions>(limiter =>
-        {
-            if (limiter.GlobalLimiter is { } global) limiter.GlobalLimiter = new Koan.Mcp.CustomTools.OneCountLimiter(global);
-        });
         services.TryAddSingleton<RequestTranslator>();
         services.TryAddSingleton<ResponseTranslator>();
         services.TryAddSingleton<EndpointToolExecutor>();

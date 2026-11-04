@@ -230,6 +230,8 @@
       href: ARCH-0142-the-realignment-finished.md
     - name: ARCH-0143 A reason is a kind, a sentence and a word, a refusal is one problem document, and every page is the application's
       href: ARCH-0143-one-refusal-shape.md
+    - name: ARCH-0144 A request of the application is answered in process through its whole pipeline, which Koan.Web holds
+      href: ARCH-0144-one-request-answered-in-process.md
 - name: Core (CORE)
   items:
     - name: CORE-0072 Source-generated registries

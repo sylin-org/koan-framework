@@ -12,7 +12,7 @@ related:
   - SEC-0011
   - SEC-0017
   - WEB-0083
-amended_by: ARCH-0142, SEC-0039, ARCH-0143
+amended_by: ARCH-0142, SEC-0039, ARCH-0143, ARCH-0144
 ---
 
 # ARCH-0141: One verb is one route, and a tool call is a request to it
@@ -23,6 +23,11 @@ amended_by: ARCH-0142, SEC-0039, ARCH-0143
 
 > **Amended by [ARCH-0143](ARCH-0143-one-refusal-shape.md) (2026-11-03): a refusal is one `Problem`, and a reason names no next step.** Rule 8's `Reason.Said` is `Answers.Nothing`, and rule 9's
 > `next`, with its mention in rule 10, no longer holds: the problem carries `kind`, `gate` and a sentence, and the address to go to next is the surface's.
+
+> **Amended by [ARCH-0144](ARCH-0144-one-request-answered-in-process.md) (2026-11-04): `Koan.Web` holds the pipeline and answers a request of it in process, and a tool call is one use of that.**
+> `KoanWebPipeline` holds what `RoutePipeline` held, and `Koan.Web` registers it, `IHttpContextAccessor` and the global limiter's single count, which keys on the pipeline's own mark,
+> so the Coalescence's holder of the pipeline and the Compatibility line on what `Koan.Mcp` registers no longer hold, nor `OneCountLimiter` as `Koan.Mcp`'s. Rule 2's request carries
+> the caller's `Cookie` and `Authorization` and places no principal, as SEC-0039 rule 7 has it, and withholds what ARCH-0144's one header rule withholds.
 
 ## Context
 

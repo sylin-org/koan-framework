@@ -108,7 +108,7 @@ Pick exactly one Entity store unless the application genuinely owns more than on
 | Declared analytics questions (named aggregations, materialized projections, agent asks) | `Sylin.Koan.Data.Analytics` + `Sylin.Koan.Data.Analytics.Web` | **one elected engine** — `Sylin.Koan.Data.Connector.DuckDb` (+ `.Native`) | [How-to](https://github.com/sylin-org/koan-framework/blob/main/docs/guides/data/entity-analytics.md) · [Recipe](https://github.com/sylin-org/koan-framework/blob/main/docs/recipes/entity-analytics.md) |
 | MongoDB | `Sylin.Koan.Data.Connector.Mongo` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Connectors/Data/Mongo/README.md) |
 | PostgreSQL | `Sylin.Koan.Data.Connector.Postgres` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Connectors/Data/Postgres/README.md) |
-| MySQL | `Sylin.Koan.Data.Connector.MySql` — **not assessed** | **a reachable MySQL server** | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Connectors/Data/MySql/README.md) |
+| MySQL or MariaDB | `Sylin.Koan.Data.Connector.MySql` | **a reachable MySQL 8.4 or MariaDB 11.8 LTS server** | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Connectors/Data/MySql/README.md) |
 | SQL Server | `Sylin.Koan.Data.Connector.SqlServer` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Connectors/Data/SqlServer/README.md) |
 | Redis | `Sylin.Koan.Data.Connector.Redis` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Connectors/Data/Redis/README.md) |
 | Couchbase | `Sylin.Koan.Data.Connector.Couchbase` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Connectors/Data/Couchbase/README.md) |
@@ -122,6 +122,7 @@ Additive data behavior:
 |---|---|---|---|
 | Recoverable deletion (restore removed Entities) | `Sylin.Koan.Data.SoftDelete` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Koan.Data.SoftDelete/README.md) |
 | Move the active default store, verifiably | `Sylin.Koan.Data.Cutover` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Koan.Data.Cutover/README.md) · [Guide](https://github.com/sylin-org/koan-framework/blob/main/docs/guides/data/default-route-cutover.md) |
+| Ranked word search over an Entity's declared text (`[Lexical]`, `Entity.Lexical.Search`) | `Sylin.Koan.Data.Core` | **SQLite or PostgreSQL** as the Entity's store | [Reference](https://github.com/sylin-org/koan-framework/blob/main/docs/reference/data/index.md#search-declared-text) |
 
 Do not hand-roll a deleted flag, a restore endpoint, or a copy script when the owning package exists.
 
@@ -133,6 +134,9 @@ Do not hand-roll a deleted flag, a restore endpoint, or a copy script when the o
 | Outcome | Package | Also needs | Recipe |
 |---|---|---|---|
 | HTTP conventions and `EntityController<T>` | `Sylin.Koan.Web` | — | [Reference](https://github.com/sylin-org/koan-framework/blob/main/docs/reference/web/index.md) |
+| Run at one public URL, under a path, behind declared proxies | `Sylin.Koan.Web` | `Koan:Web:ApplicationUrl`, and `Koan:Web:TrustedProxies` behind a proxy | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Koan.Web/README.md#public-url-and-proxy) |
+| Answer a request of the application in process, as its reader or as nobody | `Sylin.Koan.Web` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Koan.Web/README.md#a-request-answered-in-process) |
+| Keep sign-in cookies and protected sessions across a rebuilt container | `Sylin.Koan.Web` | `Koan:Web:KeyRingDirectory` on persistent storage | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Koan.Web/README.md#key-ring) |
 | Shaping, hooks, and projection add-ons | `Sylin.Koan.Web.Extensions` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Koan.Web.Extensions/README.md) |
 | OpenAPI description | `Sylin.Koan.Web.OpenApi` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Koan.Web.Extensions/README.md) |
 | Server-sent events | `Sylin.Koan.Web.Sse` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Koan.Web.Extensions/README.md) |
@@ -261,7 +265,7 @@ Keep Entity calls stable; choose the physical store from the business guarantee.
 | SQLite | Durable local or single-node state | File ownership, concurrency, backup, and deployment shape |
 | MongoDB | Document-oriented networked state | Query/consistency semantics, database naming, and existing data |
 | PostgreSQL | General networked relational state | Schema ownership, transactions, connection policy, and operations |
-| MySQL | Widely operated networked relational state | Schema ownership, transactions, connection policy, and operations |
+| MySQL or MariaDB | Widely operated networked relational state | Schema ownership, transactions, connection policy, and operations |
 | SQL Server | Microsoft relational environments | Schema ownership, transactions, connection policy, and operations |
 | Redis | Keyed Entity state near a Redis topology | Query/stream limits, durability mode, and memory policy |
 | Couchbase | Distributed document/key-value state | Bucket/query services, consistency, and operational topology |

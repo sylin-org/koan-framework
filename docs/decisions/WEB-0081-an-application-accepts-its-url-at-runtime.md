@@ -13,6 +13,8 @@ related:
 
 > **Amended by [WEB-0083](WEB-0083-the-web-fails-closed.md) (2026-10-30).** The observed-origins record evicts the origin seen least often, the least recent among equals, and the proxy posture walks every declared proxy.
 
+> **Amended by [ARCH-0144](ARCH-0144-one-request-answered-in-process.md) (2026-11-04).** A request the application's pipeline makes in process arrived on no origin, and the record does not note it, so the request in hand counts its origin once.
+
 # WEB-0081: An application accepts its URL at runtime, and sees the origins requests arrive on
 
 ## Context

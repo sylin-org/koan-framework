@@ -1,15 +1,16 @@
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Http;
 
-namespace Koan.Mcp.CustomTools;
+namespace Koan.Web.Hosting;
 
-/// <summary>An application's global limiter counts a tool call once, at the MCP edge, and the request made for it passes (ARCH-0141): that request runs inside the
-/// edge's permit, so a concurrency limit would wait on itself. A limit a route names still binds it.</summary>
+/// <summary>An application's global limiter counts the request in hand once, and a request <see cref="KoanWebPipeline"/> makes for it
+/// passes (ARCH-0144): that request runs inside the outer one's permit, so a concurrency limit would wait on itself. A limit a route names
+/// still binds it.</summary>
 internal sealed class OneCountLimiter(PartitionedRateLimiter<HttpContext> global) : PartitionedRateLimiter<HttpContext>
 {
     private static readonly PartitionedRateLimiter<HttpContext> Free = PartitionedRateLimiter.Create<HttpContext, int>(_ => RateLimitPartition.GetNoLimiter(0));
 
-    private PartitionedRateLimiter<HttpContext> For(HttpContext context) => context.Features.Get<RouteTool>() is null ? global : Free;
+    private PartitionedRateLimiter<HttpContext> For(HttpContext context) => context.Features.Get<InProcessMark>() is null ? global : Free;
 
     public override RateLimiterStatistics? GetStatistics(HttpContext resource) => For(resource).GetStatistics(resource);
 
