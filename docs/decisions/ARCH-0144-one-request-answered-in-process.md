@@ -56,8 +56,9 @@ option, registration or attribute: `Koan.Web` holds the pipeline whenever the ho
    `WebModule` registers it with `IHttpContextAccessor`. `Koan.Web` builds the pipeline (`KoanWebStartupFilter`), so it is also
    what answers a request of it; `Koan.Mcp` and every later use consume it as a public `Koan.Web` type, which needs no abstraction
    assembly, as `[Tool]` did not.
-3. **It takes** a method and an address, a path and query under the application's base URL, which it prefixes with the path base;
-   the headers it is given, `Accept` and `Content-Type` among them; a body; values handed in process, which become features of the
+3. **It takes** a method and an address, a path and query under the application's base URL, which it prefixes with the path base,
+   and which names no dot segment, since HTTP would resolve one before any route saw it and an address here is taken as it is; the
+   headers it is given, `Accept` and `Content-Type` among them; a body; values handed in process, which become features of the
    inner `HttpContext`; and its reader. **It answers** the status, the headers and the body, buffered with no cap, as a tool call's
    answer already was. An exception nothing in the pipeline handled reaches the caller as an exception. With no pipeline, in a
    process that serves no web requests, it answers `503` with a `Problem` saying so.
@@ -70,13 +71,15 @@ option, registration or attribute: `Koan.Web` holds the pipeline whenever the ho
      principal. A visitor's read inside a signed-in request is a visitor's, whatever header an application's scheme or a web
      context contributor reads its credential from (`X-Test-User` on Koan's own test scheme), and it stands nowhere on a declared
      internal network.
-   A request is never read as anyone else: a `Cookie` or `Authorization` among the headers it is given is refused with an
-   `ArgumentException`, because the reader's credential is the request in hand's to carry.
+   A request is never read as anyone else: a `Cookie` or `Authorization` among the headers it is given, and a value handed in under
+   one of ASP.NET's own server feature interfaces (the `Microsoft.AspNetCore.Http.Features` namespace, `IHttpAuthenticationFeature`
+   among them), are refused with an `ArgumentException`, because the reader's credential is the request in hand's to carry and the
+   request line, the connection and the reader are the pipeline's to set.
 5. **One header rule, the pipeline's.** Of the request in hand the caller's request carries every header except what belongs to its
    connection, its body or its own representation: `Host` and the hop-by-hop headers (`Connection`, `Keep-Alive`,
    `Proxy-Connection`, `Proxy-Authorization`, `TE`, `Trailer`, `Transfer-Encoding`, `Upgrade`, `Expect`); `Forwarded` and
    `X-Forwarded-For`, `-Host`, `-Proto` and `-Prefix`, which its scheme, host and address already resolved; every `Content-*`
-   header; `Accept`, `Accept-Encoding`, the conditionals `If-Match`, `If-None-Match`, `If-Modified-Since`, `If-Unmodified-Since` and
+   header; `Accept`, `Accept-Charset`, `Accept-Encoding`, the conditionals `If-Match`, `If-None-Match`, `If-Modified-Since`, `If-Unmodified-Since` and
    `If-Range`, and `Range`, which ask about the outer request's own answer; and `Origin`, as SEC-0039 rule 8 has it, while
    `Sec-Fetch-Site` stays so the cross-site check judges the request as the call was. A caller names the headers of its own
    transport to withhold as well (`Koan.Mcp` names `Mcp-Session-Id`, `MCP-Protocol-Version` and `Last-Event-ID`). The headers it is
@@ -112,10 +115,11 @@ edge's own authentication had made of `/mcp`, with its result, since no authenti
 | **ETags** | Result filters tag and may answer 304; the header rule withholds the outer conditionals | Filters run, so the outer `If-None-Match` answered **304** | As B | No filter runs |
 | **Middleware** | Cross-site check, CORS, the authentication result kept for entities, stage and web-context contributors (tenancy, a placed principal, read filters), the limiter counted once, the application's own | **None**: no tenant, no read filter, no limit a route names | As B | As B |
 | **Isolation** | Scope, `Items`, features and flow of its own; the outer accessor as it was | Scope and features of its own | As B | As B |
-| **Cost** | One public type and two records; 310–320 µs a call | 210–240 µs | 225–240 µs, and a second routing builder | 120–165 µs, and a binder of its own |
+| **Cost** | Three public types: the pipeline, the request and the answer; 94 production lines in `Koan.Web`, which replace `RoutePipeline`'s 14 and the invoker's 40 that made the request; buffered, and `OnStarting` and `OnCompleted` never fire (read); 310–320 µs a call | The same three, and the action named in place of an address, since nothing routes (read); about 13 lines beyond A's request as prototyped; buffered, no callback fires (read); 210–240 µs | The same three (read); about 25 lines beyond A's request, and a second routing builder; buffered, no callback fires (read); 225–240 µs | The same three, and the method and a binder of its own in place of an address (read); about 45 lines beyond A's request; buffered, no callback fires (read); 120–165 µs |
 
 The rows the tool path's specs cover, and the ETag row, were run; the formatter, exception and isolation cells of B, B2 and C are read
-from their code, since no prototype ran `InProcessSpec`.
+from their code, since no prototype ran `InProcessSpec`, and so is every cell marked (read). Production lines count neither blank lines,
+comments nor `using` lines; a rejected shape's are its prototype's serve step, the request it shares with A aside.
 
 **D. Routing, authorization and the limiter as a smaller pipeline** is B2 with three middlewares added: it would close the
 `[Authorize]` and limiter rows and still fail every middleware row, since an application's own middleware and Koan's web-context
@@ -132,9 +136,10 @@ The surface is the pipeline's own small request instead.
 - ARCH-0141's holder of the pipeline and what `Koan.Mcp` registers: `RoutePipeline`, the `IApplicationBuilderFactory`
   replacement and `IHttpContextAccessor` are `Koan.Web`'s (`KoanWebPipeline`), and `OneCountLimiter` keys on the pipeline's own
   mark, registered by `Koan.Web`, so every request made in process passes a global limiter, not only a tool call's.
-- ARCH-0141 rule 2 and SEC-0039 rule 7 on the headers a tool call's request carries: rule 5 above is the one header rule, and it
-  withholds the outer conditionals, `Range`, every `Content-*`, the forwarding headers and the rest of the hop-by-hop headers as
-  well. What a tool call carries of `Cookie`, `Authorization`, `Sec-Fetch-Site` and `Origin` is unchanged.
+- ARCH-0141 rule 2's set of headers a tool call's request withholds: rule 5 above is the one header rule, and it withholds
+  `Accept-Charset`, the outer conditionals, `Range`, every `Content-*`, the forwarding headers and the rest of the hop-by-hop headers
+  as well. SEC-0039 rule 7 still holds: what a tool call keeps of `Cookie`, `Authorization`, `Sec-Fetch-Site` and `Origin` is
+  unchanged.
 - WEB-0081's record of observed origins no longer counts a request the pipeline made.
 
 ## Coalescence
@@ -156,7 +161,8 @@ The surface is the pipeline's own small request instead.
   `Features`, `AsNobody`, `Principal` and `Withheld` only where a use needs them. A coding model that has sent an HTTP request
   reads it; `Address` is the request line's path and query, and `Features` is ASP.NET's own `IFeatureCollection`.
 - **Guarantee and correction:** the answer is what the application answers that request over HTTP from the same reader; an
-  address that is not a path, and a credential among the given headers, are refused before anything runs.
+  address that is not a path or names a dot segment, a credential among the given headers and a value handed in as one of ASP.NET's
+  own server features are refused before anything runs.
 - **Public concepts:** `KoanWebPipeline` (the pipeline, which answers), `InProcessRequest` (what to ask, and as whom) and
   `InProcessAnswer` (status, headers, body). The mark, the header rule and the limiter's single count are internal.
 - **Cognitive branches:** two readers, one of them the default. No option.
@@ -167,7 +173,7 @@ The surface is the pipeline's own small request instead.
   where only one with `Koan.Mcp` did; an application that replaces the factory itself after Koan does takes the pipeline away from
   every in-process use, which then answers `503`.
 - A global limiter in an application without `Koan.Mcp` is wrapped as one with it was: a request with the pipeline's mark passes it.
-- A tool call's request no longer carries the client's conditionals, `Range`, `Content-*` other than its own, forwarding headers,
+- A tool call's request no longer carries the client's `Accept-Charset`, conditionals, `Range`, `Content-*` other than its own, forwarding headers,
   `Keep-Alive`, `TE`, `Trailer`, `Proxy-Connection` or `Proxy-Authorization`. A tool whose route answered `304` to a client's
   `If-None-Match` now answers its body.
 - With no web pipeline, a route tool's failed call carries the `Problem` it was answered with in `structuredContent` and
@@ -204,11 +210,16 @@ The surface is the pipeline's own small request instead.
   downstream answers as the application's handler answers; the outer request's `If-None-Match` does not reach the inner one, and
   the inner one's own tag still answers `304` to a conditional it is given; `Items` and features are the inner request's own and
   the outer accessor is as it was; a refused form's page is drawn again without running the write again; many GETs as nobody
-  answer bytes and a content type; a credential among the given headers is refused.
+  answer bytes and a content type; nobody carries no connection address, so a route gated `origin:internal` admits the reader
+  arriving from a declared network and refuses nobody; a pipeline the host never built answers `503` with its `Problem`; a credential
+  among the given headers, an address that is not a path, a dot segment, plain or escaped, and a value handed in as
+  `IHttpAuthenticationFeature` are refused. `UnbuiltPipelineSpec` (`Koan.Mcp.Verbs.Tests`): a tool call through a pipeline never built
+  says `This process serves no requests.` and carries that `Problem` in `structuredContent` and `meta.problem`.
 - **The origin note** (`InProcessOriginSpec`, `Koan.Web.WellKnown.Tests`): a request whose action makes one in process counts its
   origin once, and a request made with none in hand notes nothing.
 - **Measured by removing them:** with the conditionals carried again, the `If-None-Match` spec fails; with the origin note not
-  exempting the mark, the origin spec fails; with nobody carrying the request in hand's headers, the nobody spec fails.
+  exempting the mark, the origin spec fails; with nobody carrying the request in hand's headers, the nobody spec fails; with nobody
+  given the request in hand's connection address, the `origin:internal` spec fails.
 
 ## Later
 
@@ -216,5 +227,4 @@ The surface is the pipeline's own small request instead.
   a page again in process) is read from the inner request's headers, which carry no credential, so it reads as a visitor; it fails
   closed, and no use does it yet.
 - A tracing span does not flow to the inner request, which runs on a flow of its own: a request log shows two unrelated traces.
-- An address is taken as given; a dot segment is not resolved as HTTP would resolve it before any route sees it. Reading by address
-  decides what it accepts.
+- An address that names a dot segment is refused rather than resolved; reading by address may resolve one as HTTP would.

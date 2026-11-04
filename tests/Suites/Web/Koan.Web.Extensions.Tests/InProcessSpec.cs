@@ -6,6 +6,8 @@ using System.Text.Json;
 using AwesomeAssertions;
 using Koan.Core;
 using Koan.Core.Hosting.App;
+using Koan.Web.Attributes;
+using Koan.Web.Authorization;
 using Koan.Web.Extensions;
 using Koan.Web.Hosting;
 using Microsoft.AspNetCore.Authentication;
@@ -13,6 +15,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.Features.Authentication;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
 using Microsoft.AspNetCore.Mvc.Formatters;
@@ -35,10 +38,11 @@ public sealed class InProcessSpec(InProcessHost host) : IClassFixture<InProcessH
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
     private async Task<Relayed> Relay(string address, string? who = null, string? whoHeader = null, bool nobody = false, string? accept = null,
-        string? handed = null, bool stranger = false, string? ifNoneMatch = null)
+        string? handed = null, bool stranger = false, string? ifNoneMatch = null, string? from = null)
     {
         var query = $"/in-process/relay?address={Uri.EscapeDataString(address)}&nobody={nobody}&stranger={stranger}"
-                    + (accept is null ? "" : $"&accept={Uri.EscapeDataString(accept)}") + (handed is null ? "" : $"&handed={handed}");
+                    + (accept is null ? "" : $"&accept={Uri.EscapeDataString(accept)}") + (handed is null ? "" : $"&handed={handed}")
+                    + (from is null ? "" : $"&from={from}");
         using var request = new HttpRequestMessage(HttpMethod.Get, query);
         if (who is not null) request.Headers.TryAddWithoutValidation(HeaderNames.Authorization, "Who " + who);
         if (whoHeader is not null) request.Headers.TryAddWithoutValidation(WhoScheme.Header, whoHeader);
@@ -170,13 +174,44 @@ public sealed class InProcessSpec(InProcessHost host) : IClassFixture<InProcessH
     }
 
     [Fact]
-    public async Task A_credential_given_and_an_address_that_is_not_a_path_are_refused_before_anything_runs()
+    public async Task Nobody_carries_no_connection_address_so_an_internal_network_admits_the_reader_and_not_nobody()
+    {
+        var reader = await Relay("/in-process/internal", from: "10.1.2.3");
+        var nobody = await Relay("/in-process/internal", from: "10.1.2.3", nobody: true);
+
+        reader.Status.Should().Be(200, reader.Body);
+        reader.Body.Should().Be("inside");
+        nobody.Status.Should().BeOneOf([401, 403], "nobody arrived from nowhere, which no declared network holds: {0}", nobody.Body);
+    }
+
+    [Fact]
+    public async Task A_pipeline_the_host_never_built_answers_503_in_one_problem()
+    {
+        var unbuilt = new KoanWebPipeline(host.Services, host.Services.GetRequiredService<IHttpContextAccessor>());
+
+        var answer = await unbuilt.Send(new InProcessRequest(HttpMethods.Get, "/in-process/whoami"), Ct);
+
+        answer.Status.Should().Be(503);
+        answer.Headers.ContentType.ToString().Should().StartWith("application/problem+json");
+        using var problem = JsonDocument.Parse(answer.Body);
+        problem.RootElement.GetProperty("detail").GetString().Should().Be("This process serves no requests.");
+        problem.RootElement.GetProperty("kind").GetString().Should().Be("failed");
+    }
+
+    [Fact]
+    public async Task What_would_change_the_address_or_the_reader_is_refused_before_anything_runs()
     {
         var credential = new InProcessRequest(HttpMethods.Get, "/in-process/whoami") { Headers = { Cookie = "session=someone-else" } };
         var address = new InProcessRequest(HttpMethods.Get, "https://elsewhere.example/in-process/whoami");
+        var dotted = new InProcessRequest(HttpMethods.Get, "/in-process/items/../whoami");
+        var escaped = new InProcessRequest(HttpMethods.Get, "/in-process/items/%2E%2E/whoami");
+        var feature = new InProcessRequest(HttpMethods.Get, "/in-process/whoami");
+        feature.Features.Set<IHttpAuthenticationFeature>(new HttpAuthenticationFeature { User = WhoScheme.Person("someone-else") });
 
-        await FluentActions.Awaiting(() => host.Pipeline.Send(credential, Ct)).Should().ThrowAsync<ArgumentException>();
-        await FluentActions.Awaiting(() => host.Pipeline.Send(address, Ct)).Should().ThrowAsync<ArgumentException>();
+        foreach (var refused in new[] { credential, address, dotted, escaped, feature })
+            await FluentActions.Awaiting(() => host.Pipeline.Send(refused, Ct)).Should().ThrowAsync<ArgumentException>(refused.Address);
+        Encoding.UTF8.GetString((await host.Pipeline.Send(new InProcessRequest(HttpMethods.Get, "/in-process/whoami?next=../back"), Ct)).Body.Span)
+            .Should().Be("visitor", "a dot segment in the query is no segment of the path");
     }
 }
 
@@ -253,9 +288,11 @@ public sealed class PageTags : IAsyncResultFilter
 public sealed class InProcessController(KoanWebPipeline pipeline) : ControllerBase
 {
     [HttpGet("relay")]
-    public async Task<IActionResult> Relay(string address, bool nobody, bool stranger, string? accept, string? handed, CancellationToken ct)
+    public async Task<IActionResult> Relay(string address, bool nobody, bool stranger, string? accept, string? handed, string? from, CancellationToken ct)
     {
         HttpContext.Items["outer"] = true;
+        // The address the request in hand arrived from, as a declared proxy would have resolved it.
+        if (from is not null) HttpContext.Connection.RemoteIpAddress = IPAddress.Parse(from);
         var request = new InProcessRequest(HttpMethods.Get, address) { AsNobody = nobody, Principal = stranger ? WhoScheme.Person("stranger") : null };
         request.Headers.Accept = accept ?? "application/json";
         if (handed is not null) request.Features.Set(new Handed(handed));
@@ -270,6 +307,9 @@ public sealed class InProcessController(KoanWebPipeline pipeline) : ControllerBa
 
     [HttpGet("members"), Authorize]
     public IActionResult Members() => Content("member");
+
+    [HttpGet("internal"), Tool, Access(all: "origin:internal")]
+    public IActionResult Internal() => Content("inside");
 
     [HttpGet("items/{id:int}")]
     public IActionResult Item(int id, string? shade) => Ok(new { id, shade });
@@ -330,6 +370,7 @@ public sealed class InProcessHost : IAsyncLifetime
         builder.Services.AddKoan();
         builder.Services.AddKoanControllersFrom<InProcessController>();
         builder.Services.AddSingleton<Writes>();
+        builder.Services.Configure<OriginOptions>(origin => origin.InternalNetworks.Add("10.0.0.0/8"));
         builder.Services.AddAuthentication(WhoScheme.Name).AddScheme<AuthenticationSchemeOptions, WhoScheme>(WhoScheme.Name, _ => { });
         builder.Services.PostConfigure<AuthenticationOptions>(options => options.DefaultScheme = options.DefaultAuthenticateScheme = options.DefaultChallengeScheme = WhoScheme.Name);
         builder.Services.Configure<MvcOptions>(mvc =>

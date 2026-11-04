@@ -10,7 +10,7 @@ namespace Koan.Web.Hosting;
 /// </summary>
 /// <param name="method">The HTTP method, such as <c>GET</c>.</param>
 /// <param name="address">The path and query under the application's base URL, as a request line spells them:
-/// <c>/places/open/topics?page=2</c>. The path base is the pipeline's to add.</param>
+/// <c>/places/open/topics?page=2</c>, naming no dot segment. The path base is the pipeline's to add.</param>
 public sealed class InProcessRequest(string method, string address)
 {
     public string Method { get; } = method;
@@ -23,7 +23,8 @@ public sealed class InProcessRequest(string method, string address)
 
     public ReadOnlyMemory<byte> Body { get; init; }
 
-    /// <summary>Values handed to the request in process, each set as a feature of its <see cref="HttpContext"/>.</summary>
+    /// <summary>Values handed to the request in process, each set as a feature of its <see cref="HttpContext"/>. Never one of ASP.NET's
+    /// own server features, which the pipeline sets.</summary>
     public IFeatureCollection Features { get; } = new FeatureCollection();
 
     /// <summary>Read as nobody: nothing of the request in hand reaches it but its scheme and host, and its principal is empty.</summary>

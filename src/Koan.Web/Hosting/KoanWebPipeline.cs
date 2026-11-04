@@ -35,22 +35,34 @@ public sealed class KoanWebPipeline(IServiceProvider services, IHttpContextAcces
         HeaderNames.TE, HeaderNames.Trailer, HeaderNames.TransferEncoding, HeaderNames.Upgrade, HeaderNames.Expect,
         KoanWebConstants.Headers.Forwarded, ForwardedHeadersDefaults.XForwardedForHeaderName, ForwardedHeadersDefaults.XForwardedHostHeaderName,
         ForwardedHeadersDefaults.XForwardedProtoHeaderName, ForwardedHeadersDefaults.XForwardedPrefixHeaderName,
-        HeaderNames.Accept, HeaderNames.AcceptEncoding, HeaderNames.IfMatch, HeaderNames.IfNoneMatch, HeaderNames.IfModifiedSince,
+        HeaderNames.Accept, HeaderNames.AcceptCharset, HeaderNames.AcceptEncoding, HeaderNames.IfMatch, HeaderNames.IfNoneMatch, HeaderNames.IfModifiedSince,
         HeaderNames.IfUnmodifiedSince, HeaderNames.IfRange, HeaderNames.Range, HeaderNames.Origin,
     }.ToFrozenSet(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Where ASP.NET's own server features live: the request line, the connection, the response and the authenticated user.</summary>
+    private static readonly string ServerFeatures = typeof(IFeatureCollection).Namespace!;
 
     private RequestDelegate? _pipeline;
 
     /// <summary>Answers <paramref name="request"/> as the application answers it over HTTP from the same reader, buffered whole. An exception
     /// nothing in the pipeline handled reaches the caller; a process that serves no web requests answers <c>503</c>.</summary>
-    /// <exception cref="ArgumentException">The address is not a path, or the headers given carry a credential.</exception>
+    /// <exception cref="ArgumentException">The address is not a path or names a dot segment, the headers given carry a credential, or a
+    /// feature handed in is one of ASP.NET's own.</exception>
     public async Task<InProcessAnswer> Send(InProcessRequest request, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(request);
         if (!request.Address.StartsWith('/'))
             throw new ArgumentException($"An address is a path and query under the application's base URL, such as /places; '{request.Address}' is not.", nameof(request));
+        var query = request.Address.IndexOf('?');
+        var path = query < 0 ? request.Address : request.Address[..query];
+        // HTTP resolves a dot segment before any route sees it; an address here is taken as it is, so one that names a dot segment is refused.
+        if (PathString.FromUriComponent(path).Value!.Split('/').Any(segment => segment is "." or ".."))
+            throw new ArgumentException($"An address names no dot segment, which HTTP would resolve before any route saw it; '{request.Address}' does.", nameof(request));
         if (request.Headers.ContainsKey(HeaderNames.Cookie) || request.Headers.ContainsKey(HeaderNames.Authorization))
             throw new ArgumentException("A request made in process is read as the caller of the request in hand or as nobody, so it carries no credential it is given.", nameof(request));
+        // The request line, the connection and the reader are the pipeline's to set, so a value handed in is never one of ASP.NET's own features.
+        if (request.Features.Select(feature => feature.Key).FirstOrDefault(IsServerFeature) is { } server)
+            throw new ArgumentException($"A value handed in process is the application's own; {server.Name} is ASP.NET's, which the pipeline sets.", nameof(request));
 
         // Read when a request is sent: the host resolves its builder factory before the startup filter has built the base URL.
         var baseUrl = services.GetRequiredService<KoanWebBaseUrl>();
@@ -66,12 +78,11 @@ public sealed class KoanWebPipeline(IServiceProvider services, IHttpContextAcces
                 if (Carried(name, request.Withheld)) http.Request.Headers[name] = value;
         foreach (var (name, value) in request.Headers) http.Request.Headers[name] = value;
 
-        var query = request.Address.IndexOf('?');
         http.Request.Method = request.Method;
         // With no connection there is no scheme to go by; a request from this process is as safe as one on TLS.
         http.Request.Scheme = inHand?.Request.Scheme ?? origin?.Scheme ?? Uri.UriSchemeHttps;
         http.Request.Host = inHand?.Request.Host ?? (origin is null ? new HostString("localhost") : new HostString(origin.Authority));
-        http.Request.Path = PathString.FromUriComponent((inHand?.Request.PathBase ?? baseUrl.PathBase).ToUriComponent() + (query < 0 ? request.Address : request.Address[..query]));
+        http.Request.Path = PathString.FromUriComponent((inHand?.Request.PathBase ?? baseUrl.PathBase).ToUriComponent() + path);
         http.Request.QueryString = query < 0 ? QueryString.Empty : new QueryString(request.Address[query..]);
         if (!request.Body.IsEmpty || http.Request.ContentType is { Length: > 0 })
         {
@@ -107,6 +118,11 @@ public sealed class KoanWebPipeline(IServiceProvider services, IHttpContextAcces
         builder.Use(next => _pipeline = next);
         return builder;
     }
+
+    /// <summary>Whether <paramref name="type"/> is one of the server's feature interfaces, such as <c>IHttpRequestFeature</c> or
+    /// <c>IHttpAuthenticationFeature</c>.</summary>
+    private static bool IsServerFeature(Type type)
+        => type.IsInterface && type.Namespace is { } name && (name == ServerFeatures || name.StartsWith(ServerFeatures + ".", StringComparison.Ordinal));
 
     private static bool Carried(string name, ISet<string> withheld)
         => !name.StartsWith(KoanWebConstants.Headers.ContentPrefix, StringComparison.OrdinalIgnoreCase) && !NeverCarried.Contains(name) && !withheld.Contains(name);

@@ -235,13 +235,15 @@ public sealed class DraftsController(KoanWebPipeline pipeline) : ControllerBase
 ```
 
 - **The address** is a path and query under the application's base URL; the path base is added for you. An address that
-  is not a path is refused.
+  is not a path, or that names a `.` or `..` segment, is refused.
 - **Who reads it.** By default, the caller of the request in hand: its own `Cookie` and `Authorization` are carried and
   the application's authentication reads them, as on any route. With no request in hand (a STDIO tool call, a command-line
   verb), `Principal` is the reader. `AsNobody = true` reads as a visitor: nothing of the request in hand reaches it but its
-  scheme and host. A credential among the headers you give is refused; a request is never read as anyone else.
+  scheme and host. A credential among the headers you give, and a value handed in as one of ASP.NET's own server features,
+  are refused; a request is never read as anyone else.
 - **What it carries of the request in hand:** every header except its connection's, its body's and its own answer's —
-  `Host`, the hop-by-hop and forwarding headers, every `Content-*`, `Accept`, `Accept-Encoding`, the conditionals, `Range`
+  `Host`, the hop-by-hop and forwarding headers, every `Content-*`, `Accept`, `Accept-Charset`, `Accept-Encoding`, the
+  conditionals, `Range`
   and `Origin`. Give `Accept` and `Content-Type` yourself, and name your transport's own headers in `Withheld`.
 - **Values handed in process** go in `Features` and become features of the inner `HttpContext`, which an action or a
   formatter reads; the inner request has its own DI scope, `Items` and execution flow, and the caller's
