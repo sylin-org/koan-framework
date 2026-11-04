@@ -19,6 +19,9 @@ public sealed class Sequence
 {
     private const string HeadOperation = "sequence head";
 
+    // The longest timeout a timer takes, and so the longest bound a wait can be given (Task.WaitAsync refuses more).
+    private static readonly TimeSpan LongestWait = TimeSpan.FromMilliseconds(uint.MaxValue - 1);
+
     private readonly Type _entity;
     private readonly Func<CancellationToken, Task<long>> _highest;
 
@@ -73,7 +76,7 @@ public sealed class Sequence
     /// <param name="ct">Ends the wait, which then throws <see cref="OperationCanceledException"/>.</param>
     public async Task<long> WaitPast(long after, TimeSpan wait, CancellationToken ct = default)
     {
-        if (wait <= TimeSpan.Zero || wait == Timeout.InfiniteTimeSpan)
+        if (wait <= TimeSpan.Zero || wait > LongestWait)
             throw new ArgumentOutOfRangeException(nameof(wait), wait,
                 "A wait on a sequence's head is bounded: give a positive, finite bound. To read the head without waiting, use Head.");
         var (heads, head) = HeadHere();

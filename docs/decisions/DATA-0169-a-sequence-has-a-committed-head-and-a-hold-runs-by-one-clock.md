@@ -90,7 +90,6 @@ before it reads. `new Reply(...).` lists `Send` twice, with and without a clock.
 - Additive. `ITransactionCoordinator`, `Send(ct)`, `Highest` and `Next` are unchanged, and nothing happens until a head is asked or a command sent.
 - Internally, `TransactionCoordinator` takes the host's heads and its clock, records which sequences it numbered away from their default store, and
   raises the rest once it has committed; `TransactionCoordinatorFactory` takes `SequenceHeads`, which `AddKoanTransactions` registers once.
-- `Send(default)` is ambiguous between the two overloads, so a send with no token is written `Send()`.
 - DATA-0167 item 8 ("No marks in memory") and DATA-0168 item 4 (the consumer keeps its own high-water mark) change in words only: numbering reads the store
   as before, and the committed head moves from each consumer into Koan.
 - A hold that numbers one sequence under two partitions or two tenants continues one count across them, because the tally is keyed by the sequence

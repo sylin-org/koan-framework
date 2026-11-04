@@ -261,6 +261,7 @@ public sealed class SqliteSequenceHeadSpec(SqliteFixture fixture, ITestOutputHel
                 (await FluentActions.Awaiting(() => Numbers.Head(Cancellation)).Should().ThrowAsync<InvalidOperationException>())
                     .Which.Message.Should().Contain("from source 'Other'").And.Contain("Ask the head with no source, adapter, partition or container in scope");
                 Done(await new NumberASlip("other", 0).Send(Cancellation)).Should().Be(1);
+                Done(await new NumberASlip("other", 1).Send(Cancellation)).Should().Be(2);
             }
             using (EntityContext.Adapter("sqlite"))
                 (await FluentActions.Awaiting(() => Numbers.WaitPast(0, Wait, Cancellation)).Should().ThrowAsync<InvalidOperationException>())
@@ -278,6 +279,8 @@ public sealed class SqliteSequenceHeadSpec(SqliteFixture fixture, ITestOutputHel
             await FluentActions.Awaiting(() => Numbers.WaitPast(1, TimeSpan.Zero, Cancellation)).Should().ThrowAsync<ArgumentOutOfRangeException>()
                 .WithMessage("*give a positive, finite bound*");
             await FluentActions.Awaiting(() => Numbers.WaitPast(1, Timeout.InfiniteTimeSpan, Cancellation)).Should().ThrowAsync<ArgumentOutOfRangeException>();
+            await FluentActions.Awaiting(() => Numbers.WaitPast(1, TimeSpan.MaxValue, Cancellation)).Should().ThrowAsync<ArgumentOutOfRangeException>()
+                .WithMessage("*give a positive, finite bound*");
         }
         finally
         {

@@ -17,7 +17,7 @@ public static class CommandExtensions
         /// <summary>Sends the command as <c>Send(ct)</c> does, running its hold by
         /// <paramref name="clock"/>: what the command and the code it calls read from <see cref="EntityContext.Clock"/>, for this send only.
         /// A test or a seed names the time each write it sends happens at.</summary>
-        public Task<Outcome<TResult>> Send(TimeProvider clock, CancellationToken ct = default) =>
+        public Task<Outcome<TResult>> Send(TimeProvider clock, CancellationToken ct) =>
             Run(command, clock ?? throw new ArgumentNullException(nameof(clock), "Name the clock this send runs by, or send it with Send(ct), which runs by the host's."), ct);
     }
 

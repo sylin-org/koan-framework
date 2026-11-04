@@ -17,7 +17,7 @@ amended_by:
 
 # DATA-0168: A read starts no write, and a command is sent by whoever asks for it
 
-> **Amended by [DATA-0169](DATA-0169-a-sequence-has-a-committed-head-and-a-hold-runs-by-one-clock.md) (2026-11-04): the high-water mark moves into Koan.** Item 4's consumer no longer keeps
+> **Amended by [DATA-0169](DATA-0169-a-sequence-has-a-committed-head-and-a-hold-runs-by-one-clock.md) (2026-11-04): the high-water mark moves into Koan.** Item 4's consumer need no longer keep
 > its own: each held commit raises `Sequence.Head` by a compare-and-swap maximum, and a reader waits on it with `Sequence.WaitPast` for a bound it gives.
 > Item 2 stands: nothing tells code of each commit, and the wait has nothing to register.
 
