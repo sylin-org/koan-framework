@@ -114,6 +114,9 @@ edge's own authentication had made of `/mcp`, with its result, since no authenti
 | **Isolation** | Scope, `Items`, features and flow of its own; the outer accessor as it was | Scope and features of its own | As B | As B |
 | **Cost** | One public type and two records; 310–320 µs a call | 210–240 µs | 225–240 µs, and a second routing builder | 120–165 µs, and a binder of its own |
 
+The rows the tool path's specs cover, and the ETag row, were run; the formatter, exception and isolation cells of B, B2 and C are read
+from their code, since no prototype ran `InProcessSpec`.
+
 **D. Routing, authorization and the limiter as a smaller pipeline** is B2 with three middlewares added: it would close the
 `[Authorize]` and limiter rows and still fail every middleware row, since an application's own middleware and Koan's web-context
 contributors, which set tenancy and read filters, are not in it, and it is a second copy of `KoanWebStartupFilter`'s order. Ruled
