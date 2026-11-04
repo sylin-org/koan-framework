@@ -1069,6 +1069,22 @@ timeout and is then told `NotDispatched`, so raise `Koan:Data:Sqlite:BusyTimeout
 send inside a transaction scope. A command does no network, since every other writer waits while it runs. `Commit` and `Rollback` refuse inside it. Make the tables it writes
 exist at boot, as for any hold. A sequence refuses an entity a read scope such as soft delete hides rows of.
 
+A reader follows what has committed through the sequence's head
+([DATA-0169](../decisions/DATA-0169-a-sequence-has-a-committed-head-and-a-hold-runs-by-one-clock.md)):
+
+```csharp
+var seen = await Event.Log.Head(ct);                                    // before a page reads, so it never runs ahead of what committed
+seen = await Event.Log.WaitPast(seen, TimeSpan.FromSeconds(25), ct);    // a live stream's loop: a commit here wakes it, the bound bounds it
+```
+
+Each hold that commits raises the head before its sender is answered. Another process's commit reaches a waiting reader at the wait's bound, when the wait reads
+the store once; a head nobody waits on learns of none. Both refuse inside a hold, where `Highest` is the read, and wherever the column is read from anything but
+the entity's default store: a source, an adapter, a partition, a container a name particle names, or an entity with an equality field such as a tenant's.
+
+A command reads the time from `EntityContext.Clock`, the clock its hold runs by, and carries no time of its own: a test or a seed names one for a send with
+`await new Reply(topicId, "hi").Send(clock, ct)`, and every other send runs by the host's registered `TimeProvider`, or the system's. Outside a hold the accessor is
+the host's. The `[Timestamp]` stamp stays on the system clock.
+
 **Cross-adapter coordination:**
 
 ```csharp

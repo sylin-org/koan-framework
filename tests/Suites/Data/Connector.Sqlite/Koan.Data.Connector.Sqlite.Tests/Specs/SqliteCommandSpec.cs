@@ -275,23 +275,23 @@ public sealed class SeedAtStartup<TCommand>(Func<Task<Outcome<CommandSlip>>> sen
 public sealed class SqliteCommandSpec(SqliteFixture fixture, ITestOutputHelper output)
     : KoanDataSpec<SqliteFixture>(fixture, output)
 {
-    private static readonly TimeSpan Bound = TimeSpan.FromSeconds(30);
+    internal static readonly TimeSpan Bound = TimeSpan.FromSeconds(30);
 
     private const string Slips = "KOAN_COMMAND_SLIP";
 
-    private static CancellationToken Cancellation => TestContext.Current.CancellationToken;
+    internal static CancellationToken Cancellation => TestContext.Current.CancellationToken;
 
-    private static string TempDatabase(string label) =>
+    internal static string TempDatabase(string label) =>
         Path.Combine(Path.GetTempPath(), $"koan-command-{label}-{Guid.CreateVersion7():n}.db");
 
-    private static void Delete(string path)
+    internal static void Delete(string path)
     {
         SqliteConnection.ClearAllPools();
         foreach (var file in new[] { path, path + "-wal", path + "-shm" })
             if (File.Exists(file)) File.Delete(file);
     }
 
-    private static Dictionary<string, string?> Settings(string path, string? connectionSuffix = null, TimeSpan? busyTimeout = null)
+    internal static Dictionary<string, string?> Settings(string path, string? connectionSuffix = null, TimeSpan? busyTimeout = null)
     {
         var settings = new Dictionary<string, string?>(StringComparer.Ordinal)
         {
@@ -302,14 +302,18 @@ public sealed class SqliteCommandSpec(SqliteFixture fixture, ITestOutputHelper o
         return settings;
     }
 
-    /// <summary>A real host, whose stop a spec can watch, on a file whose tables exist already (DATA-0166: first use belongs at boot).</summary>
-    private static async Task<IntegrationHost> Start(Dictionary<string, string?> settings, bool provision = true)
+    /// <summary>A real host, whose stop a spec can watch, on a file whose tables exist already (DATA-0166: first use belongs at boot).
+    /// <paramref name="declare"/> runs inside the host's composition, and <paramref name="configure"/> after it.</summary>
+    internal static async Task<IntegrationHost> Start(
+        Dictionary<string, string?> settings, bool provision = true, Action? declare = null, Action<IServiceCollection>? configure = null)
     {
         var host = await KoanIntegrationHost.Configure()
             .WithSettings(settings)
             .ConfigureServices(services =>
             {
-                services.AddKoan();
+                if (declare is null) services.AddKoan();
+                else services.AddKoan(declare);
+                configure?.Invoke(services);
             })
             .StartAsync(Cancellation);
         if (provision)
@@ -322,7 +326,7 @@ public sealed class SqliteCommandSpec(SqliteFixture fixture, ITestOutputHelper o
         return host;
     }
 
-    private static T Done<T>(Outcome<T> outcome) => outcome.Should().BeOfType<Outcome<T>.Done>().Which.Result;
+    internal static T Done<T>(Outcome<T> outcome) => outcome.Should().BeOfType<Outcome<T>.Done>().Which.Result;
 
     /// <summary>What a connection of its own reads.</summary>
     private static async Task<long> CommittedCount(string path, string table)

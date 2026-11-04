@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "generatedUtc": "2026-11-04T20:51:20Z",
+  "generatedUtc": "2026-11-04T20:33:20Z",
   "sourceCommit": "3fb5ee90bb8ea35763496612f12d60e11a7b3e7b",
   "note": "Verbatim copies of the named docs at main. Relative links inside a snapshot may point back into docs/reference and can 404 from this location; treat paths as repo-relative text.",
   "files": [

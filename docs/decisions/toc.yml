@@ -456,6 +456,8 @@
       href: DATA-0167-an-application-sends-a-write-as-a-value.md
     - name: DATA-0168 A read starts no write, and a command is sent by whoever asks for it
       href: DATA-0168-a-read-starts-no-write.md
+    - name: DATA-0169 A sequence has a committed head a reader waits on, and every hold runs by one clock
+      href: DATA-0169-a-sequence-has-a-committed-head-and-a-hold-runs-by-one-clock.md
 - name: Web (WEB)
   items:
     - name: WEB-0010 Separate AI web surface

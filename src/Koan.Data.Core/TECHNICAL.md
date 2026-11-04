@@ -366,7 +366,12 @@ validation:
 - `Send` (DATA-0167) is one async method around `EntityContext.Hold`, in the sender's flow, with no service behind it: the store's turn is the line, and the hold's own
   refusals are what a send that cannot run is told. `TransactionCoordinator.Take` tallies a hold's `Sequence` numbers, which roll back with it by being read from the store at first use, through `Data<T,K>.Top`, which takes
   no tiebreaker so that the store can answer out of the column's unique index. `EndedByItsOwner` refuses `Commit` and `Rollback` while `Run` runs. The turn passes on
-  as soon as the native commit lands; `AfterCommit` runs after that, before `Send` answers.
+  as soon as the native commit lands; once the hold has ended, `RaiseHeads` raises the host's `SequenceHeads` to the last number the tally holds for each sequence
+  it took on the default store (DATA-0169), a compare-and-swap maximum that completes the head's wake; `AfterCommit` runs after that, before `Send` answers. `Take`
+  records a sequence it numbered under a source, an adapter, a partition, a name particle or an equality field, and that sequence is not raised. `SequenceHeads`
+  is one singleton per host, registered beside the factory, which hands it and the host's `TimeProvider` (or `TimeProvider.System`) to every coordinator;
+  `Send(clock, ct)` replaces the hold's clock as it sets `EndedByItsOwner`, and `EntityContext.Clock` answers a held coordinator's clock, or the host's.
+  `WaitPast` takes the head's wake before it reads the head, and at its bound reads `Highest` outside any hold and raises the head to it.
 - Deferred entity operations restore their captured source, adapter and partition exactly during
   route resolution and execution. A captured default clears the commit caller's corresponding routing axis.
   Executing a tracked operation suppresses the transaction to prevent recursive enlistment.

@@ -219,11 +219,12 @@ the ambient Koan host binding. ASP.NET Core and workers continue to use their na
   route that declares `write.heldTransaction` (SQLite), and is refused elsewhere (DATA-0166). The body reads its own
   writes, a write acts when it is issued, and other writers wait, in another process too.
 - `command.Send(ct)` runs an `ICommand<TResult>` in a hold of its own, in this flow, and answers with an `Outcome<TResult>`; a route
-  with no holds refuses it (DATA-0167).
+  with no holds refuses it (DATA-0167). `command.Send(clock, ct)` runs that hold by a `TimeProvider` the sender names for this send; every
+  other hold runs by the host's registered `TimeProvider`, or the system's (DATA-0169).
 - Relationship expansion is direct-edge and budgeted. It is not recursive graph traversal, snapshot isolation, or a
   promise that scan-backed providers can execute without an explicit candidate limit.
-- `EntityContext` owns Data routing dimensions only; tenancy, subject, and other semantic axes are contributed and
-  enforced by their owning modules.
+- `EntityContext` owns Data routing dimensions and the clock a hold runs by (`EntityContext.Clock`); tenancy, subject, and other
+  semantic axes are contributed and enforced by their owning modules.
 - Canonical `PatchPayload` is provider-neutral. Web/MCP projections own protocol parsing and normalization before
   the operation reaches Data.
 - Required Entity operations without a live composed host throw `KoanHostContextException` with the missing
@@ -340,8 +341,17 @@ var outcome = await new Reply(topicId, "hi").Send(ct);
 - `Sequence.Of<Event>(e => e.Seq)` names a column under `[Index(Unique = true)]`, and `Next(ct)` numbers it with no gap in what commits, across
   processes too. It reads the top of the column at its first use in a hold, and refuses outside one, and over an entity a read scope such as soft
   delete hides rows of.
+- `Head(ct)` is the highest number that has committed, with every number below it committed too (DATA-0169). The first ask reads the store; after it
+  the host answers from memory, and each hold that commits raises it once, before its sender is answered. `WaitPast(seen, bound, ct)` waits for the head
+  to pass `seen`, for at most a bound it must give, and answers the head then: a commit of this process wakes it at once, and at its bound it reads the
+  store, so another process's commit reaches it within one bound. A head nobody waits on learns of no other process's commit. Both refuse inside a hold,
+  where `Highest` is the read, and wherever the column is read from anything but the entity's default store: a source, an adapter, a partition, a
+  container a storage-name particle names, or an entity with an equality field such as a tenant's.
+- A command reads the time from `EntityContext.Clock`, the clock its hold runs by; outside a hold it is the host's `TimeProvider`. The `[Timestamp]`
+  stamp stays on the system clock.
 - Work that must follow a command's commit registers `EntityContext.UncommittedScope.AfterCommit` from inside it. It runs only if the command commits, once the
-  turn has passed on and before the sender is answered, so it can send. A fact other code acts on is an Entity event, which waits for the commit too.
+  turn has passed on and the heads are raised, and before the sender is answered, so it can send. A fact other code acts on is an Entity event, which waits for
+  the commit too.
 
 ## Hold a transaction from the start of a scope
 

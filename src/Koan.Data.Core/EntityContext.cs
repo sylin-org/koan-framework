@@ -11,7 +11,7 @@ using Microsoft.Extensions.Options;
 namespace Koan.Data.Core;
 
 /// <summary>
-/// Ambient routing context for entity operations.
+/// Ambient routing context for entity operations, and the clock a hold runs by (<see cref="Clock"/>).
 /// Supports source OR adapter selection (mutually exclusive) plus partition and transaction routing.
 ///
 /// Routing dimensions:
@@ -119,6 +119,17 @@ public static class EntityContext
     /// </summary>
     public static Transactions.ITransactionCoordinator? UncommittedScope =>
         Transactions.TransactionCoordinator.AtomicDispatch ?? (CurrentTransaction is { IsCompleted: false } open ? open : null);
+
+    /// <summary>
+    /// The time a command reads (DATA-0169). Inside a hold, the command's <c>Run</c> and everything it calls, it is the clock the hold runs by:
+    /// the one its sender named with <c>Send(clock, ct)</c>, otherwise the host's registered <see cref="TimeProvider"/>, otherwise
+    /// <see cref="TimeProvider.System"/>. Outside a hold it is the host's, the same one dependency injection hands out, so code a command calls reads
+    /// one accessor wherever it runs: <c>EntityContext.Clock.GetUtcNow()</c>. The <c>[Timestamp]</c> stamp does not read it.
+    /// </summary>
+    public static TimeProvider Clock =>
+        CurrentTransaction is Transactions.TransactionCoordinator { IsHeld: true } hold
+            ? hold.Clock
+            : AppHost.Current?.GetService<TimeProvider>() ?? TimeProvider.System;
 
     /// <summary>
     /// Push a routing context for the lifetime of the returned scope. The new context is built

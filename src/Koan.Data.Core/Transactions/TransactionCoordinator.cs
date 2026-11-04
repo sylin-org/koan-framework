@@ -43,7 +43,10 @@ internal sealed class TransactionCoordinator : ITransactionCoordinator
     private DataRouteHold? _routeHold;
     private Timer? _holdLimit;
     private readonly Dictionary<Sequence, long> _sequences = new();
+    // A sequence this hold numbered anywhere but its default store, whose head it therefore does not raise.
+    private HashSet<Sequence>? _unheaded;
     private readonly SemaphoreSlim _sequenceTurn = new(1, 1);
+    private readonly SequenceHeads _heads;
 
     public string Name { get; }
     public bool IsCompleted => _isCompleted;
@@ -59,6 +62,8 @@ internal sealed class TransactionCoordinator : ITransactionCoordinator
         ILogger<TransactionCoordinator> logger,
         TransactionOptions options,
         TransactionGuarantee guarantee,
+        SequenceHeads heads,
+        TimeProvider clock,
         bool isHeld = false)
     {
         Name = name ?? throw new ArgumentNullException(nameof(name));
@@ -67,6 +72,8 @@ internal sealed class TransactionCoordinator : ITransactionCoordinator
         _services = services ?? throw new ArgumentNullException(nameof(services));
         _operationHorizon = operationHorizon ?? throw new ArgumentNullException(nameof(operationHorizon));
         _providers = providers ?? throw new ArgumentNullException(nameof(providers));
+        _heads = heads ?? throw new ArgumentNullException(nameof(heads));
+        Clock = clock ?? throw new ArgumentNullException(nameof(clock));
         Guarantee = guarantee;
         IsHeld = isHeld;
         // Deferred coordination is useful but is neither a native local transaction nor distributed atomicity. An
@@ -130,6 +137,9 @@ internal sealed class TransactionCoordinator : ITransactionCoordinator
     /// <summary>While a command runs, what sent it is what ends its hold.</summary>
     internal bool EndedByItsOwner { get; set; }
 
+    /// <summary>The time this hold runs by (DATA-0169): the host's, unless the command's sender named one for its send.</summary>
+    internal TimeProvider Clock { get; set; }
+
     private void RefuseWhileItsOwnerEndsIt()
     {
         if (EndedByItsOwner)
@@ -140,10 +150,12 @@ internal sealed class TransactionCoordinator : ITransactionCoordinator
     /// <summary>The next number of <paramref name="sequence"/> in this hold: its first use reads the store, and the flows of a hold take turns.</summary>
     internal async Task<long> Take(Sequence sequence, CancellationToken ct)
     {
+        var headed = sequence.NumbersTheHead();
         await _sequenceTurn.WaitAsync(ct).ConfigureAwait(false);
         try
         {
             var last = _sequences.TryGetValue(sequence, out var taken) ? taken : await sequence.Highest(ct).ConfigureAwait(false);
+            if (!headed) (_unheaded ??= new()).Add(sequence);
             return _sequences[sequence] = checked(last + 1);
         }
         finally
@@ -304,6 +316,7 @@ internal sealed class TransactionCoordinator : ITransactionCoordinator
 
             _isCompleted = true;
             await EndHold(held).ConfigureAwait(false);
+            RaiseHeads();
             _logger.LogInformation("Transaction '{TransactionName}' committed its held transaction", Name);
             _activity?.SetStatus(ActivityStatusCode.Ok);
             _activity?.SetTag("transaction.outcome", "committed");
@@ -323,6 +336,14 @@ internal sealed class TransactionCoordinator : ITransactionCoordinator
         {
             _activity?.Dispose();
         }
+    }
+
+    /// <summary>The hold has committed, so each sequence it numbered on its default store has committed through the last number it took, with
+    /// none missing below (DATA-0169): one raise per sequence, before the work that follows the commit and before its sender is answered.</summary>
+    private void RaiseHeads()
+    {
+        foreach (var (sequence, last) in _sequences)
+            if (_unheaded?.Contains(sequence) != true) _heads.Of(sequence).Raise(last);
     }
 
     private async Task RollbackHold()

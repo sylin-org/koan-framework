@@ -1,6 +1,8 @@
 ﻿using System;
 using Koan.Core.Modules;
+using Koan.Data.Core.Commands;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Koan.Data.Core.Transactions;
 
@@ -28,8 +30,9 @@ public static class TransactionServiceCollectionExtensions
             services.Configure(configure);
         }
 
-        // Register factory
+        // Register factory, and beside it the committed heads of this host's sequences, which its holds raise (DATA-0169)
         services.AddSingleton<ITransactionCoordinatorFactory, TransactionCoordinatorFactory>();
+        services.TryAddSingleton<SequenceHeads>();
 
         return services;
     }

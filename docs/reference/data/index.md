@@ -145,6 +145,11 @@ answers with an `Outcome<TResult>`: `Done`, `Refused` with a `Reason` that decla
 numbers a uniquely indexed column with no gap in what commits. See
 [DATA-0167](../../decisions/DATA-0167-an-application-sends-a-write-as-a-value.md).
 
+`await Event.Log.Head(ct)` is the highest number that has committed, with none missing below it, raised by each hold of this host before its sender is
+answered; `await Event.Log.WaitPast(seen, bound, ct)` waits for it to pass `seen` for at most `bound`, and at its bound reads the store, so another
+process's commit reaches it within one bound. A command reads the time from `EntityContext.Clock`: the clock `Send(clock, ct)` names, otherwise the host's
+`TimeProvider`. See [DATA-0169](../../decisions/DATA-0169-a-sequence-has-a-committed-head-and-a-hold-runs-by-one-clock.md).
+
 ## Keep a polymorphic family in one set
 
 Declare one Entity root when several runtime shapes must share one searchable table or collection.

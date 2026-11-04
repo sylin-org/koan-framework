@@ -1,4 +1,6 @@
 using System;
+using Koan.Data.Core.Commands;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Koan.Data.Core.Routing;
@@ -16,6 +18,8 @@ internal sealed class TransactionCoordinatorFactory : ITransactionCoordinatorFac
     private readonly IServiceProvider _services;
     private readonly DataOperationHorizon _operationHorizon;
     private readonly DataProviderCatalog _providers;
+    private readonly SequenceHeads _heads;
+    private readonly TimeProvider _clock;
 
     public TransactionCoordinatorFactory(
         IDataService dataService,
@@ -23,7 +27,8 @@ internal sealed class TransactionCoordinatorFactory : ITransactionCoordinatorFac
         DataOperationHorizon operationHorizon,
         DataProviderCatalog providers,
         ILogger<TransactionCoordinator> logger,
-        IOptions<TransactionOptions> options)
+        IOptions<TransactionOptions> options,
+        SequenceHeads heads)
     {
         _dataService = dataService ?? throw new ArgumentNullException(nameof(dataService));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -31,6 +36,9 @@ internal sealed class TransactionCoordinatorFactory : ITransactionCoordinatorFac
         _services = services ?? throw new ArgumentNullException(nameof(services));
         _operationHorizon = operationHorizon ?? throw new ArgumentNullException(nameof(operationHorizon));
         _providers = providers ?? throw new ArgumentNullException(nameof(providers));
+        _heads = heads ?? throw new ArgumentNullException(nameof(heads));
+        // The host's clock, as dependency injection hands it out, or the system's: Koan.Data.Core registers none of its own.
+        _clock = services.GetService<TimeProvider>() ?? TimeProvider.System;
     }
 
     public ITransactionCoordinator Create(string name, TransactionGuarantee guarantee = TransactionGuarantee.Coordinated)
@@ -53,6 +61,8 @@ internal sealed class TransactionCoordinatorFactory : ITransactionCoordinatorFac
             _logger,
             _options,
             guarantee,
+            _heads,
+            _clock,
             isHeld);
     }
 }

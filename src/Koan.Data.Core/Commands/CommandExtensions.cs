@@ -12,10 +12,16 @@ public static class CommandExtensions
         /// this waits behind other writers for at most the store's busy timeout, and is then told <see cref="DataCommitOutcome.NotDispatched"/>;
         /// a route that cannot hold, and an open scope around this send, are told the same. <paramref name="ct"/> ends the wait and the
         /// command, which then leaves nothing, and does not cut a commit short.</summary>
-        public Task<Outcome<TResult>> Send(CancellationToken ct = default) => Run(command, ct);
+        public Task<Outcome<TResult>> Send(CancellationToken ct = default) => Run(command, clock: null, ct);
+
+        /// <summary>Sends the command as <c>Send(ct)</c> does, running its hold by
+        /// <paramref name="clock"/>: what the command and the code it calls read from <see cref="EntityContext.Clock"/>, for this send only.
+        /// A test or a seed names the time each write it sends happens at.</summary>
+        public Task<Outcome<TResult>> Send(TimeProvider clock, CancellationToken ct = default) =>
+            Run(command, clock ?? throw new ArgumentNullException(nameof(clock), "Name the clock this send runs by, or send it with Send(ct), which runs by the host's."), ct);
     }
 
-    private static async Task<Outcome<TResult>> Run<TResult>(ICommand<TResult> command, CancellationToken ct)
+    private static async Task<Outcome<TResult>> Run<TResult>(ICommand<TResult> command, TimeProvider? clock, CancellationToken ct)
     {
         var name = command.GetType().Name;
         var landed = DataCommitOutcome.NotDispatched;
@@ -25,6 +31,7 @@ public static class CommandExtensions
             {
                 landed = DataCommitOutcome.NotCommitted;
                 var hold = (TransactionCoordinator)EntityContext.CurrentTransaction!;
+                if (clock is not null) hold.Clock = clock;
                 Outcome<TResult> outcome;
                 hold.EndedByItsOwner = true;
                 try

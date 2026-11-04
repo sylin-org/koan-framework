@@ -14,6 +14,7 @@ amended_by:
   - ARCH-0142
   - DATA-0168
   - ARCH-0143
+  - DATA-0169
 ---
 
 # DATA-0167: An application sends a write as a value, and it runs in a hold of its own, in the sender's flow
@@ -26,6 +27,10 @@ amended_by:
 
 > **Amended by [ARCH-0143](ARCH-0143-one-refusal-shape.md) (2026-11-03): a plain string no longer converts to an invalid reason.** Item 3's implicit conversion no longer holds: an invalid
 > reason is `Reason.Invalid(text)`, and equality is the record's.
+
+> **Amended by [DATA-0169](DATA-0169-a-sequence-has-a-committed-head-and-a-hold-runs-by-one-clock.md) (2026-11-04): a sequence has a committed head, and every hold runs by one clock.** Item 8's
+> "No marks in memory" still holds for numbering, which reads the store at its first use in each hold. Beside it Koan keeps a head per host that each held
+> commit raises: nothing numbers from it, it lags what has committed and never leads it, and a wait refreshes it from the store.
 
 ## Context
 
