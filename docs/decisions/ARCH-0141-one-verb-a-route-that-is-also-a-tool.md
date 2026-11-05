@@ -12,7 +12,7 @@ related:
   - SEC-0011
   - SEC-0017
   - WEB-0083
-amended_by: ARCH-0142, SEC-0039, ARCH-0143, ARCH-0144
+amended_by: ARCH-0142, SEC-0039, ARCH-0143, ARCH-0144, AI-0042
 ---
 
 # ARCH-0141: One verb is one route, and a tool call is a request to it
@@ -28,6 +28,10 @@ amended_by: ARCH-0142, SEC-0039, ARCH-0143, ARCH-0144
 > `KoanWebPipeline` holds what `RoutePipeline` held, and `Koan.Web` registers it, `IHttpContextAccessor` and the global limiter's single count, which keys on the pipeline's own mark,
 > so the Coalescence's holder of the pipeline and the Compatibility line on what `Koan.Mcp` registers no longer hold, nor `OneCountLimiter` as `Koan.Mcp`'s. Rule 2's request carries
 > the caller's `Cookie` and `Authorization` and places no principal, as SEC-0039 rule 7 has it, and withholds what ARCH-0144's one header rule withholds.
+
+> **Amended by [AI-0042](AI-0042-the-edge-reads-by-address-and-fails-in-one-shape.md) (2026-11-04): every failure of the edge carries a `Problem`, and an agent may read any address.** Rule 10's refusal the edge makes before any request
+> carries one too, with `retryAfter`, `challenge` and whether anything `landed` in `meta`; a route value of the wrong type is refused on its field; and rule 11 gains `read`, a tool
+> of the edge that reaches every GET route where `Koan:Mcp:ReadByAddress` is on, each answering to its own gate, while a route tool takes an `address` in place of its route values.
 
 ## Context
 

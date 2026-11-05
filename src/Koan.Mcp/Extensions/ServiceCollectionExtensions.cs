@@ -31,6 +31,7 @@ internal static class McpServiceRegistration
         services.TryAddSingleton<Koan.Mcp.CustomTools.McpCustomToolRegistry>();
         services.TryAddSingleton<Koan.Mcp.CustomTools.McpCustomToolInvoker>();
         services.TryAddSingleton<Koan.Mcp.CustomTools.RouteToolInvoker>();
+        services.TryAddSingleton<Koan.Mcp.CustomTools.AddressReader>();
         services.AddHostedService<Koan.Mcp.CustomTools.McpToolStartCheck>();
         services.TryAddEnumerable(ServiceDescriptor.Singleton<Microsoft.AspNetCore.Routing.MatcherPolicy, Koan.Mcp.CustomTools.NamedActionPolicy>());
         services.TryAddSingleton<RequestTranslator>();

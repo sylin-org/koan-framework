@@ -12,6 +12,7 @@ public sealed class CrossSiteWritesOffFixture : ForumFixture
     protected override Dictionary<string, string?> Settings() => new()
     {
         ["Koan:Web:RefuseCrossSiteWrites"] = "false",
+        ["Koan:Mcp:AllowedOrigins:0"] = "http://evil.example",
     };
 }
 
@@ -45,7 +46,7 @@ public sealed class CrossSiteWritesSpec(ForumFixture host) : IClassFixture<Forum
     [InlineData("same-site", null, HttpStatusCode.Forbidden)]
     [InlineData("same-origin", null, HttpStatusCode.OK)]
     [InlineData("none", null, HttpStatusCode.OK)]
-    [InlineData("same-origin", "http://evil.example", HttpStatusCode.OK)] // Sec-Fetch-Site decides, and a page cannot forge it
+    [InlineData("same-origin", "http://evil.example", HttpStatusCode.Forbidden)] // Sec-Fetch-Site decides the cross-site check, and the edge holds Origin to the application's own besides (AI-0042)
     [InlineData(null, "http://evil.example", HttpStatusCode.Forbidden)]
     [InlineData(null, "null", HttpStatusCode.Forbidden)]
     [InlineData(null, "{self}", HttpStatusCode.OK)]
@@ -56,7 +57,7 @@ public sealed class CrossSiteWritesSpec(ForumFixture host) : IClassFixture<Forum
     /// <summary>A forgery borrows an ambient credential, so a request with none has nothing to borrow: a client posting to an OAuth token endpoint is one.</summary>
     [Fact]
     public async Task A_cross_site_post_with_no_cookie_is_not_judged()
-        => (await Send(host.BaseUrl, HttpMethod.Post, "/mcp", "cross-site", "http://evil.example", cookie: null)).Should().Be(HttpStatusCode.OK);
+        => (await Send(host.BaseUrl, HttpMethod.Post, "/mcp", "cross-site", null, cookie: null)).Should().Be(HttpStatusCode.OK);
 
     [Fact]
     public async Task A_post_to_a_route_is_refused_alike_and_a_read_is_not()
@@ -74,7 +75,8 @@ public sealed class CrossSiteWritesSpec(ForumFixture host) : IClassFixture<Forum
         => (await Send(host.BaseUrl, HttpMethod.Post, "/mcp", null, null, cookie: null, contentType: contentType)).Should().Be(HttpStatusCode.UnsupportedMediaType);
 }
 
-/// <summary>SEC-0039: an application with a front end on another site turns the check off, and answers for that front end.</summary>
+/// <summary>SEC-0039: an application with a front end on another site turns the check off, and answers for that front end, whose origin
+/// it names to the edge (AI-0042).</summary>
 public sealed class CrossSiteWritesOffSpec(CrossSiteWritesOffFixture host) : IClassFixture<CrossSiteWritesOffFixture>
 {
     [Fact]

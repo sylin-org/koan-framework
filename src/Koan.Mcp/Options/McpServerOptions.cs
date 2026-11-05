@@ -55,9 +55,17 @@ public sealed class McpServerOptions
     /// <summary>
     /// WEB-0072 — the free-text guidance returned in the MCP <c>initialize</c> response's <c>instructions</c>
     /// field (effectively the system prompt of this MCP surface — what the LLM is told about how to use the
-    /// server). When unset, the application description (<c>[KoanApp].Description</c>) is used.
+    /// server), where the application registers no <see cref="Hosting.IMcpInstructions"/>, which composes its own
+    /// (AI-0042). When unset too, the application description (<c>[KoanApp].Description</c>) is used.
     /// </summary>
     public string? Instructions { get; set; }
+
+    /// <summary>
+    /// AI-0042 — offers the tool <c>read</c>, which answers what a GET of any address of this application answers, as JSON,
+    /// as its caller, through the application's whole pipeline, and lets every route tool take an <c>address</c> in place of
+    /// its route values. It opens no door a route had not opened. False, the default: each route that is a tool says so.
+    /// </summary>
+    public bool ReadByAddress { get; set; }
 
     /// <summary>
     /// Determines how MCP capabilities are exposed to clients (Auto, Code, Tools, Full).

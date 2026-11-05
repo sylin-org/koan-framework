@@ -74,7 +74,8 @@ internal sealed class McpVerbVisibility : IDisposable
     /// ASP.NET policy that reads only the principal. A policy's own handlers may need what the request addresses, so a tool only they could deny stays listed.</summary>
     public async Task<bool> Allows(McpCustomTool tool, CancellationToken ct = default)
     {
-        if (_user is null) return true;
+        // read opens no door: each address it reads answers to its own route's gate (AI-0042).
+        if (_user is null || tool.Reads) return true;
         if (!await Allows(tool.Method, tool.GateAction, ct).ConfigureAwait(false)) return false;
         if (tool.Route is null || _scope?.ServiceProvider is not { } services || services.GetService<IAuthorizationPolicyProvider>() is not { } policies) return true;
         var policy = await tool.Route.Policy(policies).ConfigureAwait(false);

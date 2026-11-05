@@ -136,7 +136,8 @@ public sealed class McpRpcDispatcher
 
         if (!_registry.TryGetTool(toolName, out _, out _) && !_customTools.TryGet(toolName, out _))
         {
-            return CreateError(envelope.Id, -32602, $"Tool '{toolName}' is not registered.");
+            return CreateError(envelope.Id, -32602, $"Tool '{toolName}' is not registered.",
+                Koan.Mcp.CustomTools.ToolAnswers.Json(new Koan.Web.Controllers.Problem(Microsoft.AspNetCore.Http.StatusCodes.Status404NotFound, $"No tool here is named '{toolName}'.")));
         }
 
         // SEC-0004, ARCH-0141: a tool's authority is the one gate, enforced inside CallToolFor with the threaded
@@ -192,11 +193,17 @@ public sealed class McpRpcDispatcher
             ? CreateError(id, -32603, "Failed to serialise response.")
             : new JObject { ["jsonrpc"] = "2.0", ["id"] = CloneId(id), ["result"] = result };
 
-    /// <summary>Build a JSON-RPC error response object (shared by every transport).</summary>
+    /// <summary>Build a JSON-RPC error response object (shared by every transport), whose <c>data</c> is the
+    /// <see cref="Koan.Web.Controllers.Problem"/> every failure at the edge carries (AI-0042), the one given or the code's own.</summary>
     public static JObject CreateError(JToken? id, int code, string message, JToken? data = null)
     {
-        var error = new JObject { ["code"] = code, ["message"] = message };
-        if (data is not null) error["data"] = data;
+        var status = code switch
+        {
+            -32700 or -32600 or -32602 => Microsoft.AspNetCore.Http.StatusCodes.Status400BadRequest,
+            -32601 => Microsoft.AspNetCore.Http.StatusCodes.Status404NotFound,
+            _ => Microsoft.AspNetCore.Http.StatusCodes.Status500InternalServerError,
+        };
+        var error = new JObject { ["code"] = code, ["message"] = message, ["data"] = data ?? Koan.Mcp.CustomTools.ToolAnswers.Json(new Koan.Web.Controllers.Problem(status, message)) };
         return new JObject { ["jsonrpc"] = "2.0", ["id"] = CloneId(id), ["error"] = error };
     }
 

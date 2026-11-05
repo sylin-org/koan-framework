@@ -231,6 +231,7 @@ not supply it on their own.
 |---|---|---|---|
 | MCP tools and resources over Entities | `Sylin.Koan.Mcp` | — | [Agent-native recipe](https://github.com/sylin-org/koan-framework/blob/main/docs/guides/mcp-agent-native-howto.md) · [README](https://github.com/sylin-org/koan-framework/blob/main/src/Koan.Mcp/README.md) |
 | Remote HTTP/SSE transport | `Sylin.Koan.Mcp` | — | [HTTP/SSE recipe](https://github.com/sylin-org/koan-framework/blob/main/docs/guides/mcp-http-sse-howto.md) |
+| An agent reads any address of the application as itself, and every failure is one `Problem` | `Sylin.Koan.Mcp` | `Sylin.Koan.Web` | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Koan.Mcp/README.md#reading-by-address) |
 | Human MCP console | `Sylin.Koan.Mcp.Explorer` | — | [Reference](https://github.com/sylin-org/koan-framework/blob/main/docs/reference/agents/index.md) |
 | Operational agent tools | `Sylin.Koan.Mcp.Operations` | — | [Reference](https://github.com/sylin-org/koan-framework/blob/main/docs/reference/agents/index.md) |
 | Agents ask declared analytics questions | `Sylin.Koan.Data.Analytics.Web` | `Sylin.Koan.Data.Analytics` + engine (`Sylin.Koan.Data.Connector.DuckDb`) | [Entity analytics how-to](https://github.com/sylin-org/koan-framework/blob/main/docs/guides/data/entity-analytics.md) |

@@ -65,12 +65,46 @@ The default base route is `/mcp`, and there is no session: a tool call is alread
 | Request | Meaning |
 |---|---|
 | `POST /mcp` | Send one JSON-RPC message, `initialize` and tool calls alike, answered as one JSON object. |
-| `GET /mcp` | A browser reaches the console when one is registered; anything else is `405`, as there is no stream. |
+| `GET /mcp` | A browser reaches the console when one is registered; anything else is `405`, as there is no stream, with a JSON-RPC error. |
 | `DELETE /mcp` | `405`: there is no session to end. |
 
 After `initialize`, send the negotiated `MCP-Protocol-Version`. A `Mcp-Session-Id` a client still sends
 means nothing. A normal MCP client performs this negotiation—application developers do not write
 JSON-RPC handlers.
+
+A browser's `Origin` must be the application's own: the base URL in force, or one `Koan:Mcp:AllowedOrigins` names.
+A request with no `Origin` is not a browser's and passes. A request the transport cannot take is answered with its
+HTTP status and a JSON-RPC error with no id, whose `data` is the `Problem` ([AI-0042](../../docs/decisions/AI-0042-the-edge-reads-by-address-and-fails-in-one-shape.md)).
+
+## Reading by address
+
+Where an agent should read the application the way a person follows links, turn it on:
+
+```json
+{ "Koan": { "Mcp": { "ReadByAddress": true } } }
+```
+
+The tool `read` then answers what a GET of any address of the application answers, as JSON where the route answers
+in kind, as its caller: it is sent through the application's whole pipeline in process (ARCH-0144), so each address
+answers to its own gate as it does over HTTP, and `read` opens no door a route had not opened. An address is a path or an
+absolute URL of the application; with none it reads `/`. A redirect within the application is followed once, and its
+result's `meta.address` says where the answer came from. Another host's address is refused, naming the field. Every
+route tool with route values also takes an `address` in their place, its query too: the address of a Topic names
+where a reply to it is sent.
+
+## Failures
+
+Every failure at the edge has one shape, the `Problem`. A refused tool call carries it in `structuredContent` and
+`meta.problem`, whether the route refused or the edge did before any request, with its `status` and its kind as
+`errorCode`; `meta` also carries the route's `Retry-After` as `retryAfter`, its `WWW-Authenticate` as `challenge`,
+and for a tool that writes whether anything `landed` where that is known: `false` for a refusal and for what never
+ran, `true` for success. A value for a route's path or query is the type the route takes, and a wrong one is refused on
+its field. A JSON-RPC error carries the `Problem` as its `data`.
+
+## Instructions
+
+What `initialize` tells a client is composed when it asks: register an `IMcpInstructions` (`Koan.Mcp.Hosting`) as a
+singleton. With none, `Koan:Mcp:Instructions` is told, and then the application's description.
 
 ## Names
 

@@ -30,9 +30,14 @@ decision. Normalized `QueryOptions.Shape` and `IncludeRelationships` let applica
 Discovery supplies the surface -- `[McpEntity]` entities, `[McpTool]` workflows and `[Tool]` routes -- and the caller's
 identity and grants decide which of it exists for that session. A route tool is an `McpCustomTool` with a `Route`:
 `RouteToolInvoker` maps a call to a request and the answer to a result, and `Koan.Web`'s `KoanWebPipeline` answers that request in process
-through the host's whole pipeline as the caller (ARCH-0144), so there is no second definition to keep alike, and `McpToolStartCheck` stops the host at start over two tools of one name (ARCH-0141). What the caller receives back is MCP
+through the host's whole pipeline as the caller (ARCH-0144), so there is no second definition to keep alike, and `McpToolStartCheck` stops the host at start over two tools of one name (ARCH-0141). With
+`ReadByAddress`, `read` is an `McpCustomTool` too, marked `Reads`: `AddressReader` takes an address through `Addresses`, the one
+rule of what an address of the application is, and sends its GET through the same pipeline; `RouteToolInvoker` takes an
+`address` by the same rule and matches it to the route's values (AI-0042). What the caller receives back is MCP
 tools and resources, JSON-RPC results, and transport health, with a structured failure rather than a
-silent omission for an invalid envelope, an unavailable tool, a denied grant, or a transport fault.
+silent omission for an invalid envelope, an unavailable tool, a denied grant, or a transport fault. `ToolAnswers` is the
+one mapping of an answer to a result and of a refusal to its `Problem`; `McpRpcDispatcher.CreateError` puts one in every
+JSON-RPC error, and `McpInstructions` decides what `initialize` tells, from an application's `IMcpInstructions` first.
 
 ## Runtime fact resource
 

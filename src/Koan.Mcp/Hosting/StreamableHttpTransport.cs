@@ -6,6 +6,8 @@ using System.Threading.Tasks;
 using Koan.Core;
 using Koan.Mcp.Options;
 using Koan.Web.Authorization;
+using Koan.Web.Controllers;
+using Koan.Web.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -71,7 +73,7 @@ public sealed class StreamableHttpTransport
         // The spec requires a POST client to accept BOTH representations the server may choose between.
         if (!AcceptsJsonAndEventStream(context.Request))
         {
-            await WriteStatus(context, StatusCodes.Status406NotAcceptable, "not_acceptable",
+            await Refuse(context, StatusCodes.Status406NotAcceptable, ServerError,
                 "Accept must include both application/json and text/event-stream.");
             return;
         }
@@ -80,7 +82,7 @@ public sealed class StreamableHttpTransport
         // no CORS policy grants, so a form or a text/plain post never reaches a tool.
         if (!context.Request.HasJsonContentType())
         {
-            await WriteStatus(context, StatusCodes.Status415UnsupportedMediaType, "unsupported_media_type",
+            await Refuse(context, StatusCodes.Status415UnsupportedMediaType, ServerError,
                 "A JSON-RPC message is sent as application/json.");
             return;
         }
@@ -89,19 +91,19 @@ public sealed class StreamableHttpTransport
         var payload = await ReadJsonBody(context);
         if (payload is null)
         {
-            await WriteStatus(context, StatusCodes.Status400BadRequest, "invalid_json", "Request body is not valid JSON.");
+            await Refuse(context, StatusCodes.Status400BadRequest, ParseError, "The body is not valid JSON.");
             return;
         }
         if (!JsonRpcEnvelope.TryParse(payload, out var envelope, out var parseError))
         {
-            await WriteStatus(context, StatusCodes.Status400BadRequest, "invalid_jsonrpc", parseError);
+            await Refuse(context, StatusCodes.Status400BadRequest, InvalidRequest, parseError ?? "This is not a JSON-RPC request.");
             return;
         }
 
         // initialize is exempt from the protocol-version header: it is where the version is negotiated, in the JSON body.
         if (!string.Equals(envelope.Method, "initialize", StringComparison.Ordinal) && !ValidateProtocolVersion(context, out var protocolError))
         {
-            await WriteStatus(context, StatusCodes.Status400BadRequest, "unsupported_protocol_version", protocolError);
+            await Refuse(context, StatusCodes.Status400BadRequest, ServerError, protocolError);
             return;
         }
 
@@ -132,8 +134,8 @@ public sealed class StreamableHttpTransport
 
         if (!OriginAllowed(context, options))
         {
-            await WriteStatus(context, StatusCodes.Status403Forbidden, "origin_not_allowed",
-                "The request Origin is not permitted.");
+            await Refuse(context, StatusCodes.Status403Forbidden, ServerError,
+                "The request's Origin is not this application's.");
             return;
         }
 
@@ -152,7 +154,7 @@ public sealed class StreamableHttpTransport
             return;
         }
         context.Response.Headers.Allow = "POST";
-        await WriteStatus(context, StatusCodes.Status405MethodNotAllowed, "no_stream", "This server keeps no session and pushes nothing: POST each request on its own.");
+        await Refuse(context, StatusCodes.Status405MethodNotAllowed, ServerError, "This server keeps no session and pushes nothing: POST each request on its own.");
     }
 
     // ---- shared plumbing -------------------------------------------------------------------------------------------
@@ -169,30 +171,37 @@ public sealed class StreamableHttpTransport
 
         if (KoanEnv.IsProduction && !KoanEnv.InContainer && !context.Request.IsHttps)
         {
-            await WriteStatus(context, StatusCodes.Status400BadRequest, "https_required",
+            await Refuse(context, StatusCodes.Status400BadRequest, ServerError,
                 "Streamable HTTP transport requires HTTPS in non-containerized production environments.");
             return false;
         }
 
         if (!OriginAllowed(context, options))
         {
-            await WriteStatus(context, StatusCodes.Status403Forbidden, "origin_not_allowed",
-                "The request Origin is not permitted.");
+            await Refuse(context, StatusCodes.Status403Forbidden, ServerError,
+                "The request's Origin is not this application's.");
             return false;
         }
 
         return true;
     }
 
+    /// <summary>
+    /// AI-0042 — the DNS-rebinding guard the specification asks for: a browser always sends <c>Origin</c>, and a page's own origin
+    /// is the base URL in force (<see cref="KoanWebBaseUrl.Current"/>), or one <c>Koan:Mcp:AllowedOrigins</c> names. Before the
+    /// application has an address, the request's own is all there is. A request with no <c>Origin</c> is not a browser's, so it is
+    /// not that threat, and passes.
+    /// </summary>
     private static bool OriginAllowed(HttpContext context, McpServerOptions options)
     {
-        // DNS-rebinding guard: a browser always sets Origin. When an allow-list is configured AND an Origin is
-        // present it must match; a non-browser client (no Origin) is not the rebinding threat and is allowed. With no
-        // allow-list configured we don't reject here (CORS still governs browser reads) — the existing edge posture.
-        if (options.AllowedOrigins.Length == 0) return true;
         var origin = context.Request.Headers.Origin.ToString();
         if (string.IsNullOrEmpty(origin)) return true;
-        return options.AllowedOrigins.Any(o => string.Equals(o, origin, StringComparison.OrdinalIgnoreCase));
+        if (options.AllowedOrigins.Length > 0)
+            return options.AllowedOrigins.Any(o => string.Equals(o.TrimEnd('/'), origin, StringComparison.OrdinalIgnoreCase));
+        var baseUrl = context.RequestServices.GetService<KoanWebBaseUrl>();
+        var own = baseUrl?.Current ?? $"{context.Request.Scheme}://{context.Request.Host}";
+        return Uri.TryCreate(own, UriKind.Absolute, out var application) && Uri.TryCreate(origin, UriKind.Absolute, out var sent)
+               && string.Equals(application.GetLeftPart(UriPartial.Authority), sent.GetLeftPart(UriPartial.Authority), StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool ValidateProtocolVersion(HttpContext context, out string error)
@@ -272,11 +281,22 @@ public sealed class StreamableHttpTransport
         }
     }
 
-    private static Task WriteStatus(HttpContext context, int status, string error, string? message = null)
+    /// <summary>JSON-RPC's code for a body that is not JSON.</summary>
+    private const int ParseError = -32700;
+
+    /// <summary>JSON-RPC's code for a message that is not a request.</summary>
+    private const int InvalidRequest = -32600;
+
+    /// <summary>JSON-RPC's first code for a server's own refusal, which the transport's are.</summary>
+    private const int ServerError = -32000;
+
+    /// <summary>A refusal of the transport (AI-0042): its HTTP status, and a JSON-RPC error with no id, as the specification has a
+    /// server answer what it cannot accept, whose <c>data</c> is the <see cref="Problem"/> every failure at the edge carries.</summary>
+    private static Task Refuse(HttpContext context, int status, int code, string message)
     {
         context.Response.StatusCode = status;
-        return context.Response.WriteAsJsonAsync(
-            message is null ? (object)new { error } : new { error, message },
-            cancellationToken: context.RequestAborted);
+        context.Response.ContentType = "application/json";
+        var error = McpRpcDispatcher.CreateError(null, code, message, Koan.Mcp.CustomTools.ToolAnswers.Json(new Problem(status, message)));
+        return context.Response.WriteAsync(error.ToString(Formatting.None), context.RequestAborted);
     }
 }

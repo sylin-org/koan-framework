@@ -255,7 +255,8 @@ public class ForumFixture : IAsyncLifetime
     public async Task<JObject[]> Tools(string? user)
         => ((JArray)(await Rpc("tools/list", new JObject(), user))["tools"]!).OfType<JObject>().ToArray();
 
-    private async Task<JToken> Rpc(string method, JObject parameters, string? user)
+    /// <summary>A real JSON-RPC request, answering its result.</summary>
+    public async Task<JToken> Rpc(string method, JObject parameters, string? user)
     {
         using var client = Client(user);
         var ct = TestContext.Current.CancellationToken;

@@ -9,7 +9,9 @@ using Koan.Core.Hosting.Bootstrap;
 using Koan.Web.Authorization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc.Infrastructure;
+using Koan.Mcp.Options;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Newtonsoft.Json.Linq;
 
 namespace Koan.Mcp.CustomTools;
@@ -24,14 +26,16 @@ public sealed class McpCustomToolRegistry
 {
     private readonly ILogger<McpCustomToolRegistry> _logger;
     private readonly IActionDescriptorCollectionProvider? _actions;
+    private readonly IOptions<McpServerOptions>? _options;
     private readonly object _sync = new();
     private IReadOnlyList<McpCustomTool>? _tools;
     private IReadOnlyDictionary<string, McpCustomTool>? _index;
 
-    public McpCustomToolRegistry(ILogger<McpCustomToolRegistry> logger, IActionDescriptorCollectionProvider? actions = null)
+    public McpCustomToolRegistry(ILogger<McpCustomToolRegistry> logger, IActionDescriptorCollectionProvider? actions = null, IOptions<McpServerOptions>? options = null)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _actions = actions;
+        _options = options;
     }
 
     /// <summary>All discovered custom tools.</summary>
@@ -119,7 +123,9 @@ public sealed class McpCustomToolRegistry
             }
         }
 
-        if (_actions is not null) result.AddRange(RouteTools.Discover(_actions));
+        var addressed = _options?.Value.ReadByAddress == true;
+        if (_actions is not null) result.AddRange(RouteTools.Discover(_actions, addressed));
+        if (addressed) result.Add(AddressReader.Tool);
 
         _logger.LogDebug("Discovered {Count} custom MCP tool(s).", result.Count);
         return result;
@@ -186,7 +192,8 @@ public sealed class McpCustomToolRegistry
     /// also says what its HTTP method promises. A verb on an [McpOperationalToolset]-marked Toolset is config-gated by that
     /// toolset's key (P3.2).</summary>
     internal static McpCustomTool Assemble(string name, string? description, JObject schema, MethodInfo method, bool isMutation, string gateAction,
-        bool? readOnly = null, bool? destructive = null, bool? idempotent = null, bool? openWorld = null, RouteTool? route = null, IReadOnlyList<McpCustomToolParameter>? parameters = null) => new()
+        bool? readOnly = null, bool? destructive = null, bool? idempotent = null, bool? openWorld = null, RouteTool? route = null, IReadOnlyList<McpCustomToolParameter>? parameters = null,
+        bool reads = false) => new()
     {
         Name = name,
         Description = description,
@@ -201,6 +208,7 @@ public sealed class McpCustomToolRegistry
         Method = method,
         Parameters = parameters ?? [],
         Route = route,
+        Reads = reads,
     };
 
     private static string? ParameterDescription(ParameterInfo parameter)

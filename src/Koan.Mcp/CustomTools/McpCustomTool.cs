@@ -26,6 +26,9 @@ public sealed class McpCustomTool
     /// <summary>The route this tool is a request to; null for a verb with no route.</summary>
     internal RouteTool? Route { get; init; }
 
+    /// <summary>Whether this is the edge's <c>read</c>, which reads any address as its caller and answers to each route's own gate (AI-0042).</summary>
+    internal bool Reads { get; init; }
+
     // AN4 — opt-in spec annotations (null = unmarked → omitted from the wire annotations object).
     public bool? ReadOnly { get; init; }
     public bool? Destructive { get; init; }
@@ -41,8 +44,9 @@ public sealed class McpCustomTool
     public string? OperationalToolsetKey { get; init; }
 }
 
-/// <summary>Where a <c>[Tool]</c> action answers: what a call needs to reach it as a request (ARCH-0141).</summary>
-internal sealed record RouteTool(ControllerActionDescriptor Action, string HttpMethod, RoutePattern Pattern, IReadOnlySet<string> QueryFields, string? BodyField)
+/// <summary>Where a <c>[Tool]</c> action answers: what a call needs to reach it as a request (ARCH-0141), and whether an <c>address</c>
+/// may name its route values (AI-0042).</summary>
+internal sealed record RouteTool(ControllerActionDescriptor Action, string HttpMethod, RoutePattern Pattern, IReadOnlySet<string> QueryFields, string? BodyField, bool TakesAddress = false)
 {
     /// <summary>The policy ASP.NET's middleware applies to this action; null when it applies none.</summary>
     public async Task<AuthorizationPolicy?> Policy(IAuthorizationPolicyProvider policies)

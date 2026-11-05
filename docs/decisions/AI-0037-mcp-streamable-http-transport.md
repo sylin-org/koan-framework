@@ -4,6 +4,9 @@
 > Each `POST` stands alone and is answered as one JSON object; a `GET` that is not a browser's and a `DELETE` answer `405`;
 > the session registry, server push, resumption and the deprecated `/sse` + `/rpc` pair are removed.
 
+> **Amended by [AI-0042](AI-0042-the-edge-reads-by-address-and-fails-in-one-shape.md) (2026-11-04):** a refusal of the transport is its HTTP status and a JSON-RPC
+> error with no id whose `data` is the `Problem`, and a browser's `Origin` is held to the application's own: the configured list, else the base URL in force.
+
 - **Status**: Accepted (Phases 1–3 implemented + adversarially reviewed + green; Phase 4 = doc-surface follow-ups)
 - **Date**: 2026-06-20
 - **Supersedes**: AI-0013 (MCP HTTP+SSE deployment) — the transport surface

@@ -62,7 +62,8 @@ public sealed class StreamableWithExplorerSpec : IClassFixture<StreamableWithExp
 
         res.StatusCode.Should().Be(HttpStatusCode.MethodNotAllowed);
         using var doc = JsonDocument.Parse(await res.Content.ReadAsStringAsync(Quick));
-        doc.RootElement.GetProperty("error").GetString().Should().Be("no_stream");
+        // A refusal of the transport is a JSON-RPC error whose data is the problem (AI-0042).
+        doc.RootElement.GetProperty("error").GetProperty("data").GetProperty("status").GetInt32().Should().Be(405);
     }
 
     [Fact]

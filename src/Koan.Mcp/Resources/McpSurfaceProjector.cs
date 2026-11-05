@@ -101,9 +101,9 @@ public sealed class McpSurfaceProjector
         }
 
         var options = _serverOptions.Value;
-        var instructions = !string.IsNullOrWhiteSpace(options.Instructions)
-            ? options.Instructions
-            : (string.IsNullOrWhiteSpace(app.Description) ? null : app.Description);
+        string? instructions;
+        using (var scope = _scopes?.CreateScope())
+            instructions = Koan.Mcp.Hosting.McpInstructions.Of(scope?.ServiceProvider, options, default).GetAwaiter().GetResult();
 
         return new JObject
         {

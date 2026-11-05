@@ -61,7 +61,7 @@ public sealed class McpRpcHandler
     /// LLM-facing guidance) the client surfaces. Sourced declare-once from the application identity.</summary>
     [JsonRpcMethod("initialize", UseSingleObjectParameterDeserialization = true)]
     public Task<InitializeResult> Initialize(InitializeParams? parameters, CancellationToken cancellationToken)
-        => Task.FromResult(BuildInitializeResult(parameters));
+        => BuildInitializeResult(parameters, cancellationToken);
 
     /// <summary>The latest revision this server speaks, which it answers when asked for one it does not, as the specification says it should.</summary>
     public const string DefaultProtocolVersion = "2025-11-25";
@@ -73,13 +73,10 @@ public sealed class McpRpcHandler
     /// <summary>The provider this handler resolves from; transports open per-listing scopes from it (SEC-0011).</summary>
     internal IServiceProvider Services => _services;
 
-    internal InitializeResult BuildInitializeResult(InitializeParams? parameters)
+    internal async Task<InitializeResult> BuildInitializeResult(InitializeParams? parameters, CancellationToken cancellationToken)
     {
         var app = Koan.Core.KoanEnv.CurrentSnapshot.Application;
-        var options = _serverOptions.Value;
-        var instructions = !string.IsNullOrWhiteSpace(options.Instructions)
-            ? options.Instructions
-            : (string.IsNullOrWhiteSpace(app.Description) ? null : app.Description);
+        var instructions = await McpInstructions.Of(_services, _serverOptions.Value, cancellationToken).ConfigureAwait(false);
 
         return new InitializeResult
         {
@@ -215,26 +212,31 @@ public sealed class McpRpcHandler
         var exposure = ResolveExposureMode();
         if (!McpExposure.ExposesTools(exposure))
         {
-            return new CallToolResult
+            return WithProblem(new CallToolResult
             {
                 IsError = true,
                 Content = new List<McpContent> { new McpContent { Type = "text", Text = $"Tool '{parameters.Name}' is not exposed under exposure mode '{exposure}'." } },
                 Meta = new JObject { ["errorCode"] = CodeMode.Execution.CodeModeErrorCodes.ExposureMode }
-            };
+            }, Microsoft.AspNetCore.Http.StatusCodes.Status404NotFound);
         }
 
         // Handle custom [McpTool] verbs
         if (_customTools is not null && _customInvoker is not null && _customTools.TryGet(parameters.Name, out var customTool))
         {
+            // AI-0042: read answers to the gate of each address it reads, in the request it makes.
+            if (customTool.Reads)
+                return await _services.GetRequiredService<Koan.Mcp.CustomTools.AddressReader>().Read(parameters.Arguments, user, cancellationToken).ConfigureAwait(false);
+
             // P3.2: a config-disabled operational toolset's verb is treated as absent (the global gate; the @ops grant
             // is a separate in-verb check). Mirror the list filter so list + invoke agree.
             if (customTool.OperationalToolsetKey is { Length: > 0 } opsKey && !_serverOptions.Value.IsOperationalToolsetEnabled(opsKey))
             {
-                return new CallToolResult
+                return WithProblem(new CallToolResult
                 {
                     IsError = true,
-                    Content = new List<McpContent> { new McpContent { Type = "text", Text = $"Tool '{parameters.Name}' is not available — the operational toolset '{opsKey}' is disabled (Koan:Mcp:Operations:{opsKey})." } }
-                };
+                    Content = new List<McpContent> { new McpContent { Type = "text", Text = $"Tool '{parameters.Name}' is not available — the operational toolset '{opsKey}' is disabled (Koan:Mcp:Operations:{opsKey})." } },
+                    Meta = new JObject { ["errorCode"] = "absent" }
+                }, Microsoft.AspNetCore.Http.StatusCodes.Status404NotFound);
             }
 
             // A route tool answers to its gate in the request, which a rehearsal never makes; a verb with no route, always here (ARCH-0141).
@@ -244,7 +246,9 @@ public sealed class McpRpcHandler
                 var caller = Koan.Web.Endpoints.EntityRequestContextBuilder.NonHttpPrincipal(user);
                 using var gate = McpVerbVisibility.For(_services.GetService<IServiceScopeFactory>(), _services.GetRequiredService<Koan.Web.Authorization.IAccessGateCache>(), caller);
                 if (!await gate.Allows(customTool, cancellationToken).ConfigureAwait(false))
-                    return Refused(caller.Identity?.IsAuthenticated == true ? "This isn't open to you." : "Sign in to do this.", "gated");
+                    return caller.Identity?.IsAuthenticated == true
+                        ? Refused(customTool, Microsoft.AspNetCore.Http.StatusCodes.Status403Forbidden, "This isn't open to you.")
+                        : Refused(customTool, Microsoft.AspNetCore.Http.StatusCodes.Status401Unauthorized, "Sign in to do this.");
             }
 
             // AN11 (A10) — a custom verb's effects live in imperative code the framework cannot inspect. A
@@ -268,16 +272,21 @@ public sealed class McpRpcHandler
             }
             catch (Koan.Data.Core.Commands.Refusal refusal)
             {
-                return Refused(refusal.Reason.Kind == Koan.Data.Core.Commands.ReasonKind.Absent ? Koan.Web.Controllers.Answers.Nothing : refusal.Reason.Text, refusal.Reason.Kind.ToString().ToLowerInvariant());
+                var reason = refusal.Reason;
+                var status = reason.Kind switch
+                {
+                    Koan.Data.Core.Commands.ReasonKind.Absent => Microsoft.AspNetCore.Http.StatusCodes.Status404NotFound,
+                    Koan.Data.Core.Commands.ReasonKind.Gated => user?.Identity?.IsAuthenticated == true ? Microsoft.AspNetCore.Http.StatusCodes.Status403Forbidden : Microsoft.AspNetCore.Http.StatusCodes.Status401Unauthorized,
+                    Koan.Data.Core.Commands.ReasonKind.Conflict => Microsoft.AspNetCore.Http.StatusCodes.Status409Conflict,
+                    _ => Microsoft.AspNetCore.Http.StatusCodes.Status400BadRequest,
+                };
+                return Koan.Mcp.CustomTools.ToolAnswers.Refused(customTool.Name,
+                    new Koan.Web.Controllers.Problem(status, reason.Kind == Koan.Data.Core.Commands.ReasonKind.Absent ? Koan.Web.Controllers.Answers.Nothing : reason.Text, reason.Word), customTool.IsMutation);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Custom MCP tool '{Tool}' failed.", parameters.Name);
-                return new CallToolResult
-                {
-                    IsError = true,
-                    Content = new List<McpContent> { new McpContent { Type = "text", Text = ex.Message } }
-                };
+                return Koan.Mcp.CustomTools.ToolAnswers.Refused(customTool.Name, new Koan.Web.Controllers.Problem(Microsoft.AspNetCore.Http.StatusCodes.Status500InternalServerError, ex.Message), customTool.IsMutation);
             }
         }
 
@@ -286,11 +295,32 @@ public sealed class McpRpcHandler
         return ToCallToolResult(parameters.Name, result);
     }
 
-    private static CallToolResult Refused(string text, string kind) => new()
+    private static CallToolResult Refused(Koan.Mcp.CustomTools.McpCustomTool tool, int status, string text)
+        => Koan.Mcp.CustomTools.ToolAnswers.Refused(tool.Name, new Koan.Web.Controllers.Problem(status, text), tool.IsMutation);
+
+    /// <summary>A failure that carries its own code keeps it, and carries the <see cref="Koan.Web.Controllers.Problem"/> of
+    /// <paramref name="status"/> too, so every failure at the edge has one shape (AI-0042).</summary>
+    private static CallToolResult WithProblem(CallToolResult result, int status)
     {
-        IsError = true,
-        Content = new List<McpContent> { new McpContent { Type = "text", Text = text } },
-        Meta = new JObject { ["errorCode"] = kind }
+        var problem = Koan.Mcp.CustomTools.ToolAnswers.Json(new Koan.Web.Controllers.Problem(status, result.Content.FirstOrDefault()?.Text));
+        result.Meta ??= new JObject();
+        result.Meta["status"] = status;
+        result.Meta["problem"] = problem;
+        result.StructuredContent = problem;
+        return result;
+    }
+
+    /// <summary>The status a failure's own code stands for.</summary>
+    private static int StatusOf(string? code) => code switch
+    {
+        CodeModeErrorCodes.Unauthenticated => Microsoft.AspNetCore.Http.StatusCodes.Status401Unauthorized,
+        CodeModeErrorCodes.Forbidden => Microsoft.AspNetCore.Http.StatusCodes.Status403Forbidden,
+        CodeModeErrorCodes.NotFound or CodeModeErrorCodes.ToolNotFound or CodeModeErrorCodes.ExposureMode or CodeModeErrorCodes.CodeModeDisabled
+            => Microsoft.AspNetCore.Http.StatusCodes.Status404NotFound,
+        CodeModeErrorCodes.ServiceUnavailable => Microsoft.AspNetCore.Http.StatusCodes.Status503ServiceUnavailable,
+        CodeModeErrorCodes.ExecutionError or CodeModeErrorCodes.JavaScriptError or "unexpected_error" or "execution_failed" or null
+            => Microsoft.AspNetCore.Http.StatusCodes.Status500InternalServerError,
+        _ => Microsoft.AspNetCore.Http.StatusCodes.Status400BadRequest,
     };
 
     private static CallToolResult BuildCustomResult(JToken result)
@@ -1013,7 +1043,7 @@ public sealed class McpRpcHandler
         }
         else
         {
-            return new CallToolResult
+            return WithProblem(new CallToolResult
             {
                 IsError = true,
                 Content = new List<McpContent>
@@ -1032,7 +1062,7 @@ public sealed class McpRpcHandler
                     ["warnings"] = result.Warnings,
                     ["diagnostics"] = result.Diagnostics
                 }
-            };
+            }, StatusOf(result.ErrorCode));
         }
     }
 
@@ -1065,7 +1095,7 @@ public sealed class McpRpcHandler
             diagnostics["tool"] = toolName;
             diagnostics["error"] = execution.ErrorCode ?? CodeMode.Execution.CodeModeErrorCodes.ExecutionError;
 
-            return new CallToolResult
+            return WithProblem(new CallToolResult
             {
                 IsError = true,
                 Content = new List<McpContent>
@@ -1084,7 +1114,7 @@ public sealed class McpRpcHandler
                     ["warnings"] = ToJsonArray(execution.Warnings),
                     ["diagnostics"] = diagnostics
                 }
-            };
+            }, StatusOf(execution.ErrorCode ?? CodeMode.Execution.CodeModeErrorCodes.ExecutionError));
         }
     }
 
