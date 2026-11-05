@@ -120,6 +120,14 @@ public sealed class SqliteLexicalSearchSpec(SqliteFixture fixture, ITestOutputHe
         var seen = first.Concat(second).Concat(third).Select(static match => match.Id).ToArray();
         seen.Should().OnlyHaveUniqueItems("two pages over one result set do not overlap");
         seen.Should().BeEquivalentTo(ids, "the pages cover the result set");
+
+        // One more than the page says, in the same search, whether a next page holds any; the page is the first of them.
+        var secondAndOne = await Post.Lexical.Search("pagination", s => s.Page(2, 3).OneMore());
+        var thirdAndOne = await Post.Lexical.Search("pagination", s => s.Page(3, 3).OneMore());
+        secondAndOne.Should().HaveCount(4);
+        secondAndOne.Take(3).Select(static match => match.Id).Should().Equal(second.Select(static match => match.Id));
+        secondAndOne[3].Id.Should().Be(third[0].Id);
+        thirdAndOne.Should().ContainSingle();
     }
 
     [Fact]

@@ -112,6 +112,7 @@ var matches = await Post.Lexical.Search("copper lantern", s => s.Top(20).Snippet
 var posts = await Post.Lexical.Find("copper lantern", s => s.Page(2, 20), ct);              // entities in rank order
 var typed = await Post.Lexical.Search("copper lant", s => s.Top(5).AsTyped(), ct);          // the last word by its start
 var mine = await Post.Lexical.Search("copper", s => s.Top(20).Within(post => tangents.Contains(post.TangentId)), ct);
+var next = await Post.Lexical.Search("copper", s => s.Page(2, 20).OneMore(), ct);           // 21 answered: a page 3 holds some
 ```
 
 Every word is optional and a row holding more of them ranks higher. `AsTyped()` reads the text as still being typed:
@@ -119,7 +120,8 @@ the word it ends in also matches as the start of a word, unless a space or punct
 stems the partial word first, so one whose stem is not the start of the stored one, such as "runnin" for "running",
 finds nothing until it is whole. `Within(predicate)` searches only the rows a predicate holds for: the store applies it
 before it ranks and pages, so a page is full where such rows remain and says nothing of any other row, and a predicate
-the store cannot run is refused. A search is bounded by construction: the
+the store cannot run is refused. `OneMore()` answers one match past the page as well, so the one search says whether a next
+page holds any. A search is bounded by construction: the
 declaration names `Top(size)` or `Page(page, size)`, a page holds at most 1,000 matches, and a snippet window holds at
 most 64 words. Rows written before the declaration are indexed by `Post.Lexical.Rebuild(ct)`; `Post.Lexical.Status(ct)`
 says exactly whether the index covers every row, and the `data:lexical` readiness report says what it last measured,

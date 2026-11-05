@@ -66,6 +66,14 @@ public sealed class RouteGateSpec(RestEntityWebFactory fx)
     }
 
     [Fact]
+    public async Task A_page_the_application_answers_401_itself_carries_the_challenge_too()
+    {
+        var page = await Send(HttpMethod.Get, "/route-gate/own-page");
+        page.Status.Should().Be(HttpStatusCode.Unauthorized);
+        page.Challenges.Should().Equal(ShelfChallenge.Said);
+    }
+
+    [Fact]
     public async Task An_open_route_and_an_undeclared_one_meet_no_gate()
     {
         (await Send(HttpMethod.Get, "/route-gate/catalogue")).Status.Should().Be(HttpStatusCode.OK);
@@ -132,6 +140,10 @@ public sealed class RouteGateController : ControllerBase
 
     [HttpGet("plain")]
     public IActionResult Plain() => Ok();
+
+    [HttpGet("own-page")]
+    [Open("A page that asks for a sign-in in its own words.")]
+    public IActionResult OwnPage() => new ObjectResult(new { said = "Sign in to read the shelves." }) { StatusCode = StatusCodes.Status401Unauthorized };
 
     [HttpGet("{shelf}")]
     [Shelved("read")]

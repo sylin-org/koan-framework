@@ -45,8 +45,8 @@ internal sealed partial class SqliteRepository<TEntity, TKey> : ILexicalSearchRe
             $"{select} FROM {index} JOIN {plan.QualifiedTable} AS koan_row ON koan_row.rowid = {index}.rowid " +
             $"WHERE {index} MATCH @match" + (where is null ? string.Empty : $" AND ({where})") +
             $" ORDER BY bm25({index}), {string.Join(", ", plan.IdentityRoots.Select(static root => $"koan_row.{SqliteDialect.Quote(root)}"))}" +
-            $" LIMIT {query.Size} OFFSET {query.Offset}";
-        var matches = new List<LexicalMatch<TKey>>(query.Size);
+            $" LIMIT {query.Limit} OFFSET {query.Offset}";
+        var matches = new List<LexicalMatch<TKey>>(query.Limit);
         await using var reader = await command.ExecuteReaderAsync(ct).ConfigureAwait(false);
         var score = reader.GetOrdinal("koan_score");
         var excerpt = query.Snippet is null ? -1 : reader.GetOrdinal("koan_snippet");

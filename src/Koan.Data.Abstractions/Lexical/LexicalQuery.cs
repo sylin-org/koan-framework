@@ -22,7 +22,7 @@ public sealed record LexicalQuery
     /// </summary>
     public const int MaximumOffset = 10_000;
 
-    public LexicalQuery(string text, int page, int size, LexicalSnippet? snippet = null, bool typed = false)
+    public LexicalQuery(string text, int page, int size, LexicalSnippet? snippet = null, bool typed = false, bool oneMore = false)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(text);
         Offset = RequirePage(page, size);
@@ -34,6 +34,7 @@ public sealed record LexicalQuery
         Size = size;
         Snippet = snippet;
         Typing = typed ? TermBeingTyped(text) : null;
+        OneMore = oneMore;
     }
 
     /// <summary>
@@ -72,6 +73,12 @@ public sealed record LexicalQuery
 
     /// <summary>How many ranked matches precede this page; at most <see cref="MaximumOffset"/>.</summary>
     public int Offset { get; }
+
+    /// <summary>Whether the store answers one match past the page, so the one search says whether a next page holds any.</summary>
+    public bool OneMore { get; }
+
+    /// <summary>How many matches the store answers at most, from <see cref="Offset"/>: the page's, and one more where it asks.</summary>
+    public int Limit => OneMore ? Size + 1 : Size;
 
     /// <summary>
     /// The word someone is still typing, which the store matches as the start of a word: the term the text ends in, on

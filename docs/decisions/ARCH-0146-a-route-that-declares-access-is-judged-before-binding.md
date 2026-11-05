@@ -59,7 +59,8 @@ resolves the route values once, and answers `AuthorizeDecision.Refused(reason)` 
    allow, which every listing reads.
 5. **A listing asks with no resource,** as before, so a provider that judges an address defers there.
 6. **A 401 carries the application's challenge.** Every `IChallenge` registered adds one challenge of `WWW-Authenticate` to each 401
-   Koan's refusals answer, so a client learns where to prove who it is without reading a sentence.
+   an action answers, a refusal through `Answers` or a page the application answers 401 itself, unless a challenge is already written,
+   so a client learns where to prove who it is without reading a sentence.
 7. **A start check the application turns on.** With `Koan:Web:Authorization:RoutesDeclareAccess`, the host stops at start over a routed
    action of the application's own that declares neither a gate nor `[Open]`, naming each. A controller a Koan module brings, whose
    assembly names its module identity, answers for itself.
@@ -78,7 +79,7 @@ New public concepts: `AccessAttribute<TNeed>`, `OpenAttribute`, `AuthorizeDecisi
 
 - A plain route whose class carries `[Access]` or `[RequireScope]` is now judged by it.
 - A provider that returns `Allowed()` is unchanged; one that returns a value has it on the request.
-- `Answers`' 401s carry a challenge only where an application registers one.
+- A 401 an action answers carries a challenge only where an application registers one.
 
 ## Considered and rejected
 

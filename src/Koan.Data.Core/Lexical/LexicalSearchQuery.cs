@@ -18,6 +18,7 @@ public sealed class LexicalSearchQuery<TEntity>
     private int _size;
     private LexicalSnippet? _snippet;
     private bool _typed;
+    private bool _oneMore;
 
     /// <summary>The first <paramref name="size"/> matches, best first.</summary>
     public LexicalSearchQuery<TEntity> Top(int size) => Page(1, size);
@@ -28,6 +29,16 @@ public sealed class LexicalSearchQuery<TEntity>
         LexicalQuery.RequirePage(page, size);
         _page = page;
         _size = size;
+        return this;
+    }
+
+    /// <summary>
+    /// Answer one match past the page as well, so this one search says whether a next page holds any: more matches than the page's size
+    /// means it does, and the page is the first of them.
+    /// </summary>
+    public LexicalSearchQuery<TEntity> OneMore()
+    {
+        _oneMore = true;
         return this;
     }
 
@@ -68,6 +79,6 @@ public sealed class LexicalSearchQuery<TEntity>
         if (_size == 0)
             throw new ArgumentException(
                 "A lexical search is bounded: declare Top(size) or Page(page, size) on the query.", nameof(text));
-        return new LexicalQuery(text, _page, _size, _snippet, _typed);
+        return new LexicalQuery(text, _page, _size, _snippet, _typed, _oneMore);
     }
 }

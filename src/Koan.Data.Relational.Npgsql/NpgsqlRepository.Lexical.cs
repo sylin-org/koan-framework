@@ -39,7 +39,7 @@ public sealed partial class NpgsqlRepository<TEntity, TKey> : ILexicalSearchRepo
         var sql = $"{select} FROM {_plan.QualifiedTable}, {NpgsqlLexical.QueryFunction(query)}({configuration}, @koan_match) AS koan_query " +
                   $"WHERE {column} @@ koan_query" + (where is null ? string.Empty : $" AND ({where})") +
                   $" ORDER BY koan_score DESC, {string.Join(", ", _plan.IdentityRoots.Select(NpgsqlDialect.Quote))}" +
-                  $" LIMIT {query.Size} OFFSET {query.Offset}";
+                  $" LIMIT {query.Limit} OFFSET {query.Offset}";
         await using var connection = await Open(ct).ConfigureAwait(false);
         var rows = await AdoCommands.QueryRowsAsync(connection, sql, parameters, null, ct).ConfigureAwait(false);
         var matches = new List<LexicalMatch<TKey>>(rows.Count);

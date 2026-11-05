@@ -7,13 +7,13 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Microsoft.Net.Http.Headers;
 
 namespace Koan.Web.Controllers;
 
 /// <summary>A route's one answer to a command's outcome (ARCH-0141, ARCH-0143, ARCH-0145). A refusal's kind picks its status once, here, and its
 /// answer is a <see cref="Problem"/> carrying the reason's word, and its field where it names one; what success answers stays the action's, and
-/// every page stays the application's. A <c>401</c> carries each <see cref="IChallenge"/> the application registered (ARCH-0146).
+/// every page stays the application's. A <c>401</c> carries each <see cref="IChallenge"/> the application registered (ARCH-0146), as every
+/// <c>401</c> an action answers does.
 /// <list type="table">
 /// <item><term><see cref="ReasonKind.Invalid"/></term><description>400, with the reason, under its field in <c>errors</c> where it names one.</description></item>
 /// <item><term><see cref="ReasonKind.Absent"/></term><description>404, saying <see cref="Nothing"/> whatever the reason says, so nothing an application words tells a hidden resource from a missing one.</description></item>
@@ -42,8 +42,8 @@ public static class Answers
     {
         ArgumentNullException.ThrowIfNull(reason);
         var detail = reason.Kind == ReasonKind.Absent ? Nothing : reason.Text;
-        return Answer(http, new Problem(Status(http, reason), detail, reason.Word,
-            reason.Field is { } field ? new Dictionary<string, string[]> { [field] = [detail] } : null));
+        return new Problem(Status(http, reason), detail, reason.Word,
+            reason.Field is { } field ? new Dictionary<string, string[]> { [field] = [detail] } : null).ToResult();
     }
 
     /// <summary>The status a reason answers with, for a page that shows it in place.</summary>
@@ -83,19 +83,10 @@ public static class Answers
     internal static IActionResult Denied(HttpContext http, AuthorizeDecision decision) => decision switch
     {
         AuthorizeDecision.Refuse refuse => Refused(http, refuse.Reason),
-        AuthorizeDecision.Absent => Answer(http, new Problem(StatusCodes.Status404NotFound, Nothing)),
-        AuthorizeDecision.Challenge => Answer(http, new Problem(StatusCodes.Status401Unauthorized, "Sign in to do this.")),
-        _ => Answer(http, new Problem(StatusCodes.Status403Forbidden, "This isn't open to you.")),
+        AuthorizeDecision.Absent => new Problem(StatusCodes.Status404NotFound, Nothing).ToResult(),
+        AuthorizeDecision.Challenge => new Problem(StatusCodes.Status401Unauthorized, "Sign in to do this.").ToResult(),
+        _ => new Problem(StatusCodes.Status403Forbidden, "This isn't open to you.").ToResult(),
     };
-
-    /// <summary>A problem as the answer, a <c>401</c> with what the application asks of a caller who is not signed in.</summary>
-    private static IActionResult Answer(HttpContext http, Problem problem)
-    {
-        if (problem.Status == StatusCodes.Status401Unauthorized)
-            foreach (var challenge in http.RequestServices.GetServices<IChallenge>())
-                http.Response.Headers.Append(HeaderNames.WWWAuthenticate, challenge.For(http));
-        return problem.ToResult();
-    }
 
     internal static IActionResult Unbound(ModelStateDictionary state)
         => new Problem(StatusCodes.Status400BadRequest, Errors: new ValidationProblemDetails(state).Errors.AsReadOnly()).ToResult();

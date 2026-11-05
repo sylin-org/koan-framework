@@ -39,6 +39,7 @@ public static class ServiceCollectionExtensions
             o.SuppressImplicitRequiredAttributeForNonNullableReferenceTypes = true;
             o.Filters.Add(new TypeFilterAttribute(typeof(Koan.Web.Transformers.EntityOutputTransformFilter)));
             o.Filters.Add(new TypeFilterAttribute(typeof(Serialization.FieldAccessResultFilter)) { Order = int.MaxValue });
+            o.Filters.Add(Filters.ChallengeFilter.Instance);
             o.ModelBinderProviders.Insert(o.ModelBinderProviders.ToList().FindIndex(static provider => provider is Microsoft.AspNetCore.Mvc.ModelBinding.Binders.ArrayModelBinderProvider),
                 new Filters.SentEmptyCollectionBinderProvider());
         })
