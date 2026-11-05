@@ -38,7 +38,8 @@ public interface IAtprotoRepository
 /// <summary>
 /// The PDS answered a repository call with a refusal: its HTTP status and the XRPC error name it gave, never its text.
 /// <see cref="Transient"/> says whether the same call can pass later — the PDS was busy, limited the rate or failed —
-/// and <see cref="NeedsGrant"/> whether the session no longer holds what the call needs, so the person grants it again.
+/// and <see cref="NeedsGrant"/> whether the session no longer holds what the call needs, so the person grants it again;
+/// a DID with no session this application can use is refused so, before anything is sent.
 /// </summary>
 public sealed class AtprotoRepositoryException(HttpStatusCode status, string? error, string nsid)
     : Exception($"The PDS refused {nsid} with {(int)status}{(error is null ? "" : " " + error)}.")
@@ -51,11 +52,14 @@ public sealed class AtprotoRepositoryException(HttpStatusCode status, string? er
     public bool Transient => (int)Status >= 500 || Status == HttpStatusCode.TooManyRequests;
 
     public bool NeedsGrant => Status is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden
-        || Error is "InsufficientScope" or "InvalidToken" or "ExpiredToken";
+        || Error is "InsufficientScope" or "InvalidToken" or "ExpiredToken" or AtprotoRepository.AuthorizationRequired;
 }
 
 internal sealed class AtprotoRepository(AtprotoSessions sessions) : IAtprotoRepository
 {
+    /// <summary>The error name of a call refused before it was sent: the DID has no session this application can use.</summary>
+    public const string AuthorizationRequired = "AuthorizationRequired";
+
     /// <summary>The largest answer a repository call reads: a record's address and content id, or a blob reference.</summary>
     private const long AnswerBytes = 64 * 1024;
 
@@ -113,8 +117,20 @@ internal sealed class AtprotoRepository(AtprotoSessions sessions) : IAtprotoRepo
 
     private async Task<JsonDocument> Call(string did, string nsid, HttpContent content, CancellationToken ct)
     {
+        HttpResponseMessage sent;
         using (content)
-        using (var response = await sessions.Send(did, nsid, HttpMethod.Post, AnswerBytes, content: content, ct: ct))
+        {
+            try
+            {
+                sent = await sessions.Send(did, nsid, HttpMethod.Post, AnswerBytes, content: content, ct: ct);
+            }
+            catch (AtprotoAuthorizationRequiredException)
+            {
+                throw new AtprotoRepositoryException(HttpStatusCode.Unauthorized, AuthorizationRequired, nsid);
+            }
+        }
+
+        using (var response = sent)
         {
             await using var stream = await response.Content.ReadAsStreamAsync(ct);
             JsonDocument? answer = null;

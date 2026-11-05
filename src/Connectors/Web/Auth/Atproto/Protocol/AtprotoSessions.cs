@@ -520,7 +520,7 @@ public sealed class AtprotoSessions
         await Task.Delay(left < Constants.ClaimPause ? left : Constants.ClaimPause, ct);
     }
 
-    private static InvalidOperationException AuthorizationRequired(Exception? cause = null)
+    private static AtprotoAuthorizationRequiredException AuthorizationRequired(Exception? cause = null)
         => new("AT authorization is required for this DID.", cause);
 
     private void ValidateSaved(OAuthSessionData saved, (string Did, string? Handle, string Pds, string Issuer) identity, string clientId)
@@ -528,7 +528,7 @@ public sealed class AtprotoSessions
         RequireScopes(saved.Scope, AllowedScopes);
         RequireScopes(saved.TokenSet.Scope, AllowedScopes);
         if (saved.TokenSet.Sub != identity.Did || saved.TokenSet.Audience.TrimEnd('/') != identity.Pds || saved.TokenSet.Issuer != identity.Issuer || saved.ClientId != clientId)
-            throw new InvalidOperationException("Stored AT session no longer matches its identity, PDS, issuer or client; reauthorize.");
+            throw new AtprotoAuthorizationRequiredException("Stored AT session no longer matches its identity, PDS, issuer or client; reauthorize.");
     }
 
     private static bool HasBroaderScopes(string? scope)

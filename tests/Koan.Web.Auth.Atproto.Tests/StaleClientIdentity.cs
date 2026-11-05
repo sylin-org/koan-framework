@@ -69,7 +69,7 @@ public sealed class StaleClientIdentity
         await using var world = await World.Start();
 
         Assert.Null(await world.Sessions.GetSessionMetadata(Did, TestContext.Current.CancellationToken));
-        var send = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+        var send = await Assert.ThrowsAsync<AtprotoAuthorizationRequiredException>(() =>
             world.Sessions.Send(Did, "com.atproto.server.getSession", HttpMethod.Get, 64 * 1024, ct: TestContext.Current.CancellationToken));
         Assert.Equal("AT authorization is required for this DID.", send.Message);
         Assert.NotNull((await world.Store.Read(Did, TestContext.Current.CancellationToken))?.Grant);

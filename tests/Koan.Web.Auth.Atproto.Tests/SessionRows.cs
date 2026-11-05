@@ -5,6 +5,7 @@ using CarpaNet.OAuth.Crypto;
 using CarpaNet.OAuth.Storage;
 using Koan.Data.Core;
 using Koan.Web.Auth.Connector.Atproto.Infrastructure;
+using Koan.Web.Auth.Connector.Atproto.Protocol;
 using Koan.Web.Auth.Connector.Atproto.Storage;
 using Microsoft.AspNetCore.DataProtection;
 using Xunit;
@@ -85,7 +86,7 @@ public sealed class SessionRows
         using (var response = await later.Sessions.Send(kept, "com.atproto.server.getSession", HttpMethod.Get, 64 * 1024, ct: Ct))
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Null(await later.Sessions.GetSessionMetadata(lost, Ct));
-        var send = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+        var send = await Assert.ThrowsAsync<AtprotoAuthorizationRequiredException>(() =>
             later.Sessions.Send(lost, "com.atproto.server.getSession", HttpMethod.Get, 64 * 1024, ct: Ct));
         Assert.Equal("AT authorization is required for this DID.", send.Message);
 
@@ -146,7 +147,7 @@ public sealed class SessionRows
         await world.ExpireAccess(node, did);
         world.Pds.End(did);
 
-        var send = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+        var send = await Assert.ThrowsAsync<AtprotoAuthorizationRequiredException>(() =>
             node.Sessions.Send(did, "com.atproto.server.getSession", HttpMethod.Get, 64 * 1024, ct: Ct));
 
         Assert.Equal("AT authorization is required for this DID.", send.Message);

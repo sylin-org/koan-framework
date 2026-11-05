@@ -54,6 +54,9 @@ public sealed class RepositoryWrites
         IAtprotoRepository repository = new AtprotoRepository(node.Sessions);
         var ct = TestContext.Current.CancellationToken;
         Assert.False(await repository.Holds(SessionWorld.Did(2), [Documents], ct));
+        var unsigned = await Assert.ThrowsAsync<AtprotoRepositoryException>(() =>
+            repository.Delete(SessionWorld.Did(2), "site.standard.document", "3mwgqaw5is227", ct));
+        Assert.True(unsigned.NeedsGrant);
 
         world.Pds.End(did);
         var refused = await Assert.ThrowsAsync<AtprotoRepositoryException>(() =>
