@@ -11,9 +11,13 @@ amends:
   - DATA-0167
 related:
   - SEC-0039
+amended_by: ARCH-0145 (proposed)
 ---
 
 # ARCH-0143: A reason is a kind, a sentence and a word, a refusal is one problem document, and every page is the application's
+
+> **Amended by [ARCH-0145](ARCH-0145-a-reason-names-its-word-and-its-field.md), proposed (2026-11-04): every reason has a word, the kind's where it names none, an invalid one may name its field,**
+> and the problem carries the word as `word`, in place of §2's `Gate`, on every refusal.
 
 ## Context
 

@@ -330,9 +330,10 @@ var outcome = await new Reply(topicId, "hi").Send(ct);
 - It runs in a hold of its own, in this flow, so in its sender's partition, source and tenant. Commands take turns in arrival order, with every other
   hold of the store. Only `Done` commits; every other outcome, a `Refusal` thrown from below it and any other throw leave nothing. A role change joins it
   (SEC-0036). `Commit` and `Rollback` refuse inside it.
-- `Outcome<T>` is `Done`, `Refused` or `Failed`. A `Reason` declares its kind once, where it is defined: `Reason.Invalid(text)`, `Reason.Absent(text)`,
-  `Reason.Gated(text)` or `Reason.Gated(word, text)` with a stable word a client acts on, or `Reason.Conflict(text)`. Equality is the record's, and a string is
-  never a reason (ARCH-0143). `throw new Refusal(reason)` from below a command reaches its sender the same way. `Failed.Landed` says `NotDispatched` (it never ran: the
+- `Outcome<T>` is `Done`, `Refused` or `Failed`. A `Reason` declares its kind once, where it is defined: `Reason.Invalid(text)`, or `Reason.Invalid(field, text)`
+  naming the wire field it concerns, `Reason.Absent(text)`, `Reason.Gated(text)` or `Reason.Gated(word, text)`, and `Reason.Conflict(text)` or
+  `Reason.Conflict(word, text)`. Every reason has a word a client acts on, its kind's where it names none. Equality is the record's, and a string is
+  never a reason (ARCH-0143, ARCH-0145). `throw new Refusal(reason)` from below a command reaches its sender the same way. `Failed.Landed` says `NotDispatched` (it never ran: the
   sender gave up, the store's busy timeout ran out, the route cannot hold, or a scope is open around the send), `NotCommitted` (nothing landed) or `Unknown` (the native commit
   itself failed). A command that fails throws; only `Send` says `Failed`.
 - The token ends the wait and the command, and the outcome says what happened. Nothing cuts a commit short. A command that never returns hangs its own

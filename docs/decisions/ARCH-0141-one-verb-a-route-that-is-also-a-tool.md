@@ -12,7 +12,7 @@ related:
   - SEC-0011
   - SEC-0017
   - WEB-0083
-amended_by: ARCH-0142, SEC-0039, ARCH-0143, ARCH-0144, AI-0042
+amended_by: ARCH-0142, SEC-0039, ARCH-0143, ARCH-0144, AI-0042, ARCH-0146
 ---
 
 # ARCH-0141: One verb is one route, and a tool call is a request to it
@@ -32,6 +32,9 @@ amended_by: ARCH-0142, SEC-0039, ARCH-0143, ARCH-0144, AI-0042
 > **Amended by [AI-0042](AI-0042-the-edge-reads-by-address-and-fails-in-one-shape.md) (2026-11-04): every failure of the edge carries a `Problem`, and an agent may read any address.** Rule 10's refusal the edge makes before any request
 > carries one too, with `retryAfter`, `challenge` and whether anything `landed` in `meta`; a route value of the wrong type is refused on its field; and rule 11 gains `read`, a tool
 > of the edge that reaches every GET route where `Koan:Mcp:ReadByAddress` is on, each answering to its own gate, while a route tool takes an `address` in place of its route values.
+
+> **Amended by [ARCH-0146](ARCH-0146-a-route-that-declares-access-is-judged-before-binding.md) (2026-11-04): the gate is its own filter, on every `[Tool]` action and every routed action that declares access,**
+> and a decision may refuse with a reason or allow with a value the action reads. Rule 5's "asked by `[Tool]`'s filter" no longer holds.
 
 ## Context
 

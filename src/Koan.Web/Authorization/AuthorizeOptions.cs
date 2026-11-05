@@ -16,4 +16,10 @@ public sealed class AuthorizeOptions
     public const string SectionPath = "Koan:Web:Authorization";
 
     public AuthorizeDefault DefaultDecision { get; init; } = AuthorizeDefault.Allow;
+
+    /// <summary>
+    /// ARCH-0146 — whether the host stops at start over a routed action of the application's that declares neither a gate nor
+    /// <c>[Open("why")]</c>. False, the default, starts it as it is.
+    /// </summary>
+    public bool RoutesDeclareAccess { get; set; }
 }

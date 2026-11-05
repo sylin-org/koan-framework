@@ -43,17 +43,27 @@ public static class EntityAuthorization
     public static async Task<AuthorizeDecision?> Decide(IAuthorize? authorize, ClaimsPrincipal subject, string action,
         MethodInfo verb, IReadOnlyDictionary<string, object?>? resource = null, CancellationToken ct = default)
     {
+        var decision = await Decision(authorize, subject, action, verb, resource, ct).ConfigureAwait(false);
+        return decision is AuthorizeDecision.Allow ? null : decision;
+    }
+
+    /// <summary>
+    /// The same decision whole (ARCH-0146): an allow with what the provider found, which a route's gate puts on the request, or what refuses.
+    /// No seam registered is an allow with nothing found.
+    /// </summary>
+    public static async Task<AuthorizeDecision> Decision(IAuthorize? authorize, ClaimsPrincipal subject, string action,
+        MethodInfo verb, IReadOnlyDictionary<string, object?>? resource = null, CancellationToken ct = default)
+    {
         ArgumentNullException.ThrowIfNull(subject);
         ArgumentNullException.ThrowIfNull(verb);
-        if (authorize is null) return null;
-        var decision = await authorize.AuthorizeAsync(new AuthorizeRequest
+        if (authorize is null) return AuthorizeDecision.Allowed();
+        return await authorize.AuthorizeAsync(new AuthorizeRequest
         {
             Subject = subject,
             Action = action,
             Resource = verb,
             Context = resource,
         }, ct).ConfigureAwait(false);
-        return decision is AuthorizeDecision.Allow ? null : decision;
     }
 
     /// <summary>The action an HTTP method performs: a read, a removal, or otherwise a write.</summary>

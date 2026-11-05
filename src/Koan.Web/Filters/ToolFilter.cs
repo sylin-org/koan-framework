@@ -1,48 +1,20 @@
 using System.Globalization;
 using System.Text.Json;
-using Koan.Web.Authorization;
 using Koan.Web.Controllers;
-using Koan.Web.Hooks;
-using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Mvc.Controllers;
 using Microsoft.AspNetCore.Mvc.Filters;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Primitives;
 
 namespace Koan.Web.Filters;
 
-/// <summary>What every <c>[Tool]</c> action answers to, on either door (ARCH-0141): the one gate before anything is read of the
-/// request, a body read as a form or one JSON object alike, and a value that cannot bind refused with its field named.</summary>
-internal sealed class ToolFilter : IAsyncAuthorizationFilter, IResourceFilter, IActionFilter, IExceptionFilter
+/// <summary>What every <c>[Tool]</c> action answers to after its gate (<see cref="GateFilter"/>), on either door (ARCH-0141): a body read as a form
+/// or one JSON object alike, and a value that cannot bind refused with its field named.</summary>
+internal sealed class ToolFilter : IResourceFilter, IActionFilter, IExceptionFilter
 {
     public static readonly ToolFilter Instance = new();
-
-    public async Task OnAuthorizationAsync(AuthorizationFilterContext context)
-    {
-        var http = context.HttpContext;
-        // WEB-0083: a credential a handler rejected is not the anonymous case, whatever the gate would say to a visitor. A session
-        // cookie that no longer holds was presented by nobody, and its handler reports no credential (SEC-0037).
-        if (http.Features.Get<IAuthenticateResultFeature>()?.AuthenticateResult?.Failure is not null)
-        {
-            context.Result = Answers.Denied(AuthorizeDecision.Challenged());
-            return;
-        }
-
-        var origins = http.RequestServices.GetService<IOptions<OriginOptions>>()?.Value ?? OriginOptions.Empty;
-        var decision = await EntityAuthorization.Decide(
-            http.RequestServices.GetService<IAuthorize>(),
-            OriginStamp.Apply(http.User, OriginResolver.FromHttpContext(http, origins)),
-            EntityAuthorization.ActionOf(http.Request.Method),
-            ((ControllerActionDescriptor)context.ActionDescriptor).MethodInfo,
-            http.Request.RouteValues,
-            http.RequestAborted);
-        if (decision is not null) context.Result = Answers.Denied(decision);
-    }
 
     public void OnResourceExecuting(ResourceExecutingContext context)
     {

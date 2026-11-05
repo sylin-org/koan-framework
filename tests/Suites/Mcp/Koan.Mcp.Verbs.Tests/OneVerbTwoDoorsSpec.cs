@@ -55,7 +55,9 @@ public sealed class OneVerbTwoDoorsSpec(ForumFixture forum) : IClassFixture<Foru
         if (route.Kind is not null) tool.Kind.Should().Be(route.Kind);
         if (route.Text.Length > 0) tool.Text.Should().Be(route.Text);
         tool.Location.Should().Be(route.Location);
-        tool.Gate.Should().Be(route.Gate);
+        // A route that refused with no problem, as an ASP.NET policy does, says no word; the edge's own problem then says its kind (ARCH-0145).
+        if (route.Word is not null) tool.Word.Should().Be(route.Word);
+        else if (tool.Failed) tool.Word.Should().Be(tool.Kind);
     }
 
     private async Task<int> PostsWith(string body)
@@ -133,7 +135,7 @@ public sealed class OneVerbTwoDoorsSpec(ForumFixture forum) : IClassFixture<Foru
         nothing.Should().Be(there, "nothing leaks of what the place holds");
         there.Status.Should().Be(401);
         there.Kind.Should().Be("gated");
-        there.Gate.Should().Be("sign-in");
+        there.Word.Should().Be("sign-in");
         there.Text.Should().Be(Reply.SignIn.Text);
         (await PostsWith("hello?")).Should().Be(0);
     }

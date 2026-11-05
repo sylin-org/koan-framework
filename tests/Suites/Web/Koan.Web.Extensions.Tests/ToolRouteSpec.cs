@@ -86,20 +86,29 @@ public sealed class ToolRouteSpec(RestEntityWebFactory fx)
     }
 
     [Theory]
-    [InlineData("absent", HttpStatusCode.NotFound, "Nothing answers at this address.")]
-    [InlineData("gated", HttpStatusCode.Unauthorized, "Not for you.")]
-    [InlineData("conflict", HttpStatusCode.Conflict, "Already there.")]
-    [InlineData("invalid", HttpStatusCode.BadRequest, "Not like that.")]
-    public async Task One_mapping_answers_each_kind(string kind, HttpStatusCode status, string says)
+    [InlineData("absent", HttpStatusCode.NotFound, "absent", "Nothing answers at this address.", "absent")]
+    [InlineData("gated", HttpStatusCode.Unauthorized, "gated", "Not for you.", "timed-out")]
+    [InlineData("conflict", HttpStatusCode.Conflict, "conflict", "Already there.", "conflict")]
+    [InlineData("taken", HttpStatusCode.Conflict, "conflict", "Another one has this id.", "id-taken")]
+    [InlineData("invalid", HttpStatusCode.BadRequest, "invalid", "Not like that.", "invalid")]
+    public async Task One_mapping_answers_each_kind_with_its_word(string refusal, HttpStatusCode status, string kind, string says, string word)
     {
-        var answer = await Post($"/tool-route/{kind}/refused");
+        var answer = await Post($"/tool-route/{refusal}/refused");
         answer.Status.Should().Be(status);
         answer.Body.GetProperty("kind").GetString().Should().Be(kind);
         answer.Body.GetProperty("detail").GetString().Should().Be(says);
-        if (kind == "gated")
-        {
-            answer.Body.GetProperty("gate").GetString().Should().Be("timed-out");
-        }
+        answer.Body.GetProperty("word").GetString().Should().Be(word, "every refusal carries a word, its kind's where it names none");
+        answer.Body.TryGetProperty("gate", out _).Should().BeFalse("the word has one name on the wire");
+    }
+
+    [Fact]
+    public async Task An_invalid_reason_that_names_its_field_is_refused_on_that_field()
+    {
+        var answer = await Post("/tool-route/field/refused");
+        answer.Status.Should().Be(HttpStatusCode.BadRequest);
+        answer.Body.GetProperty("kind").GetString().Should().Be("invalid");
+        answer.Body.GetProperty("errors").GetProperty("count").EnumerateArray().Select(said => said.GetString()).Should().Equal("Not that many.");
+        answer.Body.GetProperty("detail").GetString().Should().Be("Not that many.");
     }
 
     [Fact]
@@ -142,6 +151,8 @@ public sealed class ToolRouteController : ControllerBase
         "absent" => new Outcome<string>.Refused(Reason.Absent("A sentence that says too much.")),
         "gated" => new Outcome<string>.Refused(Reason.Gated("timed-out", "Not for you.")),
         "conflict" => new Outcome<string>.Refused(Reason.Conflict("Already there.")),
+        "taken" => new Outcome<string>.Refused(Reason.Conflict("id-taken", "Another one has this id.")),
+        "field" => new Outcome<string>.Refused(Reason.Invalid("count", "Not that many.")),
         _ => new Outcome<string>.Refused(Reason.Invalid("Not like that.")),
     }, _ => Ok());
 

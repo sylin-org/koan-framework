@@ -36,6 +36,8 @@ public sealed class RestEntityWebFactory : IAsyncLifetime
 
     public HttpClient Client => _client ?? throw new InvalidOperationException("Host not started.");
 
+    public IServiceProvider Services => _host?.Services ?? throw new InvalidOperationException("Host not started.");
+
     public async ValueTask InitializeAsync()
     {
         var builder = Host.CreateDefaultBuilder()
@@ -74,6 +76,9 @@ public sealed class RestEntityWebFactory : IAsyncLifetime
                     // WEB-0074: the one supported meaning of ?q= - an application hook that turns it into a filter.
                     services.AddSingleton<Koan.Web.Hooks.IRequestOptionsHook<Gizmo>, GizmoLabelSearch>();
                     // ARCH-0092 Phase 3.2: a test auth scheme so the entity floor can be exercised end-to-end.
+                    // ARCH-0146: an application's provider for the routes that declare a shelf need, and its challenge on a 401.
+                    services.AddScoped<IAuthorizationProvider, ShelfAccess>();
+                    services.AddSingleton<IChallenge, ShelfChallenge>();
                     services.AddAuthentication(TestAuthHandler.SchemeName)
                         .AddScheme<AuthenticationSchemeOptions, TestAuthHandler>(TestAuthHandler.SchemeName, _ => { });
                 });

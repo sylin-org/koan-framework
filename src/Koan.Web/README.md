@@ -9,7 +9,7 @@ Turn Koan entities into controller-first ASP.NET Core APIs, with shared policy, 
 
 - `EntityController<TEntity, TKey>` and the string-key `EntityController<TEntity>` convenience surface
 - attribute-routed ASP.NET Core MVC integration
-- `[Tool]` on a controller or action, which makes a route also a tool where `Koan.Mcp` is present, and `this.Answer(outcome, done)` or `this.Refused(reason)`, a route's one answer to a command (ARCH-0141): a `Problem` as `application/problem+json`; an application that renders pages registers an ordinary `text/html` output formatter that writes `Problem` and sets `RespectBrowserAcceptHeader`, and a browser reads its page (ARCH-0143)
+- `[Tool]` on a controller or action, which makes a route also a tool where `Koan.Mcp` is present, and `this.Answer(outcome, done)` or `this.Refused(reason)`, a route's one answer to a command (ARCH-0141): a `Problem` as `application/problem+json`, carrying the reason's `word` and its field (ARCH-0145); an application that renders pages registers an ordinary `text/html` output formatter that writes `Problem` and sets `RespectBrowserAcceptHeader`, and a browser reads its page (ARCH-0143)
 - middleware an application adds in `Program` runs for a route, after authorization and before the endpoint; a default CORS policy runs before authentication with no call of yours; a fallback belongs on `app.MapFallback`, because a terminal `app.Run` answers every route (ARCH-0142)
 - health and optional OpenAPI wiring
 - static-file middleware only when the host supplies a real web-root provider
@@ -253,6 +253,41 @@ public sealed class DraftsController(KoanWebPipeline pipeline) : ControllerBase
   callbacks never fire. A process that serves no web requests answers `503`.
 - A request made in process runs inside the outer request's limiter permit and is not an observed origin. A limit a route
   names still binds it. See [ARCH-0144](https://github.com/sylin-org/koan-framework/blob/main/docs/decisions/ARCH-0144-one-request-answered-in-process.md).
+
+## Who may reach a route
+
+A routed action that declares what it needs is judged once, before anything is bound, by your own `IAuthorizationProvider`, and the
+action reads what the judgement found:
+
+```csharp
+public sealed class Needs(Bit bit) : AccessAttribute<Bit>(bit);
+
+public sealed class Doorway : IAuthorizationProvider
+{
+    public int Order => 10;
+
+    public async Task<AuthorizeDecision?> EvaluateAsync(AuthorizeRequest request, CancellationToken ct)
+    {
+        if (request.Resource is not MethodInfo verb || AccessAttribute<Bit>.Of(verb) is not [var bit] || request.Context is not { } route)
+            return null;                                         // not declared, or a listing: defer
+        var here = await Here.Resolve(request.Subject, route, ct);
+        return here.Refusal(bit) is { } reason ? AuthorizeDecision.Refused(reason) : AuthorizeDecision.Allowed(here);
+    }
+}
+
+[HttpPost("/t/{tangent}/{topic}")]
+[Needs(Bit.Post)]
+public IActionResult Reply(string tangent, string topic, ReplyInput input) => ... HttpContext.Features.Get<Here>() ...
+```
+
+- **Who is judged:** every `[Tool]` action, and every routed action that declares `[Access]`, `[RequireScope]` or your
+  `AccessAttribute<TNeed>` on itself or its controller. `[Open("why")]` says that nothing judges a route. The judgement runs
+  before every resource filter and before binding, so nobody is told to fix their input before being told they may not act.
+- **What it answers:** `AuthorizeDecision.Refused(reason)` answers as a command's refusal does, through `Answers`.
+  `Allowed(value)` puts the value on the request as a feature of its own type. A listing asks with no route values.
+- **A 401 asks for a credential:** each `IChallenge` you register adds a challenge to `WWW-Authenticate`.
+- **The start check:** `Koan:Web:Authorization:RoutesDeclareAccess=true` stops the host at start over any of your routed
+  actions that declares neither a gate nor `[Open]`. See [ARCH-0146](https://github.com/sylin-org/koan-framework/blob/main/docs/decisions/ARCH-0146-a-route-that-declares-access-is-judged-before-binding.md).
 
 ## Technical reference
 

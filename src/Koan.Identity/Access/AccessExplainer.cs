@@ -80,7 +80,13 @@ public sealed class AccessExplainer
             new AuthorizeRequest { Subject = principal, Action = action, Resource = resource }, ct).ConfigureAwait(false);
 
         var allowed = decision is AuthorizeDecision.Allow;
-        var reason = decision is AuthorizeDecision.Forbid forbid ? forbid.Reason ?? "forbidden" : null;
+        var reason = decision switch
+        {
+            AuthorizeDecision.Allow => null,
+            AuthorizeDecision.Forbid forbid => forbid.Reason ?? "forbidden",
+            AuthorizeDecision.Refuse refuse => refuse.Reason.Text,
+            _ => null,
+        };
         return new AccessDecision(allowed, reason, access.Facts);
     }
 

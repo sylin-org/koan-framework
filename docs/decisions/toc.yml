@@ -234,6 +234,10 @@
       href: ARCH-0143-one-refusal-shape.md
     - name: ARCH-0144 A request of the application is answered in process through its whole pipeline, which Koan.Web holds
       href: ARCH-0144-one-request-answered-in-process.md
+    - name: ARCH-0145 Every reason has a word, an invalid one may name its field, and a refusal carries the word as word
+      href: ARCH-0145-a-reason-names-its-word-and-its-field.md
+    - name: ARCH-0146 A routed action that declares access is judged once, before anything is bound, and the action reads what its gate found
+      href: ARCH-0146-a-route-that-declares-access-is-judged-before-binding.md
 - name: Core (CORE)
   items:
     - name: CORE-0072 Source-generated registries

@@ -64,6 +64,7 @@ public sealed class ToolAttribute(string? particle = null) : Attribute, IControl
 
     private static void Filter(ActionModel action)
     {
+        GateFilter.Convention.On(action);
         if (!action.Filters.Contains(ToolFilter.Instance)) action.Filters.Add(ToolFilter.Instance);
     }
 }

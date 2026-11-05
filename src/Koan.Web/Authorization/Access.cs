@@ -1,4 +1,5 @@
 using System;
+using System.Reflection;
 
 namespace Koan.Web.Authorization;
 
@@ -38,6 +39,47 @@ public sealed class AccessAttribute : Attribute
 
     /// <summary>Applies to every action NOT named by an explicit <see cref="Read"/>/<see cref="Write"/>/<see cref="Remove"/>.</summary>
     public string? All { get; }
+}
+
+/// <summary>
+/// ARCH-0146 — an application's own access declaration, typed by what it needs: <c>public sealed class Needs(Bit bit) : AccessAttribute&lt;Bit&gt;(bit);</c>.
+/// A routed action that declares one, on itself or on the class it is reached through, is judged before anything is bound, by the application's
+/// <see cref="IAuthorizationProvider"/>, which reads the declaration with <see cref="Of"/> from <see cref="AuthorizeRequest.Resource"/>, the action's
+/// <see cref="MethodInfo"/>. Koan's own gate reads none of it.
+/// </summary>
+[AttributeUsage(AttributeTargets.Class | AttributeTargets.Method, AllowMultiple = false, Inherited = true)]
+public abstract class AccessAttribute<TNeed>(TNeed need) : Attribute where TNeed : notnull
+{
+    /// <summary>What the action needs of its caller, in the application's own terms.</summary>
+    public TNeed Need { get; } = need;
+
+    /// <summary>What <paramref name="verb"/> declares, reached through the class it was found on: its class's, then its own. Every declaration
+    /// holds, so a method never opens what its class closes (ARCH-0141).</summary>
+    public static IReadOnlyList<TNeed> Of(MethodInfo verb)
+    {
+        ArgumentNullException.ThrowIfNull(verb);
+        return (verb.ReflectedType is { } owner ? new MemberInfo[] { owner, verb } : [verb])
+            .SelectMany(member => member.GetCustomAttributes<AccessAttribute<TNeed>>(inherit: true))
+            .Select(declared => declared.Need)
+            .ToList();
+    }
+}
+
+/// <summary>
+/// ARCH-0146 — a routed action that no gate judges, and why: sign-in, a challenge, a public statement. It declares access as plainly as a gate does,
+/// so the start check (<see cref="AuthorizeOptions.RoutesDeclareAccess"/>) knows it was meant. On a method it opens nothing its class closes.
+/// </summary>
+[AttributeUsage(AttributeTargets.Class | AttributeTargets.Method, AllowMultiple = false, Inherited = true)]
+public sealed class OpenAttribute : Attribute
+{
+    public OpenAttribute(string why)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(why);
+        Why = why;
+    }
+
+    /// <summary>Why nothing judges who may reach it.</summary>
+    public string Why { get; }
 }
 
 /// <summary>

@@ -27,7 +27,7 @@ public sealed class ProblemNegotiationSpec(RestEntityWebFactory fx)
         response.Content.Headers.ContentType!.MediaType.Should().Be("application/problem+json");
         using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(Ct));
         body.RootElement.GetProperty("kind").GetString().Should().Be("gated");
-        body.RootElement.GetProperty("gate").GetString().Should().Be("timed-out");
+        body.RootElement.GetProperty("word").GetString().Should().Be("timed-out");
         body.RootElement.GetProperty("title").GetString().Should().Be("Gated", "a title names the kind");
     }
 }

@@ -1054,10 +1054,12 @@ switch (await new Reply(topicId, "hi").Send(ct))
 | A reason | Means |
 |---|---|
 | `Reason.Invalid(text)` | a value the sender gave cannot be taken |
+| `Reason.Invalid(field, text)` | the same, about one wire field, which a route's `this.Answer` carries under `errors` |
 | `Reason.Absent(text)` | what it acts on is not there, for this sender |
 | `Reason.Gated(text)` | this sender may not, or not now |
-| `Reason.Gated(word, text)` | the same, with a stable word a client branches on; a route's `this.Answer` carries it as the problem's `gate` |
+| `Reason.Gated(word, text)` | the same, with a stable word a client branches on; a route's `this.Answer` carries it as the problem's `word` |
 | `Reason.Conflict(text)` | it disagrees with what is there |
+| `Reason.Conflict(word, text)` | the same, with a word that tells it from another conflict |
 
 Declare a reason's kind once, where the reason is defined. Code below the command that has no `Outcome<T>` to return throws `new Refusal(reason)`. `Send`'s token ends the wait and the command, and the outcome
 says which: nothing cuts a commit short. Whoever asks for a write sends it, in their own flow, and a read sends none. A number comes from `Sequence.Of<Event>(e => e.Seq)`,
