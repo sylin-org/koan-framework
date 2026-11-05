@@ -40,14 +40,16 @@ public sealed class AuthController(IAuthProviderCatalog providers, IOptions<Auth
     /// <summary>
     /// SEC-0040 — binds a login of <paramref name="provider"/> to the person signed in: the provider's own challenge,
     /// carrying the person. Its callback binds the login it verifies to them, in place of any login of that provider they
-    /// held, and refuses a login that is another person's. Where <c>ReConsent:ForceOnLink</c> asks, the person must have
-    /// signed in within <c>ReConsent:MaxAge</c>, so a cookie alone binds nothing.
+    /// held, and refuses a login that is another person's. It is a form POST, which Koan's cross-site guard judges (SEC-0039)
+    /// and a cross-site page cannot send with the session cookie, so binding never starts from another site; a connector
+    /// that names an account reads it from the form. The person must have signed in within <c>ReConsent:MaxAge</c> unless
+    /// <c>ReConsent:ForceOnLink</c> is turned off, so a cookie alone binds nothing.
     /// </summary>
-    [HttpGet(AuthConstants.Routes.ConnectionsLink)]
+    [HttpPost(AuthConstants.Routes.ConnectionsLink)]
     public async Task<IActionResult> Bind(
         [FromRoute] string provider,
-        [FromQuery(Name = AuthConstants.Query.Return)] string? returnUrl,
-        [FromQuery(Name = AuthConstants.Query.Failure)] string? failurePath)
+        [FromForm(Name = AuthConstants.Query.Return)] string? returnUrl,
+        [FromForm(Name = AuthConstants.Query.Failure)] string? failurePath)
     {
         if (string.IsNullOrWhiteSpace(provider)) return NotFound();
         if (providers.Find(provider) is not { Eligible: true }) return NotFound();
@@ -92,9 +94,11 @@ public sealed class AuthController(IAuthProviderCatalog providers, IOptions<Auth
         return true;
     }
 
-    /// <summary>A binding that needs a (recent) sign-in first: the failure landing with its code, or a 401 saying why.</summary>
+    /// <summary>A binding that needs a (recent) sign-in first: the failure landing with its code, or a 401 Problem saying why.</summary>
     private IActionResult SignInFirst(AuthenticationProperties props, string why)
-        => SignInFailureReturn.Redirect(HttpContext, props, SignInFailure.SignInFirst) ? new EmptyResult() : Unauthorized(why);
+        => SignInFailureReturn.Redirect(HttpContext, props, SignInFailure.SignInFirst)
+            ? new EmptyResult()
+            : SignInFailureReturn.Problem(SignInFailure.SignInFirst, why).ToResult();
 
     // POST only (SEC-0035): on a GET, an image in anything a person reads would end their session.
     [HttpPost(AuthConstants.Routes.Logout)]

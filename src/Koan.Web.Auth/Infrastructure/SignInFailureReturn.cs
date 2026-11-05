@@ -1,8 +1,12 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Text;
 using Koan.Web.Auth.Options;
+using Koan.Web.Controllers;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Abstractions;
+using Microsoft.AspNetCore.Routing;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -30,6 +34,31 @@ public static class SignInFailureReturn
 {
     /// <summary>The query key the landing receives the code in.</summary>
     public const string CodeParameter = AuthConstants.Query.Error;
+
+    /// <summary>
+    /// SEC-0040 — answers a sign-in its callback refused: the failure landing with its code where one is named, and otherwise
+    /// a <see cref="Problem"/> carrying the code as its word and the refusal's sentence, never a server error.
+    /// </summary>
+    public static Task Refuse(HttpContext context, AuthenticationProperties? properties, SignInRefusedException refused)
+        => Redirect(context, properties ?? refused.Properties, refused.Failure)
+            ? Task.CompletedTask
+            : Answer(context, Problem(refused.Failure, refused.Message));
+
+    /// <summary>A refusal of a sign-in or a binding as Koan's <see cref="Problem"/>: its code is the word a client acts on.</summary>
+    public static Problem Problem(SignInFailure failure, string detail) => new(failure switch
+    {
+        SignInFailure.LoginTaken => StatusCodes.Status409Conflict,
+        SignInFailure.SignInFirst => StatusCodes.Status401Unauthorized,
+        SignInFailure.AccessDenied => StatusCodes.Status403Forbidden,
+        _ => StatusCodes.Status400BadRequest,
+    }, detail, Code(failure));
+
+    /// <summary>Writes <paramref name="problem"/> outside an action, as every Koan door answers, and keeps no copy.</summary>
+    private static Task Answer(HttpContext context, Problem problem)
+    {
+        context.Response.Headers.CacheControl = "no-store";
+        return problem.ToResult().ExecuteResultAsync(new ActionContext(context, context.GetRouteData(), new ActionDescriptor()));
+    }
 
     /// <summary>The sanitized code for <paramref name="failure"/>, as the landing receives it.</summary>
     public static string Code(SignInFailure failure) => failure switch

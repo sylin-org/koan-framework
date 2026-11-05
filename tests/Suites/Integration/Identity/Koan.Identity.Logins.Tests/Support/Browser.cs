@@ -33,14 +33,24 @@ public sealed class Browser : IDisposable
     public bool Holds(string name) => _cookies.ContainsKey(name);
 
     /// <summary>Goes to <paramref name="url"/> and follows the host's redirects to where they end, or to the first that leaves it.</summary>
-    public async Task<Landing> Go(string url)
+    public Task<Landing> Go(string url) => Walk(HttpMethod.Get, new Uri(Origin, url), null, null);
+
+    /// <summary>
+    /// Submits a form of <paramref name="fields"/> to <paramref name="url"/> from a page of <paramref name="site"/>, as the
+    /// browser says in <c>Sec-Fetch-Site</c>, then follows the redirects as <see cref="Go"/> does.
+    /// </summary>
+    public Task<Landing> Submit(string url, IReadOnlyDictionary<string, string> fields, string site = "same-origin")
+        => Walk(HttpMethod.Post, new Uri(Origin, url), new FormUrlEncodedContent(fields), site);
+
+    private async Task<Landing> Walk(HttpMethod method, Uri target, HttpContent? content, string? site)
     {
-        var target = new Uri(Origin, url);
         var chain = new List<string>();
         for (var hop = 0; hop < MostHops; hop++)
         {
-            using var request = new HttpRequestMessage(HttpMethod.Get, target);
+            using var request = new HttpRequestMessage(method, target) { Content = content };
             if (_cookies.Count > 0) request.Headers.Add("Cookie", string.Join("; ", _cookies.Select(static c => $"{c.Key}={c.Value}")));
+            if (site is not null) request.Headers.Add("Sec-Fetch-Site", site);
+            (method, content, site) = (HttpMethod.Get, null, null);
             using var response = await _client.SendAsync(request, TestContext.Current.CancellationToken);
             Keep(response);
             chain.Add($"{(int)response.StatusCode} {target.PathAndQuery}");

@@ -51,7 +51,6 @@ internal sealed class AtprotoHost : IAsyncDisposable
             ["Koan:Environment"] = "Development",
             ["Koan:BackgroundServices:Enabled"] = "false",
             ["Logging:LogLevel:Default"] = "Warning",
-            ["Koan:Identity:SeedDevUsers"] = "false",
             ["Koan:Web:ApplicationUrl"] = Public.ToString().TrimEnd('/'),
             ["Koan:Web:Auth:Providers:atproto:Scopes:0"] = "atproto",
             ["Koan:Data:Sources:Default:Adapter"] = "sqlite",
@@ -93,16 +92,32 @@ internal sealed class AtprotoHost : IAsyncDisposable
     public Task<Who> SignIn(Browser browser, string did)
         => Approve(browser, $"/auth/atproto/challenge?identifier={HandleOf(did)}&return={LoginProbeController.WhoAmI}", did);
 
-    /// <summary>Binds <paramref name="did"/>'s login to the person <paramref name="browser"/> is signed in as.</summary>
-    public Task<Who> Bind(Browser browser, string did)
-        => Approve(browser, $"/me/connections/atproto/link?identifier={HandleOf(did)}&return={LoginProbeController.WhoAmI}", did);
+    /// <summary>Binds <paramref name="did"/>'s login to the person <paramref name="browser"/> is signed in as, from the application's own form.</summary>
+    public async Task<Who> Bind(Browser browser, string did)
+    {
+        var landed = await Approved(browser, await browser.Submit(BindPath, BindFields(did)), did);
+        landed.Status.Should().Be(HttpStatusCode.OK, landed.Trace);
+        landed.At.AbsolutePath.Should().Be(LoginProbeController.WhoAmI, landed.Trace);
+        return await browser.WhoAmI();
+    }
+
+    public const string BindPath = "/me/connections/atproto/link";
+
+    /// <summary>The form that binds <paramref name="did"/>'s account: its handle, and where a bind returns.</summary>
+    public static Dictionary<string, string> BindFields(string did)
+        => new() { ["identifier"] = HandleOf(did), ["return"] = LoginProbeController.WhoAmI };
+
+    /// <summary>The provider's approval of the challenge <paramref name="started"/> sent to it, as <paramref name="did"/>, and the callback.</summary>
+    public async Task<Landing> Approved(Browser browser, Landing started, string did)
+    {
+        started.Status.Should().Be(HttpStatusCode.Redirect, started.Trace);
+        started.At.ToString().Should().StartWith(Pds.Origin + "/authorize?", started.Trace);
+        return await browser.Go("/auth/atproto/callback" + Pds.Approval(LoopbackPds.StateOf(started.At.ToString()), did));
+    }
 
     private async Task<Who> Approve(Browser browser, string challenge, string did)
     {
-        var started = await browser.Go(challenge);
-        started.Status.Should().Be(HttpStatusCode.Redirect, started.Trace);
-        started.At.ToString().Should().StartWith(Pds.Origin + "/authorize?", started.Trace);
-        var landed = await browser.Go("/auth/atproto/callback" + Pds.Approval(LoopbackPds.StateOf(started.At.ToString()), did));
+        var landed = await Approved(browser, await browser.Go(challenge), did);
         landed.Status.Should().Be(HttpStatusCode.OK, landed.Trace);
         landed.At.AbsolutePath.Should().Be(LoginProbeController.WhoAmI, landed.Trace);
         return await browser.WhoAmI();

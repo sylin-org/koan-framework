@@ -19,10 +19,10 @@ using Xunit;
 namespace Koan.Identity.Tests;
 
 /// <summary>
-/// SEC-0007 P0 / Layer-0 acceptance (ARCH-0079 — real <c>AddKoan()</c>, offline). Proves the durable person
-/// core + the wired sign-in reconciliation seams (the auth flow handler and the external-identity store), the
-/// <c>Membership.IdentityId</c> soft-FK resolution, the durable dev-seed, the ambient-exempt global plane, and
-/// the dev-open / prod-closed fail-closed boot guard.
+/// SEC-0007 P0 / Layer-0 and SEC-0040 acceptance (ARCH-0079 — real <c>AddKoan()</c>, offline). Proves the durable person
+/// core + the wired sign-in reconciliation seams (the auth flow handler and the external-identity store), a person of
+/// Koan's own id and the logins bound to it, the <c>Membership.IdentityId</c> soft-FK resolution, the ambient-exempt
+/// global plane, and a boot that refuses invalid configuration.
 /// </summary>
 [Collection("identity")]
 public sealed class IdentityReconciliationSpec : IdentityHostScopedSpec
@@ -54,14 +54,6 @@ public sealed class IdentityReconciliationSpec : IdentityHostScopedSpec
         => IndexMetadata.GetIndexes(entity).Should().Contain(
             index => !index.IsPrimaryKey && index.Properties[0].Name == property,
             "every /me and every sign-in reads these rows by this property");
-
-    [Theory]
-    [InlineData(true, null, "Open")]
-    [InlineData(false, null, "Closed")]
-    [InlineData(false, IdentityPosture.Open, "Open")]
-    [InlineData(true, IdentityPosture.Closed, "Closed")]
-    public void Posture_resolves_dev_open_prod_closed(bool isDevelopment, IdentityPosture? over, string expected)
-        => IdentityPostureResolver.Resolve(isDevelopment, over).ToString().Should().Be(expected);
 
     [Fact]
     public async Task Reconcile_upserts_durable_person_with_verified_primary_email()
@@ -125,21 +117,6 @@ public sealed class IdentityReconciliationSpec : IdentityHostScopedSpec
         await Reconciler.ReconcileAsync(new IdentityClaims("ivan@example.com", DisplayName: "Ivan", Email: "ivan@example.com", EmailVerified: true));
         (await store.Exists("ivan@example.com")).Should().BeTrue();   // a real person exists
         (await store.Exists("no-such-person")).Should().BeFalse();    // the stub always returned false
-    }
-
-    [Fact]
-    public async Task Dev_seed_persists_durable_offline_dev_users()
-    {
-        // The Development generic-host boot trips ASP.NET's web-only DI validation, so the seed LOGIC (its durable
-        // effect) is exercised directly; the dev-open gating is covered by the posture + fail-closed facts.
-        await SecIdentityModule.SeedDevUsersAsync(Reconciler, IdentityHostFixture.DevUser);
-
-        (await Identity.Get(IdentityHostFixture.DevUser)).Should().NotBeNull("the dev-seed persists a durable dev person");
-        (await Identity.Get("alice@example.com")).Should().NotBeNull();
-        (await Identity.Get("bob@example.com")).Should().NotBeNull();
-
-        var aliceEmails = await IdentityEmail.Query(e => e.IdentityId == "alice@example.com");
-        aliceEmails.Should().Contain(e => e.Address == "alice@example.com" && e.Verified && e.Primary);
     }
 
     [Fact]
@@ -207,14 +184,6 @@ public sealed class IdentityReconciliationSpec : IdentityHostScopedSpec
 
         (await Reconciler.ReconcileAsync(new IdentityClaims(subject, Provider: "atproto"))).Id.Should().Be(subject);
     }
-
-    [Theory]
-    [InlineData(true, IdentityPosture.Open, true, true)]      // dev + open + enabled → seed
-    [InlineData(false, IdentityPosture.Open, true, false)]    // not Development → never seed a backdoor identity
-    [InlineData(true, IdentityPosture.Closed, true, false)]   // Development but closed → no seed
-    [InlineData(true, IdentityPosture.Open, false, false)]    // seeding disabled → no seed
-    public void Seed_gate_is_dev_open_enabled_only(bool isDev, IdentityPosture posture, bool enabled, bool expected)
-        => SecIdentityModule.ShouldSeedDevUsers(isDev, posture, enabled).Should().Be(expected);
 
     [Fact]
     public async Task Email_verification_upgrades_on_a_later_signin()
@@ -335,15 +304,13 @@ public sealed class IdentityReconciliationSpec : IdentityHostScopedSpec
     }
 
     [Fact]
-    public async Task Forced_open_outside_development_refuses_to_boot()
+    public async Task Invalid_identity_configuration_refuses_to_boot_with_its_path_and_the_fact_keeps_its_fixture()
     {
-        // A non-Development host with the Identity posture forced Open must fail the SEC-0007 boot guard
-        // (Open auto-seeds dev users and is legal only in Development). Trust/Tenancy do not throw in "Test".
         var act = async () =>
         {
             await using var host = KoanIntegrationHost.Configure()
                 .WithEnvironment("Test")
-                .WithSetting("Koan:Identity:Posture", "Open")
+                .WithSetting("Koan:Identity:AuditSnapshotMode", "Typo")
                 .ConfigureServices(s => s.AddKoan())
                 .Build();
 
@@ -351,7 +318,7 @@ public sealed class IdentityReconciliationSpec : IdentityHostScopedSpec
             await host.StartAsync(TestContext.Current.CancellationToken);
         };
 
-        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*Open*Development*");
+        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*Koan:Identity*AuditSnapshotMode*");
 
         AppHost.Current.Should().BeSameAs(_fx.Services,
             "nested host cleanup must restore the fixture selected for this fact flow");
@@ -359,25 +326,6 @@ public sealed class IdentityReconciliationSpec : IdentityHostScopedSpec
         await new Identity { Id = probeId, DisplayName = "Fixture Still Selected" }.Save();
         (await Identity.Get(probeId)).Should().NotBeNull(
             "the surrounding fact scope must keep selecting the shared fixture after nested host cleanup");
-    }
-
-    [Fact]
-    public async Task Invalid_posture_configuration_refuses_to_boot_with_the_configuration_path()
-    {
-        var act = async () =>
-        {
-            await using var host = KoanIntegrationHost.Configure()
-                .WithEnvironment("Test")
-                .WithSetting("Koan:Identity:Posture", "Typo")
-                .ConfigureServices(s => s.AddKoan())
-                .Build();
-
-            using var hostScope = AppHost.PushScope(host.Services);
-            await host.StartAsync(TestContext.Current.CancellationToken);
-        };
-
-        await act.Should().ThrowAsync<InvalidOperationException>()
-            .WithMessage("*Koan:Identity*Posture*");
     }
 
     [Fact]

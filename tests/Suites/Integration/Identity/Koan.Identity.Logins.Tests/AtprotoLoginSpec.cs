@@ -35,6 +35,41 @@ public sealed class AtprotoLoginSpec
     }
 
     [Fact]
+    public async Task A_page_of_another_site_cannot_bind_its_account_to_a_signed_in_person()
+    {
+        // The attack: a page elsewhere sends a signed-in person to bind an account its author holds at a provider that
+        // approves anything, and would then sign in as them.
+        await using var host = await AtprotoHost.Start(One, Two);
+        using var browser = host.Browser();
+        var person = await host.SignIn(browser, One);
+
+        var posted = await browser.Submit(AtprotoHost.BindPath, AtprotoHost.BindFields(Two), site: "cross-site");
+        posted.Status.Should().Be(HttpStatusCode.Forbidden, posted.Trace);
+        var navigated = await browser.Go($"{AtprotoHost.BindPath}?identifier={AtprotoHost.HandleOf(Two)}");
+        navigated.Status.Should().Be(HttpStatusCode.MethodNotAllowed, "a navigation cannot start a binding");
+
+        var now = await browser.WhoAmI();
+        (now.Id, now.Did).Should().Be((person.Id, One), "nothing was bound and the session is unchanged");
+        using (var later = host.Browser()) (await host.SignIn(later, One)).Id.Should().Be(person.Id, "the person keeps their login");
+        (await host.Bind(browser, Two)).Id.Should().Be(person.Id, "the application's own form still binds");
+    }
+
+    [Fact]
+    public async Task With_no_failure_landing_another_persons_did_is_refused_with_a_problem_saying_why()
+    {
+        await using var host = await AtprotoHost.Start(One, Two);
+        using (var owner = host.Browser()) await host.SignIn(owner, One);
+        using var browser = host.Browser();
+        var person = await host.SignIn(browser, Two);
+
+        var refused = await host.Approved(browser, await browser.Submit(AtprotoHost.BindPath, AtprotoHost.BindFields(One)), One);
+
+        refused.Status.Should().Be(HttpStatusCode.Conflict, refused.Trace);
+        refused.Body.Should().Contain("login_taken");
+        (await browser.WhoAmI()).Id.Should().Be(person.Id, "a refused binding signs nothing in");
+    }
+
+    [Fact]
     public async Task A_proof_of_a_bound_did_lands_on_its_person_and_a_proof_of_an_unbound_one_makes_a_person()
     {
         await using var host = await AtprotoHost.Start(One, Three);

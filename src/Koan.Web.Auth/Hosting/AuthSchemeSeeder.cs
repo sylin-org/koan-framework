@@ -158,13 +158,9 @@ internal static class AuthSchemeSeeder
                 await LoginArrival.Arrive(ctx.HttpContext, ctx.Properties, Login(ctx.Scheme.Name, user, json));
             },
             // WEB-0080: when the application names a failure landing, a sign-in that cannot complete lands there with a
-            // sanitized code; otherwise the maintained handler's own answer stands.
-            OnRemoteFailure = ctx =>
-            {
-                var (failure, properties) = Refusal(ctx);
-                if (SignInFailureReturn.Redirect(ctx.HttpContext, properties, failure)) ctx.HandleResponse();
-                return Task.CompletedTask;
-            },
+            // sanitized code; otherwise the maintained handler's own answer stands. A login refused at its arrival
+            // (SEC-0040) always says why.
+            OnRemoteFailure = Failed,
             OnAccessDenied = ctx =>
             {
                 if (SignInFailureReturn.Redirect(ctx.HttpContext, ctx.Properties, SignInFailure.AccessDenied)) ctx.HandleResponse();
@@ -249,12 +245,7 @@ internal static class AuthSchemeSeeder
                 await LoginArrival.Arrive(ctx.HttpContext, ctx.Properties, Login(ctx.Scheme.Name, user, json));
             },
             // WEB-0080: the same failure landing as the OAuth2 handler.
-            OnRemoteFailure = ctx =>
-            {
-                var (failure, properties) = Refusal(ctx);
-                if (SignInFailureReturn.Redirect(ctx.HttpContext, properties, failure)) ctx.HandleResponse();
-                return Task.CompletedTask;
-            },
+            OnRemoteFailure = Failed,
             OnAccessDenied = ctx =>
             {
                 if (SignInFailureReturn.Redirect(ctx.HttpContext, ctx.Properties, SignInFailure.AccessDenied)) ctx.HandleResponse();
@@ -328,13 +319,19 @@ internal static class AuthSchemeSeeder
     }
 
     /// <summary>
-    /// Why a callback failed, and the challenge's properties. A login refused at its arrival says why, and carries the
-    /// properties an OAuth2 handler does not hand its failure event.
+    /// A callback that failed. A login refused at its arrival answers its own refusal, with the challenge's properties it
+    /// carries, which an OAuth2 handler does not hand its failure event; any other failure lands on the failure landing
+    /// when one is named.
     /// </summary>
-    private static (SignInFailure Failure, AuthenticationProperties? Properties) Refusal(RemoteFailureContext ctx)
-        => ctx.Failure is SignInRefusedException refused
-            ? (refused.Failure, ctx.Properties ?? refused.Properties)
-            : (SignInFailure.Failed, ctx.Properties);
+    private static async Task Failed(RemoteFailureContext ctx)
+    {
+        if (ctx.Failure is SignInRefusedException refused)
+        {
+            await SignInFailureReturn.Refuse(ctx.HttpContext, ctx.Properties, refused);
+            ctx.HandleResponse();
+        }
+        else if (SignInFailureReturn.Redirect(ctx.HttpContext, ctx.Properties, SignInFailure.Failed)) ctx.HandleResponse();
+    }
 
     /// <summary>
     /// The maintained handler's Backchannel calls token/userinfo/discovery SERVER-side, so a relative endpoint must

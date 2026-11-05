@@ -6,8 +6,10 @@
 
 > **D1 and identity-key amendment (2026-11-05, [SEC-0040](SEC-0040-a-person-is-koans-own.md)):** a person's id is Koan's own,
 > a GUID v7 made when a login is first seen, never a provider's subject (`Identity.Id` == the claims `sub` below no longer
-> holds). Logins bind to the signed-in person through their provider's challenge at `/me/connections/{provider}/link`, at
-> most one per provider and never fewer than one; this builds the second-provider follow-on of the identity-key question.
+> holds). Logins bind to the signed-in person through their provider's challenge, a same-site form POST to
+> `/me/connections/{provider}/link`, at most one per provider and never fewer than one; this builds the second-provider
+> follow-on of the identity-key question. The dev-open posture and its seeded dev users are gone: a seeded person held no
+> login, and the Test connector makes a person at their first sign-in.
 
 > **D8 amendment (2026-10-29, [SEC-0021](SEC-0021-resource-overwrites-resolve-in-discord-order.md)):** the verbs refused
 > while impersonating also include `role.manage` (the role routes' writes and the access console's role revoke) and

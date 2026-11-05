@@ -15,7 +15,7 @@ namespace Koan.Identity.Logins.Tests;
 /// <summary>
 /// A real Koan application on a loopback Kestrel port, in Development, with Koan.Identity over SQLite and the Test
 /// connector's two providers: <c>test</c> (OAuth2) and <c>test-oidc</c> (OIDC). Real Kestrel, because the maintained
-/// handlers reach the Test provider's token and userinfo endpoints over HTTP. <c>ReConsent:ForceOnLink</c> is on, and the
+/// handlers reach the Test provider's token and userinfo endpoints over HTTP. <c>ReConsent:ForceOnLink</c> is on by default, and the
 /// clock can be moved forward, so a sign-in can grow old.
 /// </summary>
 public sealed class TestConnectorHost : IAsyncLifetime
@@ -45,8 +45,6 @@ public sealed class TestConnectorHost : IAsyncLifetime
                 ["Koan:BackgroundServices:Enabled"] = "false",
                 ["Koan:Data:Sources:Default:Adapter"] = "sqlite",
                 ["Koan:Data:Sources:Default:ConnectionString"] = $"Data Source={Path.Combine(_folder, "store.sqlite")};Pooling=False",
-                ["Koan:Identity:SeedDevUsers"] = "false",
-                ["Koan:Web:Auth:ReConsent:ForceOnLink"] = "true",
             }))
             .ConfigureWebHostDefaults(web =>
             {

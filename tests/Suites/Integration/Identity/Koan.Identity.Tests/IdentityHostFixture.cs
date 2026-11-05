@@ -10,7 +10,6 @@ namespace Koan.Identity.Tests;
 
 public sealed class IdentityHostFixture : IAsyncLifetime
 {
-    public const string DevUser = "devboss";
     private IntegrationHost? _host;
     public IServiceProvider Services => _host?.Services ?? throw new InvalidOperationException("Host not started.");
     public async ValueTask InitializeAsync()

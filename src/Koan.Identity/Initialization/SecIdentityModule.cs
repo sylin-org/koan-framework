@@ -2,10 +2,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using Koan.Core;
-using Koan.Core.Hosting.App;
 using Koan.Core.Hosting.Registry;
 using Koan.Core.Modules;
 using Koan.Core.Provenance;
@@ -19,9 +16,9 @@ namespace Koan.Identity.Initialization;
 
 /// <summary>
 /// SEC-0007 Layer 0 — lights up the durable person when <c>Koan.Identity</c> is referenced (Reference = Intent):
-/// registers the reconciler, replaces Koan.Web.Auth's vestigial in-memory <see cref="IUserStore"/> /
-/// <see cref="IExternalIdentityStore"/> with <c>Entity&lt;&gt;</c>-backed durable stores, and seeds offline dev
-/// users under a dev-open / prod-closed posture. The reconciliation <i>trigger</i> is the discovered
+/// registers the reconciler and replaces Koan.Web.Auth's vestigial in-memory <see cref="IUserStore"/> /
+/// <see cref="IExternalIdentityStore"/> with <c>Entity&lt;&gt;</c>-backed durable stores. A person is made at the first
+/// sign-in of one of their logins (SEC-0040), the Test connector's offline ones included. The reconciliation <i>trigger</i> is the discovered
 /// <see cref="IdentityAuthFlowHandler"/> (cookie sign-in) when functional Web Auth is also referenced—no manual
 /// wiring. Web Auth's defaults use standard <c>TryAdd</c> semantics, so durable store replacement is order-independent.
 /// </summary>
@@ -68,72 +65,14 @@ public sealed class SecIdentityModule : KoanModule
         // IdentityAuthFlowHandler is discovered via [KoanDiscoverable] on IKoanAuthFlowHandler — never registered here.
     }
 
-    public override async Task Start(IServiceProvider services, CancellationToken ct)
-    {
-        // Module startup can run alongside another host in tests or embedded compositions. Entity statics must
-        // resolve through the provider this invocation was handed without replacing the process-default owner.
-        using var hostScope = AppHost.PushScope(services);
-
-        var env = services.GetRequiredService<IHostEnvironment>();
-        var cfg = services.GetRequiredService<IConfiguration>();
-        var options = services.GetService<IOptions<IdentityOptions>>()?.Value ?? new IdentityOptions();
-        var logger = services.GetService<ILoggerFactory>()?.CreateLogger("Koan.Identity");
-
-        var posture = IdentityPostureResolver.Resolve(KoanEnv.Gate.DevelopmentOnly(env), options.Posture);
-
-        // Fail-closed (mirrors Trust/Tenancy): Open auto-seeds dev users and is legal only in Development.
-        if (posture == IdentityPosture.Open && !KoanEnv.Gate.DevelopmentOnly(env))
-            throw new InvalidOperationException(
-                "SEC-0007 fail-closed: Identity posture 'Open' (which auto-seeds dev users) is only valid in " +
-                $"Development; environment '{env.EnvironmentName}' must resolve 'Closed'. Remove the " +
-                "'Koan:Identity:Posture' override.");
-
-        logger?.LogInformation("Koan.Identity posture resolved: {Posture}.", posture);
-
-        if (ShouldSeedDevUsers(KoanEnv.Gate.DevelopmentOnly(env), posture, options.SeedDevUsers))
-        {
-            var reconciler = services.GetService<IIdentityReconciler>() ?? new IdentityReconciler();
-            var devUser = (options.DevUser ?? Environment.UserName).Trim();
-            await SeedDevUsersAsync(reconciler, devUser, ct).ConfigureAwait(false);
-            logger?.LogInformation(
-                "Koan.Identity dev-open: seeded dev person '{DevUser}' + alice@example.com + bob@example.com (offline).", devUser);
-        }
-    }
-
-    /// <summary>
-    /// The dev-seed gate (SEC-0007 G): offline dev users are seeded only under Development + an Open posture, and
-    /// only when seeding is enabled. Pure so the P0 acceptance spec can prove the gate without a full boot.
-    /// </summary>
-    internal static bool ShouldSeedDevUsers(bool isDevelopment, IdentityPosture posture, bool seedDevUsers)
-        => isDevelopment && posture == IdentityPosture.Open && seedDevUsers;
-
-    /// <summary>
-    /// Seeds the offline dev persons (the primary dev user + alice and bob) into the real data store via the
-    /// reconciler. The application names them by their ids: no provider vouched for them, so they hold no login. Internal
-    /// so the P0 acceptance spec can drive it directly (the full Development generic-host boot trips ASP.NET's web-only
-    /// DI validation, so the seed logic is exercised here instead).
-    /// </summary>
-    internal static async Task SeedDevUsersAsync(IIdentityReconciler reconciler, string devUser, CancellationToken ct = default)
-    {
-        await reconciler.ReconcileAsync(
-            new IdentityClaims(devUser, DisplayName: devUser, Email: $"{devUser}@local.dev", EmailVerified: true), ct).ConfigureAwait(false);
-        await reconciler.ReconcileAsync(
-            new IdentityClaims("alice@example.com", DisplayName: "Alice Example", Email: "alice@example.com", EmailVerified: true), ct).ConfigureAwait(false);
-        await reconciler.ReconcileAsync(
-            new IdentityClaims("bob@example.com", DisplayName: "Bob Example", Email: "bob@example.com", EmailVerified: true), ct).ConfigureAwait(false);
-    }
-
     public override void Report(ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
     {
         module.Describe(Version);
-        var configured = cfg.GetValue<IdentityPosture?>($"{IdentityOptions.SectionPath}:Posture");
         var auditSnapshotMode = cfg.GetValue<Audit.IdentityAuditSnapshotMode?>(
             $"{IdentityOptions.SectionPath}:{nameof(IdentityOptions.AuditSnapshotMode)}")
             ?? Audit.IdentityAuditSnapshotMode.PrivacySafe;
-        var posture = IdentityPostureResolver.Resolve(KoanEnv.Gate.DevelopmentOnly(env), configured);
-        var source = configured is null ? (KoanEnv.Gate.DevelopmentOnly(env) ? "dev-open" : "closed") : "override";
         module.SetSetting("Identity", b => b.Value(
-            $"posture={posture} ({source}); audit={auditSnapshotMode}; erasure=preview+owner-receipt; " +
-            "durable person + IUserStore/IExternalIdentityStore reconciliation; no per-MAU axis (SEC-0007 D2)"));
+            $"audit={auditSnapshotMode}; erasure=preview+owner-receipt; " +
+            "durable person of Koan's own id + IUserStore/IExternalIdentityStore reconciliation; no per-MAU axis (SEC-0007 D2, SEC-0040)"));
     }
 }

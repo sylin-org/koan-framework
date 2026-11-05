@@ -107,11 +107,47 @@ public sealed class TestConnectorLoginSpec(TestConnectorHost host) : IClassFixtu
     }
 
     [Fact]
+    public async Task With_no_failure_landing_a_refused_binding_answers_a_problem_saying_why()
+    {
+        var theirs = Unique("ivy");
+        using (var owner = host.Browser(theirs)) await SignIn(owner, "test");
+        using var nobody = host.Browser(Unique("joe"));
+        var unsigned = await Bind(nobody, "test", Unique("joe"), landing: false);
+        unsigned.Status.Should().Be(HttpStatusCode.Unauthorized, unsigned.Trace);
+        Word(unsigned).Should().Be("sign_in_first", "binding needs someone signed in");
+
+        using var browser = host.Browser(Unique("kai"));
+        var kai = await SignIn(browser, "test");
+        var taken = await Bind(browser, "test", theirs, landing: false);
+
+        taken.Status.Should().Be(HttpStatusCode.Conflict, taken.Trace);
+        Word(taken).Should().Be("login_taken");
+        taken.Body.Should().Contain("another person");
+        (await browser.WhoAmI()).Should().Be(kai);
+    }
+
+    [Fact]
+    public async Task Binding_never_starts_from_a_page_of_another_site()
+    {
+        var first = Unique("lou");
+        using var browser = host.Browser(first);
+        var lou = await SignIn(browser, "test");
+        browser.Cookie("_tp_user", TestConnectorHost.Persona(Unique("lou-elsewhere")));
+
+        var posted = await browser.Submit(BindPath("test"), Fields(), site: "cross-site");
+        posted.Status.Should().Be(HttpStatusCode.Forbidden, posted.Trace);
+        (await browser.Go(BindPath("test"))).Status.Should().Be(HttpStatusCode.MethodNotAllowed, "a navigation cannot bind");
+        (await Logins(lou.Id!)).Should().Equal("test");
+        (await browser.WhoAmI()).Should().Be(lou);
+
+        var newer = Unique("lou-new");
+        (await Bind(browser, "test", newer)).At.AbsolutePath.Should().Be(LoginProbeController.WhoAmI, "this site's own form binds");
+        (await browser.WhoAmI()).ProviderSubject.Should().Be($"test:{newer}");
+    }
+
+    [Fact]
     public async Task Binding_needs_a_recent_sign_in_so_a_cookie_alone_binds_nothing()
     {
-        using var nobody = host.Browser(Unique("gil"));
-        (await nobody.Go("/me/connections/test/link")).Status.Should().Be(HttpStatusCode.Unauthorized, "binding needs someone signed in");
-
         var first = Unique("hal");
         using var browser = host.Browser(first);
         var hal = await SignIn(browser, "test");
@@ -121,7 +157,8 @@ public sealed class TestConnectorLoginSpec(TestConnectorHost host) : IClassFixtu
             var stale = await Bind(browser, "test", Unique("hal-new"));
             stale.At.AbsolutePath.Should().Be(LoginProbeController.LandingPath, stale.Trace);
             stale.At.Query.Should().Contain("error=sign_in_first");
-            (await browser.Go("/me/connections/test/link")).Status.Should().Be(HttpStatusCode.Unauthorized);
+            var unlanded = await Bind(browser, "test", Unique("hal-new"), landing: false);
+            (unlanded.Status, Word(unlanded)).Should().Be((HttpStatusCode.Unauthorized, "sign_in_first"));
             (await Logins(hal.Id!)).Should().Equal("test");
 
             browser.Cookie("_tp_user", TestConnectorHost.Persona(first));
@@ -177,11 +214,31 @@ public sealed class TestConnectorLoginSpec(TestConnectorHost host) : IClassFixtu
         return await browser.WhoAmI();
     }
 
-    /// <summary>Binds the login of <paramref name="provider"/> the Test provider signs <paramref name="email"/> in as.</summary>
-    private static Task<Landing> Bind(Browser browser, string provider, string email)
+    /// <summary>
+    /// Binds the login of <paramref name="provider"/> the Test provider signs <paramref name="email"/> in as, from this
+    /// application's own form, naming the failure landing unless <paramref name="landing"/> is false.
+    /// </summary>
+    private static Task<Landing> Bind(Browser browser, string provider, string email, bool landing = true)
     {
         browser.Cookie("_tp_user", TestConnectorHost.Persona(email));
-        return browser.Go($"/me/connections/{provider}/link?return={LoginProbeController.WhoAmI}&failure={LoginProbeController.LandingPath}");
+        return browser.Submit(BindPath(provider), Fields(landing));
+    }
+
+    private static string BindPath(string provider) => $"/me/connections/{provider}/link";
+
+    private static Dictionary<string, string> Fields(bool landing = true)
+    {
+        var fields = new Dictionary<string, string> { ["return"] = LoginProbeController.WhoAmI };
+        if (landing) fields["failure"] = LoginProbeController.LandingPath;
+        return fields;
+    }
+
+    /// <summary>The word of the Problem a refusal answered with.</summary>
+    private static string? Word(Landing refused)
+    {
+        using var json = JsonDocument.Parse(refused.Body);
+        return json.RootElement.EnumerateObject().FirstOrDefault(static field => field.NameEquals("word") || field.NameEquals("Word")).Value is
+            { ValueKind: JsonValueKind.String } word ? word.GetString() : null;
     }
 
     /// <summary>The providers of the logins <paramref name="person"/> holds.</summary>

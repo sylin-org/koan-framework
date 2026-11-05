@@ -94,7 +94,10 @@ accepting the previous URL again restores it.
 6. The principal carries protocol DID/optional verified handle claims, hands the
    login to `LoginArrival.Arrive` — the person it is bound to, or, on a binding
    challenge, the signed-in person who asked (SEC-0040) — and enters Koan's cookie
-   lifecycle. No OAuth credential is placed in AuthenticationProperties tokens.
+   lifecycle. No OAuth credential is placed in AuthenticationProperties tokens. A
+   binding challenge is a form POST, so the account comes from its `identifier`
+   field, and a sign-in's from the query. A refused binding answers through
+   `SignInFailureReturn.Refuse`: its failure landing, or a Problem naming its code.
 7. A step that fails throws `AtprotoSignInException` carrying the Web Auth
    `SignInFailure` for its phase (WEB-0080): identity resolution is
    `HandleUnresolved`; discovery, metadata and the pushed request are

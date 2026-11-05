@@ -93,17 +93,21 @@ security requirements are implemented.
 
 Every verified login arrives at `LoginArrival.Arrive` (SEC-0040) before the cookie is signed in: the seeded OAuth2 and OIDC
 handlers' events, and a connector's callback. An ordinary sign-in hands it to `IExternalIdentityStore.Link`, which makes it
-arrive as the person it is bound to; a sign-in while someone is signed in replaces the session. `GET
-/me/connections/{provider}/link` binds instead: it takes the same `return` and `failure` as the challenge, reads the cookie,
-and issues the provider's challenge with the signed-in person in `AuthConstants.Items.Bind`. With nobody signed in it answers
-401, or lands on the failure landing with `sign_in_first`. With `ReConsent:ForceOnLink`, a sign-in older than
-`ReConsent:MaxAge` (10 minutes) answers the same: the cookie's `OnSigningIn` stamps when its person signed in
+arrive as the person it is bound to; a sign-in while someone is signed in replaces the session. A form `POST
+/me/connections/{provider}/link` binds instead: it takes `return` and `failure` from the form, reads the cookie, and issues
+the provider's challenge with the signed-in person in `AuthConstants.Items.Bind`. It is a POST so that binding never starts
+from another site: SEC-0039's guard refuses a cross-site POST that carries a cookie, a `SameSite=Lax` cookie is not sent on
+one, and there is no GET to navigate to. A connector that names an account reads it from that form. With nobody signed in
+it lands on the failure landing with `sign_in_first`. `ReConsent:ForceOnLink`, on unless an application turns it off, answers
+the same for a sign-in older than `ReConsent:MaxAge` (10 minutes): the cookie's `OnSigningIn` stamps when its person signed in
 (`AuthConstants.Items.SignedIn`, Unix seconds, from the host's `TimeProvider`), which a sliding renewal keeps, where the
 ticket's issue time moves. At the callback the person named must still be the one the cookie signs in, and
 `IExternalIdentityStore.Bind` binds the login to the person that principal is; it answers `AnotherPersons` for a login that
 is someone else's, and `NotThePerson` for a session that acts as them without being them, which Koan.Identity's
 impersonation is. A refusal throws `SignInRefusedException`, carrying its `SignInFailure` and the challenge's properties, so the failure landing
-named on the challenge is found though an OAuth2 handler hands its failure event none. The sign-in that follows arrives as
+named on the challenge is found though an OAuth2 handler hands its failure event none. `SignInFailureReturn.Refuse` answers
+it, and with no landing named it writes Koan's `Problem`, the code as its word and the reason as its sentence (401 for
+`sign_in_first`, 409 for `login_taken`); the challenge's own refusals answer the same Problem. The sign-in that follows arrives as
 the person, carrying the new login's claims. The in-memory store knows no people, and refuses to bind.
 
 The framework cookie scheme is `Koan.cookie`. Challenge and access-denied responses pass through the discovered

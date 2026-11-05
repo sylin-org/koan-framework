@@ -19,8 +19,12 @@ internal sealed class AtprotoAuthenticationHandler(IOptionsMonitor<AtprotoAuthen
       try
       {
         if (!sessions.Enabled) throw new InvalidOperationException("AT provider is inactive.");
+        // A binding is a form POST (SEC-0040), which names its account in the form; a sign-in names it in the query.
         var identifier = properties.Items.TryGetValue(Constants.Account, out var account) && account is not null
-            ? new Microsoft.Extensions.Primitives.StringValues(account) : Request.Query["identifier"];
+            ? new Microsoft.Extensions.Primitives.StringValues(account)
+            : HttpMethods.IsPost(Request.Method) && Request.HasFormContentType
+                ? (await Request.ReadFormAsync(Context.RequestAborted))["identifier"]
+                : Request.Query["identifier"];
         if (identifier.Count > 1 || (identifier.Count == 1 && (string.IsNullOrWhiteSpace(identifier) || identifier.ToString().Length > 2048)))
             throw new InvalidOperationException("Supply one account handle or DID as identifier.");
         GenerateCorrelationId(properties);
@@ -75,7 +79,9 @@ internal sealed class AtprotoAuthenticationHandler(IOptionsMonitor<AtprotoAuthen
         }
         catch (SignInRefusedException refused)
         {
-            return Failed(refused.Failure, properties);
+            // SEC-0040: a refused login says why, on the failure landing or as a Problem.
+            await SignInFailureReturn.Refuse(Context, properties, refused);
+            return HandleRequestResult.Handle();
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {

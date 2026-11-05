@@ -7,11 +7,20 @@ Koan's durable person, session, audit, erasure, and server-role core. Reference 
 
 A person's id is Koan's own, a GUID v7 made the first time one of their logins signs in; it is never a provider's subject.
 Each login (`ExternalIdentityLink`) is bound to one person, who holds at most one per provider and never fewer than one.
-A signed-in person binds another through its provider's challenge at `/me/connections/{provider}/link`, which takes the
-challenge's `return` and `failure`; a new login of a provider takes the place of the one they held, and a login that is
-someone else's is refused (`login_taken`). They unbind one with `DELETE /api/identity/me/connected/{linkId}`
-(Koan.Identity.Web), never their last. `Koan:Web:Auth:ReConsent:ForceOnLink` asks for a recent sign-in before binding
-(`sign_in_first`). See SEC-0040.
+A signed-in person binds another through its provider's challenge: a form on the application's own page posts to
+`/me/connections/{provider}/link` with `return`, `failure` and, for atproto, the account's `identifier`. A new login of a
+provider takes the place of the one they held, and a login that is someone else's is refused (`login_taken`). Binding needs
+a sign-in within the last ten minutes (`sign_in_first`), unless `Koan:Web:Auth:ReConsent:ForceOnLink` is turned off. They
+unbind one with `DELETE /api/identity/me/connected/{linkId}` (Koan.Identity.Web), never their last. See SEC-0040.
+
+```html
+<form method="post" action="/me/connections/atproto/link">
+  <input name="identifier" placeholder="you.bsky.social">
+  <input type="hidden" name="return" value="/account">
+  <input type="hidden" name="failure" value="/account">
+  <button>Add this account</button>
+</form>
+```
 
 ## What is taken from a person reaches what they hold
 
