@@ -3,8 +3,8 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using CarpaNet.Identity;
 using Koan.Web.Auth.Connector.Atproto.Infrastructure;
-using Koan.Web.Auth.Domain;
 using Koan.Web.Auth.Extensions;
+using Koan.Web.Auth.Infrastructure;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.WebUtilities;
@@ -23,14 +23,12 @@ public sealed partial class AtprotoServiceAuth
     private readonly AtprotoSessions sessions;
     private readonly TimeProvider time;
     private readonly ILogger<AtprotoServiceAuth> logger;
-    private readonly IExternalIdentityStore? identities;
 
-    internal AtprotoServiceAuth(AtprotoSessions sessions, TimeProvider time, ILogger<AtprotoServiceAuth> logger, IExternalIdentityStore? identities = null)
+    internal AtprotoServiceAuth(AtprotoSessions sessions, TimeProvider time, ILogger<AtprotoServiceAuth> logger)
     {
         this.sessions = sessions;
         this.time = time;
         this.logger = logger;
-        this.identities = identities;
     }
 
     /// <summary>
@@ -84,15 +82,18 @@ public sealed partial class AtprotoServiceAuth
 
     /// <summary>
     /// Signs in the DID <paramref name="proof"/> proved, as the callback of a browser's sign-in ends: the same claims, the
-    /// same external identity linked, and the same cookie, through every sign-in contributor.
+    /// same login arriving as its person (SEC-0040) — the person it is bound to, or a new one the first time — and the same
+    /// cookie, through every sign-in contributor, as a sign-in of this provider.
     /// </summary>
     /// <exception cref="ArgumentException"><paramref name="proof"/> proved nothing.</exception>
     public async Task SignIn(HttpContext context, AtprotoServiceAuthResult proof)
     {
         ArgumentNullException.ThrowIfNull(context);
         if (!proof.Verified) throw new ArgumentException("Only a verified token signs anyone in.", nameof(proof));
-        if (identities is not null) await identities.Link(AtprotoSessions.External(proof.Did!, proof.Handle), context.RequestAborted);
-        await context.SignInAsync(AuthenticationExtensions.CookieScheme, AtprotoSessions.Principal(proof.Did!, proof.Handle));
+        await LoginArrival.Arrive(context, null, AtprotoSessions.External(proof.Did!, proof.Handle));
+        var properties = new AuthenticationProperties();
+        properties.Items[AuthConstants.Items.Provider] = Constants.Provider;
+        await context.SignInAsync(AuthenticationExtensions.CookieScheme, AtprotoSessions.Principal(proof.Did!, proof.Handle), properties);
     }
 
     private AtprotoServiceAuthResult Refused(AtprotoServiceAuthOutcome outcome)

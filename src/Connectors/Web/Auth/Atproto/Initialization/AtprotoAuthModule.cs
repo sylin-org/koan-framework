@@ -52,7 +52,7 @@ public sealed class AtprotoAuthModule : KoanModule
             sp.GetService<IHttpContextAccessor>()));
         services.AddSingleton<IAtprotoRepository>(sp => new AtprotoRepository(sp.GetRequiredService<AtprotoSessions>()));
         services.AddSingleton(sp => new AtprotoServiceAuth(sp.GetRequiredService<AtprotoSessions>(), sp.GetRequiredService<TimeProvider>(),
-            sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<AtprotoServiceAuth>>(), sp.GetService<Koan.Web.Auth.Domain.IExternalIdentityStore>()));
+            sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<AtprotoServiceAuth>>()));
         services.AddKoanControllersFrom<AtprotoMetadataController>();
         services.AddAuthentication().AddScheme<AtprotoAuthenticationOptions, AtprotoAuthenticationHandler>(Constants.Provider, options =>
         {

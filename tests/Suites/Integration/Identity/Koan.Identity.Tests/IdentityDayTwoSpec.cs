@@ -322,7 +322,7 @@ public sealed class IdentityDayTwoSpec : IdentityHostScopedSpec
         identity.AddClaim(new Claim(ClaimTypes.NameIdentifier, subject));
         await scope.ServiceProvider.GetRequiredService<AuthFlowDispatcher>().DispatchSignIn(new Koan.Web.Auth.Contributors.AuthSignInContext
         {
-            Provider = "test",
+            Provider = null, // the application's own sign-in, naming its person
             Identity = identity,
             Services = scope.ServiceProvider,
             HttpContext = new DefaultHttpContext { RequestServices = scope.ServiceProvider },

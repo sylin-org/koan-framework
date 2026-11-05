@@ -98,7 +98,7 @@ public sealed class AtprotoSessions
     /// <summary>The external identity a verified AT identity links, whichever way it was verified.</summary>
     internal static ExternalIdentity External(string did, string? handle) => new()
     {
-        UserId = did, Provider = Constants.Provider,
+        Subject = did, Provider = Constants.Provider,
         ProviderKeyHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(did))),
         ClaimsJson = JsonSerializer.Serialize(new { did, handle }),
     };

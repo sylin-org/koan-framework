@@ -108,18 +108,19 @@ public sealed class SecIdentityModule : KoanModule
         => isDevelopment && posture == IdentityPosture.Open && seedDevUsers;
 
     /// <summary>
-    /// Seeds the offline dev persons (the primary dev user + the alice/bob "sign in as …" personas) into the real
-    /// data store via the reconciler. Internal so the P0 acceptance spec can drive it directly (the full Development
-    /// generic-host boot trips ASP.NET's web-only DI validation, so the seed logic is exercised here instead).
+    /// Seeds the offline dev persons (the primary dev user + alice and bob) into the real data store via the
+    /// reconciler. The application names them by their ids: no provider vouched for them, so they hold no login. Internal
+    /// so the P0 acceptance spec can drive it directly (the full Development generic-host boot trips ASP.NET's web-only
+    /// DI validation, so the seed logic is exercised here instead).
     /// </summary>
     internal static async Task SeedDevUsersAsync(IIdentityReconciler reconciler, string devUser, CancellationToken ct = default)
     {
         await reconciler.ReconcileAsync(
-            new IdentityClaims(devUser, DisplayName: devUser, Email: $"{devUser}@local.dev", EmailVerified: true, Provider: "dev"), ct).ConfigureAwait(false);
+            new IdentityClaims(devUser, DisplayName: devUser, Email: $"{devUser}@local.dev", EmailVerified: true), ct).ConfigureAwait(false);
         await reconciler.ReconcileAsync(
-            new IdentityClaims("alice@example.com", DisplayName: "Alice Example", Email: "alice@example.com", EmailVerified: true, Provider: "dev"), ct).ConfigureAwait(false);
+            new IdentityClaims("alice@example.com", DisplayName: "Alice Example", Email: "alice@example.com", EmailVerified: true), ct).ConfigureAwait(false);
         await reconciler.ReconcileAsync(
-            new IdentityClaims("bob@example.com", DisplayName: "Bob Example", Email: "bob@example.com", EmailVerified: true, Provider: "dev"), ct).ConfigureAwait(false);
+            new IdentityClaims("bob@example.com", DisplayName: "Bob Example", Email: "bob@example.com", EmailVerified: true), ct).ConfigureAwait(false);
     }
 
     public override void Report(ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)

@@ -3,6 +3,16 @@
 Koan's durable person, session, audit, erasure, and server-role core. Reference the package beside Web Auth and keep
 `AddKoan()` as the only bootstrap.
 
+## A person and their logins
+
+A person's id is Koan's own, a GUID v7 made the first time one of their logins signs in; it is never a provider's subject.
+Each login (`ExternalIdentityLink`) is bound to one person, who holds at most one per provider and never fewer than one.
+A signed-in person binds another through its provider's challenge at `/me/connections/{provider}/link`, which takes the
+challenge's `return` and `failure`; a new login of a provider takes the place of the one they held, and a login that is
+someone else's is refused (`login_taken`). They unbind one with `DELETE /api/identity/me/connected/{linkId}`
+(Koan.Identity.Web), never their last. `Koan:Web:Auth:ReConsent:ForceOnLink` asks for a recent sign-in before binding
+(`sign_in_first`). See SEC-0040.
+
 ## What is taken from a person reaches what they hold
 
 A request's roles are the person's now. The cookie carries none: each request projects them from the person's compiled

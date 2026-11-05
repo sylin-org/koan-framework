@@ -8,7 +8,7 @@ public enum IdentityPosture
 {
     /// <summary>Prod-closed: no dev-user auto-seed; never a seeded backdoor identity.</summary>
     Closed = 0,
-    /// <summary>Dev-open: offline dev users are seeded for "sign in as alice@example.com" with no network.</summary>
+    /// <summary>Dev-open: offline dev people, named by their ids, are seeded with no network.</summary>
     Open = 1,
 }
 

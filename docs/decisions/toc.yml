@@ -736,3 +736,5 @@
       href: SEC-0037-an-edge-that-is-part-of-the-application.md
     - name: SEC-0039 A caller brings its own credential, and SEC-0037 is overturned
       href: SEC-0039-a-caller-brings-its-own-credential.md
+    - name: SEC-0040 A person is Koan's own, and binds the logins that arrive to it
+      href: SEC-0040-a-person-is-koans-own.md

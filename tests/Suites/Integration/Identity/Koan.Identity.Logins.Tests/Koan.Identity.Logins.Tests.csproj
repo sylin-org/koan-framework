@@ -1,0 +1,46 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <!-- ARCH-0091: xUnit v3 runs as a self-executing test assembly (VSTest-compatible mode keeps `dotnet test`). -->
+    <OutputType>Exe</OutputType>
+    <AssemblyName>Koan.Identity.Logins.Tests</AssemblyName>
+    <RootNamespace>Koan.Identity.Logins.Tests</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="AwesomeAssertions" />
+    <PackageReference Include="Microsoft.AspNetCore.TestHost" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit.v3" />
+    <PackageReference Include="xunit.runner.visualstudio">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <!-- SEC-0040: a person's logins through real sign-ins — the Test connector's OAuth2/OIDC providers on a loopback
+       Kestrel host, and the atproto connector against the loopback PDS its own suite proves. -->
+  <ItemGroup>
+    <ProjectReference Include="../../../../../src/Koan.Core/Koan.Core.csproj" />
+    <ProjectReference Include="../../../../../src/Koan.Data.Core/Koan.Data.Core.csproj" />
+    <ProjectReference Include="../../../../../src/Koan.Web/Koan.Web.csproj" />
+    <ProjectReference Include="../../../../../src/Koan.Web.Auth/Koan.Web.Auth.csproj" />
+    <ProjectReference Include="../../../../../src/Koan.Identity/Koan.Identity.csproj" />
+    <ProjectReference Include="../../../../../src/Koan.Identity.Web/Koan.Identity.Web.csproj" />
+    <ProjectReference Include="../../../../../src/Connectors/Web/Auth/Test/Koan.Web.Auth.Connector.Test.csproj" />
+    <ProjectReference Include="../../../../../src/Connectors/Web/Auth/Atproto/Koan.Web.Auth.Connector.Atproto.csproj" />
+    <ProjectReference Include="../../../../../src/Connectors/Data/Sqlite/Koan.Data.Connector.Sqlite.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="../../../../Koan.Web.Auth.Atproto.Tests/LoopbackPds.cs" Link="Support/LoopbackPds.cs" />
+    <Compile Include="../../../../Koan.Web.Auth.Atproto.Tests/ServiceAuthSigner.cs" Link="Support/ServiceAuthSigner.cs" />
+  </ItemGroup>
+</Project>

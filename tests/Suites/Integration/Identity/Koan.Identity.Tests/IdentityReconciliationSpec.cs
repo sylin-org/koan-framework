@@ -70,16 +70,17 @@ public sealed class IdentityReconciliationSpec : IdentityHostScopedSpec
             "carol@example.com", DisplayName: "Carol", Picture: "https://x/c.png",
             Email: "Carol@Example.com", EmailVerified: true, Provider: "google"));
 
-        person.Id.Should().Be("carol@example.com");
+        Guid.Parse(person.Id).Version.Should().Be(7, "a first sign-in makes a person whose id is Koan's own, never the provider's subject");
+        (await Identity.Get("carol@example.com")).Should().BeNull();
 
-        var fetched = await Identity.Get("carol@example.com");
+        var fetched = await Identity.Get(person.Id);
         fetched.Should().NotBeNull();
         fetched!.DisplayName.Should().Be("Carol");
         fetched.Picture.Should().Be("https://x/c.png");
         fetched.Status.Should().Be(IdentityStatus.Active);
         fetched.CreatedAt.Should().NotBe(default);
 
-        var emails = await IdentityEmail.Query(e => e.IdentityId == "carol@example.com");
+        var emails = await IdentityEmail.Query(e => e.IdentityId == person.Id);
         emails.Should().ContainSingle();
         emails[0].Address.Should().Be("carol@example.com"); // normalized lower-case
         emails[0].Verified.Should().BeTrue();
@@ -150,6 +151,7 @@ public sealed class IdentityReconciliationSpec : IdentityHostScopedSpec
             .OfType<IdentityAuthFlowHandler>().SingleOrDefault();
         handler.Should().NotBeNull("[KoanDiscoverable] must auto-register the reconciliation handler");
         handler!.Priority.Should().Be(1000, "reconciliation must run after identity-mapping handlers (int.MinValue)");
+        var provider = Guid.NewGuid().ToString("N");
 
         var ci = new ClaimsIdentity(authenticationType: "test");
         ci.AddClaim(new Claim(ClaimTypes.NameIdentifier, "frank@example.com"));
@@ -157,13 +159,15 @@ public sealed class IdentityReconciliationSpec : IdentityHostScopedSpec
         ci.AddClaim(new Claim(ClaimTypes.Email, "frank@example.com"));
         ci.AddClaim(new Claim("email_verified", "true"));
         var http = new DefaultHttpContext { RequestServices = scope.ServiceProvider };
-        var ctx = new AuthSignInContext { Provider = "test", Identity = ci, Services = scope.ServiceProvider, HttpContext = http };
+        var ctx = new AuthSignInContext { Provider = provider, Identity = ci, Services = scope.ServiceProvider, HttpContext = http };
 
         // Route through the REAL dispatcher (Priority-ordered, membership-checked) — the same call the cookie
         // OnSigningIn event makes — not a direct handler invocation that would bypass ordering + registration.
         await scope.ServiceProvider.GetRequiredService<AuthFlowDispatcher>().DispatchSignIn(ctx, default);
 
-        var person = await Identity.Get("frank@example.com");
+        var subject = ci.FindFirst(ClaimTypes.NameIdentifier)!.Value;
+        subject.Should().NotBe("frank@example.com", "the cookie's subject becomes the person's own id");
+        var person = await Identity.Get(subject);
         person.Should().NotBeNull("the wired cookie sign-in dispatch must materialize the durable person");
         person!.DisplayName.Should().Be("Frank");
     }
@@ -172,13 +176,36 @@ public sealed class IdentityReconciliationSpec : IdentityHostScopedSpec
     public async Task Relink_same_provider_identity_upserts_one_row()
     {
         var store = _fx.Services.GetRequiredService<IExternalIdentityStore>();
-        const string keyHash = "REKEY1";
-        await store.Link(new ExternalIdentity { UserId = "heidi@example.com", Provider = "google", ProviderKeyHash = keyHash, ClaimsJson = "{\"name\":\"Heidi\"}" });
-        await store.Link(new ExternalIdentity { UserId = "heidi@example.com", Provider = "google", ProviderKeyHash = keyHash, ClaimsJson = "{\"name\":\"Heidi\",\"avatar\":\"https://x/h.png\"}" });
+        await store.Link(Login("heidi@example.com", "google", "{\"name\":\"Heidi\"}"));
+        await store.Link(Login("heidi@example.com", "google", "{\"name\":\"Heidi\",\"avatar\":\"https://x/h.png\"}"));
 
-        var links = await store.GetByUser("heidi@example.com");
-        links.Should().ContainSingle("the deterministic KeyFor id must upsert the same triple, not append a duplicate");
-        links[0].ClaimsJson.Should().Contain("avatar", "the surviving row reflects the latest link");
+        var person = await PersonOf("heidi@example.com", "google");
+        var links = await store.GetByUser(person);
+        links.Should().ContainSingle("the deterministic KeyFor id must upsert the same login, not append a duplicate");
+        links[0].ClaimsJson.Should().Contain("avatar", "the surviving row reflects the latest sign-in");
+    }
+
+    [Fact]
+    public async Task Concurrent_first_sign_ins_of_one_login_end_on_one_person()
+    {
+        var subject = $"racer-{Guid.CreateVersion7():N}";
+        var people = await Task.WhenAll(Enumerable.Range(0, 8).Select(_ => Task.Run(() =>
+            Reconciler.ReconcileAsync(new IdentityClaims(subject, DisplayName: "Racer", Provider: "google")))));
+
+        people.Select(person => person.Id).Distinct().Should().ContainSingle("the login is written only if absent, and the loser reads the winner");
+        (await ExternalIdentityLink.Query(l => l.IdentityId == people[0].Id)).Should().ContainSingle();
+    }
+
+    [Fact]
+    public async Task A_person_stored_with_their_first_subject_as_id_keeps_arriving_as_themselves()
+    {
+        // Every person stored before SEC-0040 has the subject of their first login as id, and that login binds to it.
+        const string subject = "did:plc:legacyaaaaaaaaaaaaaaaaaaa";
+        await new Identity { Id = subject, DisplayName = "Legacy" }.Save();
+        var hash = IdentityReconciler.ProviderKeyHash(subject);
+        await new ExternalIdentityLink { Id = ExternalIdentityLink.KeyFor(subject, "atproto", hash), IdentityId = subject, Provider = "atproto", ProviderKeyHash = hash }.Save();
+
+        (await Reconciler.ReconcileAsync(new IdentityClaims(subject, Provider: "atproto"))).Id.Should().Be(subject);
     }
 
     [Theory]
@@ -230,57 +257,50 @@ public sealed class IdentityReconciliationSpec : IdentityHostScopedSpec
         var store = _fx.Services.GetRequiredService<IExternalIdentityStore>();
         store.Should().BeOfType<IdentityExternalIdentityStore>();
 
-        const string keyHash = "ABC123";
-        await store.Link(new ExternalIdentity
-        {
-            UserId = "grace@example.com",
-            Provider = "discord",
-            ProviderKeyHash = keyHash,
-            ClaimsJson = "{\"name\":\"Grace\",\"email\":\"grace@example.com\",\"email_verified\":true}",
-        });
+        await store.Link(Login("grace@example.com", "discord",
+            "{\"name\":\"Grace\",\"email\":\"grace@example.com\",\"email_verified\":true}"));
 
-        var links = await store.GetByUser("grace@example.com");
+        var id = await PersonOf("grace@example.com", "discord");
+        var links = await store.GetByUser(id);
         links.Should().ContainSingle();
         links[0].Provider.Should().Be("discord");
 
-        var person = await Identity.Get("grace@example.com");
+        var person = await Identity.Get(id);
         person.Should().NotBeNull("the already-wired AuthSchemeSeeder Link() path must materialize the durable person");
         person!.DisplayName.Should().Be("Grace");
-
-        await store.Unlink("grace@example.com", "discord", keyHash);
-        (await store.GetByUser("grace@example.com")).Should().BeEmpty();
+        (await IdentityEmail.Query(e => e.IdentityId == id)).Should().ContainSingle(e => e.Address == "grace@example.com" && e.Verified);
     }
 
     [Fact]
     public async Task Explicit_link_resolves_a_second_provider_to_the_canonical_person()
     {
-        // Person S exists (first provider). A signed-in S EXPLICITLY links a SECOND provider (microsoft, sub-t).
-        await Reconciler.ReconcileAsync(new IdentityClaims("person-s", DisplayName: "S", Provider: "google"));
-        await _fx.Services.GetRequiredService<IdentityLinkService>().LinkAsync("person-s", "microsoft", "sub-t");
+        // Person S exists (first provider). A signed-in S EXPLICITLY binds a SECOND provider's login (microsoft, sub-t).
+        var s = await Reconciler.ReconcileAsync(new IdentityClaims("person-s", DisplayName: "S", Provider: "google"));
+        (await _fx.Services.GetRequiredService<IdentityLinkService>().Bind(s.Id, "microsoft", "sub-t")).Should().Be(BindOutcome.Bound);
 
         // Sub-t signing in via microsoft now resolves to the canonical person S — no duplicate, never via an email claim.
         var person = await Reconciler.ReconcileAsync(new IdentityClaims("sub-t", DisplayName: "T via MS", Provider: "microsoft"));
-        person.Id.Should().Be("person-s", "an explicitly-linked provider identity resolves to the canonical person");
-        (await Identity.Get("sub-t")).Should().BeNull("no separate identity is minted for the linked provider sub");
+        person.Id.Should().Be(s.Id, "a bound login resolves to its person");
+        (await ExternalIdentityLink.Query(l => l.IdentityId == s.Id)).Should().HaveCount(2);
     }
 
     [Fact]
     public async Task No_email_auto_merge_two_idps_with_the_same_email_stay_separate()
     {
         // Same VERIFIED email from two providers does NOT merge — linking is explicit only (account-takeover-safe).
-        await Reconciler.ReconcileAsync(new IdentityClaims("idp-one", Email: "twins@x.com", EmailVerified: true, Provider: "google"));
+        var first = await Reconciler.ReconcileAsync(new IdentityClaims("idp-one", Email: "twins@x.com", EmailVerified: true, Provider: "google"));
         var second = await Reconciler.ReconcileAsync(new IdentityClaims("idp-two", Email: "twins@x.com", EmailVerified: true, Provider: "microsoft"));
 
-        second.Id.Should().Be("idp-two", "a matching verified email never auto-merges");
-        (await Identity.Get("idp-one")).Should().NotBeNull();
-        (await Identity.Get("idp-two")).Should().NotBeNull("both stay separate until the user explicitly links them");
+        second.Id.Should().NotBe(first.Id, "a matching verified email never auto-merges");
+        (await Identity.Get(first.Id)).Should().NotBeNull();
+        (await Identity.Get(second.Id)).Should().NotBeNull("both stay separate until the person explicitly binds one to the other");
     }
 
     [Fact]
     public async Task Sign_in_of_a_linked_provider_rewrites_the_cookie_subject_to_canonical()
     {
-        await Reconciler.ReconcileAsync(new IdentityClaims("canon-person", DisplayName: "Canon", Provider: "google"));
-        await _fx.Services.GetRequiredService<IdentityLinkService>().LinkAsync("canon-person", "microsoft", "linked-sub");
+        var canon = await Reconciler.ReconcileAsync(new IdentityClaims("canon-person", DisplayName: "Canon", Provider: "google"));
+        await _fx.Services.GetRequiredService<IdentityLinkService>().Bind(canon.Id, "microsoft", "linked-sub");
 
         using var scope = _fx.Services.CreateScope();
         var ci = new ClaimsIdentity(authenticationType: "test");
@@ -294,17 +314,24 @@ public sealed class IdentityReconciliationSpec : IdentityHostScopedSpec
         };
         await scope.ServiceProvider.GetRequiredService<AuthFlowDispatcher>().DispatchSignIn(ctx, default);
 
-        ci.FindFirst(ClaimTypes.NameIdentifier)!.Value.Should().Be("canon-person", "the linked provider's sign-in resolves to the canonical person (NameIdentifier rewritten)");
+        ci.FindFirst(ClaimTypes.NameIdentifier)!.Value.Should().Be(canon.Id, "the bound login's sign-in resolves to its person (NameIdentifier rewritten)");
     }
 
     [Fact]
-    public async Task Unlink_is_owner_scoped()
+    public async Task Unbind_is_owner_scoped_and_never_takes_the_last_login()
     {
         var links = _fx.Services.GetRequiredService<IdentityLinkService>();
-        var link = await links.LinkAsync("owner-person", "discord", "owned-sub");
+        var owner = await Reconciler.ReconcileAsync(new IdentityClaims("owned-first", Provider: "google"));
+        var first = (await links.ForPerson(owner.Id)).Should().ContainSingle().Subject;
 
-        (await links.UnlinkAsync("someone-else", link.Id)).Should().BeFalse("you cannot unlink another person's connected account");
-        (await links.UnlinkAsync("owner-person", link.Id)).Should().BeTrue("the owner can unlink their own");
+        (await links.Unbind(owner.Id, first.Id)).Should().Be(UnbindOutcome.LastLogin, "a person signs in with a login");
+        (await links.Bind(owner.Id, "discord", "owned-sub")).Should().Be(BindOutcome.Bound);
+        (await links.Unbind("someone-else", first.Id)).Should().Be(UnbindOutcome.NotFound, "you cannot unbind another person's login");
+        (await links.Unbind(owner.Id, first.Id)).Should().Be(UnbindOutcome.Unbound, "the owner unbinds their own while another remains");
+
+        var arrives = await Reconciler.ReconcileAsync(new IdentityClaims("owned-first", Provider: "google"));
+        arrives.Id.Should().NotBe(owner.Id, "the unbound subject's next sign-in arrives as a new person");
+        (await Reconciler.ReconcileAsync(new IdentityClaims("owned-sub", Provider: "discord"))).Id.Should().Be(owner.Id);
     }
 
     [Fact]
@@ -352,4 +379,30 @@ public sealed class IdentityReconciliationSpec : IdentityHostScopedSpec
         await act.Should().ThrowAsync<InvalidOperationException>()
             .WithMessage("*Koan:Identity*Posture*");
     }
+
+    [Fact]
+    public async Task An_operator_impersonating_a_person_binds_no_login_to_them()
+    {
+        var store = _fx.Services.GetRequiredService<IExternalIdentityStore>();
+        var target = await Reconciler.ReconcileAsync(new IdentityClaims("impersonated-target", Provider: "google"));
+        var acting = new ClaimsPrincipal(Koan.Identity.Impersonation.ImpersonationClaims.BuildImpersonatedIdentity(target.Id, "operator-person"));
+
+        (await store.Bind(acting, Login("operators-own", "discord", "{}"))).Should().Be(BindOutcome.NotThePerson, "SEC-0007 D8");
+
+        (await _fx.Services.GetRequiredService<IdentityLinkService>().ForPerson(target.Id)).Select(l => l.Provider).Should().Equal("google");
+        var self = new ClaimsPrincipal(new ClaimsIdentity([new Claim(ClaimTypes.NameIdentifier, target.Id)], "cookie"));
+        (await store.Bind(self, Login("targets-own", "discord", "{}"))).Should().Be(BindOutcome.Bound);
+    }
+
+    private static ExternalIdentity Login(string subject, string provider, string claimsJson) => new()
+    {
+        Subject = subject,
+        Provider = provider,
+        ProviderKeyHash = IdentityReconciler.ProviderKeyHash(subject),
+        ClaimsJson = claimsJson,
+    };
+
+    /// <summary>The person the login (<paramref name="provider"/>, <paramref name="subject"/>) is bound to.</summary>
+    private static async Task<string> PersonOf(string subject, string provider)
+        => (await ExternalIdentityLink.Get(ExternalIdentityLink.KeyFor(subject, provider, IdentityReconciler.ProviderKeyHash(subject))))!.IdentityId;
 }

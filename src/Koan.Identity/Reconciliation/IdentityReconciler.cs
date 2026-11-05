@@ -6,14 +6,14 @@ using Koan.Data.Core;
 namespace Koan.Identity.Reconciliation;
 
 /// <summary>
-/// The idempotent reconciliation core (SEC-0007 P0). Upserts the durable <see cref="Identity"/> for a sign-in and
-/// attaches the verified-email factor. Never clobbers user-owned display fields with an IdP backfill.
+/// The idempotent reconciliation core (SEC-0007 P0, SEC-0040). Upserts the durable <see cref="Identity"/> a sign-in
+/// arrives as and attaches the verified-email factor. Never clobbers user-owned display fields with an IdP backfill.
 /// <para>
-/// <b>Person ≠ email is realized by EXPLICIT, session-authorized account-linking — never email auto-merge</b>
-/// (architect decision: trusting an IdP's <c>email_verified</c> to merge is an account-takeover vector). A sign-in
-/// resolves to the canonical person via the durable <see cref="ExternalIdentityLink"/> for this (provider, sub): if
-/// the provider identity has been explicitly linked to a person, that person is canonical; otherwise this sub is its
-/// own person. A second provider is attached only by a signed-in user via <c>IdentityLinkService</c>.
+/// <b>A person is Koan's own.</b> A provider's sign-in resolves its login — the <see cref="ExternalIdentityLink"/> for this
+/// (provider, sub) — to the person it is bound to. A login seen for the first time is written only if absent, bound to a
+/// new person whose id is a GUID v7, so two concurrent first sign-ins of one login end on one person: the loser of the
+/// write reads the winner's. Nothing is ever matched by email (an account-takeover vector); a second login is bound only
+/// by the signed-in person, through <c>IdentityLinkService.Bind</c>.
 /// </para>
 /// </summary>
 internal sealed class IdentityReconciler : IIdentityReconciler
@@ -23,10 +23,11 @@ internal sealed class IdentityReconciler : IIdentityReconciler
         if (string.IsNullOrWhiteSpace(claims.Subject))
             throw new ArgumentException("Reconciliation requires a non-empty subject.", nameof(claims));
 
-        var canonicalId = await ResolveLinkedIdentityIdAsync(claims.Subject, claims.Provider, ct).ConfigureAwait(false)
-                          ?? claims.Subject;
-        var existing = await Identity.Get(canonicalId, ct).ConfigureAwait(false);
-        var identity = existing ?? new Identity { Id = canonicalId };
+        var personId = string.IsNullOrWhiteSpace(claims.Provider)
+            ? claims.Subject
+            : (await Login(claims.Subject, claims.Provider, claims.ClaimsJson, ct).ConfigureAwait(false)).IdentityId;
+        var existing = await Identity.Get(personId, ct).ConfigureAwait(false);
+        var identity = existing ?? new Identity { Id = personId };
         var changed = existing is null;
 
         // Backfill display fields from the IdP only when empty — a user-set value is authoritative and never clobbered.
@@ -45,6 +46,7 @@ internal sealed class IdentityReconciler : IIdentityReconciler
         // write (e.g. a just-issued Deactivation that flips Status) cannot be reverted by a stale
         // full-row replace from this sign-in path. The reconciler never sets Status, so it can only ever lose a
         // lifecycle change via that clobber — skipping the redundant write removes the race in the common case.
+        // Two first sign-ins of one login write one row: they name the same person.
         if (changed)
             await identity.Save(ct).ConfigureAwait(false);
 
@@ -54,13 +56,39 @@ internal sealed class IdentityReconciler : IIdentityReconciler
         return identity;
     }
 
-    /// <summary>The canonical person id this (provider, sub) is explicitly linked to, or null (a fresh/own identity).</summary>
-    internal static async Task<string?> ResolveLinkedIdentityIdAsync(string subject, string? provider, CancellationToken ct = default)
+    /// <summary>
+    /// The login (<paramref name="provider"/>, <paramref name="subject"/>): the one bound to its person, or, the first
+    /// time it is seen, one bound to a new person. Its userinfo follows the provider's latest word, written only while the
+    /// login is still bound to the person it was read with, so a sign-in never brings back a login unbound meanwhile.
+    /// </summary>
+    internal static async Task<ExternalIdentityLink> Login(string subject, string provider, string? claimsJson, CancellationToken ct)
     {
-        if (string.IsNullOrWhiteSpace(provider)) return null;
         var keyHash = ProviderKeyHash(subject);
-        var link = await ExternalIdentityLink.Get(ExternalIdentityLink.KeyFor(subject, provider, keyHash), ct).ConfigureAwait(false);
-        return link?.IdentityId;
+        var id = ExternalIdentityLink.KeyFor(subject, provider, keyHash);
+        var link = await ExternalIdentityLink.Get(id, ct).ConfigureAwait(false);
+        if (link is null)
+        {
+            var first = new ExternalIdentityLink
+            {
+                Id = id,
+                IdentityId = new Identity().Id, // a new person's id is Koan's own: the entity's GUID v7
+                Provider = provider,
+                ProviderKeyHash = keyHash,
+                ClaimsJson = claimsJson,
+            };
+            var written = await ExternalIdentityLink.Insert(first, ct: ct).ConfigureAwait(false);
+            if (written.Outcome == MutationOutcome.Inserted) return first;
+            link = await ExternalIdentityLink.Get(id, ct).ConfigureAwait(false)
+                ?? throw new InvalidOperationException("A login written by a concurrent first sign-in could not be read back; sign in again.");
+        }
+
+        if (claimsJson is not null && !string.Equals(claimsJson, link.ClaimsJson, StringComparison.Ordinal))
+        {
+            var person = link.IdentityId;
+            link.ClaimsJson = claimsJson;
+            await ExternalIdentityLink.ReplaceIf(link, stored => stored.IdentityId == person, ct: ct).ConfigureAwait(false);
+        }
+        return link;
     }
 
     /// <summary>The provider-key hash convention (matches Koan.Web.Auth's AuthSchemeSeeder): hex(SHA-256(sub)).</summary>

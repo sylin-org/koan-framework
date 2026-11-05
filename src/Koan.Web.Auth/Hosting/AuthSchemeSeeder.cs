@@ -155,13 +155,14 @@ internal static class AuthSchemeSeeder
                     user = JObject.Parse(json);
                 }
                 ApplyClaims(ctx.Identity!, user, cfg);
-                await LinkExternalIdentityAsync(ctx.HttpContext, ctx.Scheme.Name, user, json);
+                await LoginArrival.Arrive(ctx.HttpContext, ctx.Properties, Login(ctx.Scheme.Name, user, json));
             },
             // WEB-0080: when the application names a failure landing, a sign-in that cannot complete lands there with a
             // sanitized code; otherwise the maintained handler's own answer stands.
             OnRemoteFailure = ctx =>
             {
-                if (SignInFailureReturn.Redirect(ctx.HttpContext, ctx.Properties, SignInFailure.Failed)) ctx.HandleResponse();
+                var (failure, properties) = Refusal(ctx);
+                if (SignInFailureReturn.Redirect(ctx.HttpContext, properties, failure)) ctx.HandleResponse();
                 return Task.CompletedTask;
             },
             OnAccessDenied = ctx =>
@@ -245,12 +246,13 @@ internal static class AuthSchemeSeeder
                 var json = ctx.User.RootElement.GetRawText();
                 var user = JObject.Parse(json);
                 ApplyClaims(identity, user, cfg);
-                await LinkExternalIdentityAsync(ctx.HttpContext, ctx.Scheme.Name, user, json);
+                await LoginArrival.Arrive(ctx.HttpContext, ctx.Properties, Login(ctx.Scheme.Name, user, json));
             },
             // WEB-0080: the same failure landing as the OAuth2 handler.
             OnRemoteFailure = ctx =>
             {
-                if (SignInFailureReturn.Redirect(ctx.HttpContext, ctx.Properties, SignInFailure.Failed)) ctx.HandleResponse();
+                var (failure, properties) = Refusal(ctx);
+                if (SignInFailureReturn.Redirect(ctx.HttpContext, properties, failure)) ctx.HandleResponse();
                 return Task.CompletedTask;
             },
             OnAccessDenied = ctx =>
@@ -306,8 +308,8 @@ internal static class AuthSchemeSeeder
                 identity.AddClaim(new Claim(kv.Key, kv.Value));
     }
 
-    /// <summary>Persist the external-identity link before sign-in completes; any failure rejects the authentication flow.</summary>
-    private static async Task LinkExternalIdentityAsync(HttpContext http, string provider, JObject user, string claimsJson)
+    /// <summary>The login a provider's userinfo vouches for. Fail-closed: userinfo with no identifier signs no one in.</summary>
+    private static ExternalIdentity Login(string provider, JObject user, string claimsJson)
     {
         var sub = (string?)user["sub"] ?? (string?)user["id"];
         if (string.IsNullOrWhiteSpace(sub))
@@ -316,17 +318,23 @@ internal static class AuthSchemeSeeder
                 $"Koan Web Auth rejected provider '{provider}' because userinfo contained neither 'sub' nor 'id'.");
         }
 
-        var store = http.RequestServices.GetService<IExternalIdentityStore>();
-        if (store is null) return;
-        var keyHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(sub)));
-        await store.Link(new ExternalIdentity
+        return new ExternalIdentity
         {
-            UserId = sub,
+            Subject = sub,
             Provider = provider,
-            ProviderKeyHash = keyHash,
+            ProviderKeyHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(sub))),
             ClaimsJson = claimsJson
-        }, http.RequestAborted);
+        };
     }
+
+    /// <summary>
+    /// Why a callback failed, and the challenge's properties. A login refused at its arrival says why, and carries the
+    /// properties an OAuth2 handler does not hand its failure event.
+    /// </summary>
+    private static (SignInFailure Failure, AuthenticationProperties? Properties) Refusal(RemoteFailureContext ctx)
+        => ctx.Failure is SignInRefusedException refused
+            ? (refused.Failure, ctx.Properties ?? refused.Properties)
+            : (SignInFailure.Failed, ctx.Properties);
 
     /// <summary>
     /// The maintained handler's Backchannel calls token/userinfo/discovery SERVER-side, so a relative endpoint must

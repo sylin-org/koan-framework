@@ -41,15 +41,20 @@ public sealed class IdentitySelfServiceController : ControllerBase
 
     [HttpGet("connected")]
     public async Task<ActionResult<IReadOnlyList<ExternalIdentityLink>>> Connected(CancellationToken ct)
-        => Subject is null ? Unauthorized() : Ok(await _links.ForPersonAsync(Subject, ct));
+        => Subject is null ? Unauthorized() : Ok(await _links.ForPerson(Subject, ct));
 
-    // Unlink a connected account (unlink-safe across all factor types — you can only unlink your OWN links).
-    // Linking a NEW provider happens via that provider's auth callback (so the sub is verified), not a raw POST.
+    // SEC-0040: unbind one of your OWN logins, never your last. Binding a login happens through its provider's challenge
+    // at /me/connections/{provider}/link (so the provider verifies it), not a raw POST.
     [HttpDelete("connected/{linkId}")]
-    public async Task<IActionResult> Unlink([FromRoute] string linkId, CancellationToken ct)
+    public async Task<IActionResult> Unbind([FromRoute] string linkId, CancellationToken ct)
     {
         if (Subject is null) return Unauthorized();
-        return await _links.UnlinkAsync(Subject, linkId, ct) ? NoContent() : NotFound();
+        return await _links.Unbind(Subject, linkId, ct) switch
+        {
+            UnbindOutcome.Unbound => NoContent(),
+            UnbindOutcome.LastLogin => Conflict("This is the only login you sign in with; bind another before unbinding it."),
+            _ => NotFound(),
+        };
     }
 
     [HttpGet("sessions")]

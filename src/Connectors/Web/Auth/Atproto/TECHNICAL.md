@@ -91,9 +91,10 @@ accepting the previous URL again restores it.
    read and the commit is read and decided again, a bounded number of times, so an
    in-flight refresh never overwrites a newly authorized session and a sign-in never
    overwrites a grant it did not see.
-6. The principal carries protocol DID/optional verified handle claims, links the
-   existing external-identity store, and enters Koan's cookie lifecycle. No OAuth
-   credential is placed in AuthenticationProperties tokens.
+6. The principal carries protocol DID/optional verified handle claims, hands the
+   login to `LoginArrival.Arrive` — the person it is bound to, or, on a binding
+   challenge, the signed-in person who asked (SEC-0040) — and enters Koan's cookie
+   lifecycle. No OAuth credential is placed in AuthenticationProperties tokens.
 7. A step that fails throws `AtprotoSignInException` carrying the Web Auth
    `SignInFailure` for its phase (WEB-0080): identity resolution is
    `HandleUnresolved`; discovery, metadata and the pushed request are
@@ -176,9 +177,10 @@ issuer `IssuerUnknown`, and a connection, a timeout or a 5xx or 429 makes it `Is
 `80 24` P-256, a compressed point) or a 2019 key type (a raw point), bounded base58btc, and checks a compact 64-byte low-S
 ECDSA signature over the SHA-256 of the ASCII `header.payload` through BouncyCastle. The key's curve must be what `alg`
 says. `exp` is read again after resolving. `SignIn` is what the callback of a browser's sign-in does once it has a verified
-identity, through the same `AtprotoSessions.Principal` and `External`: it links the external identity and calls
-`SignInAsync` on the cookie scheme, so the cookie's `OnSigningIn` runs every sign-in contributor. The event reads the
-provider from the callback's path, so it sees none here. `VerifiedHandle` is the check a sign-in makes: the handle the document names, when it resolves back to
+identity, through the same `AtprotoSessions.Principal` and `External`: the login arrives at `LoginArrival.Arrive`, as the
+person it is bound to or, the first time, a new one (SEC-0040), and `SignInAsync` on the cookie scheme names `atproto` in
+`AuthConstants.Items.Provider`, so the cookie's `OnSigningIn` runs every sign-in contributor as a sign-in of this provider.
+A proof binds nothing: binding takes the browser's challenge. `VerifiedHandle` is the check a sign-in makes: the handle the document names, when it resolves back to
 the DID. `WebDid` derives a did:web from a base URL: its host, every loopback address as `localhost`, a port other than the
 default as `%3A<port>`, and each path segment after a colon.
 

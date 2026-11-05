@@ -13,7 +13,8 @@ namespace Koan.Identity.Reconciliation;
 /// <summary>
 /// SEC-0007 P0/P1 — the wired sign-in trigger. The cookie pipeline (OnSigningIn → AuthFlowDispatcher) drives every
 /// discovered <see cref="IKoanAuthFlowHandler"/>; this one runs late (after identity-mapping) and (P0) upserts the
-/// durable <see cref="Identity"/> from the baked claims, then (P1) records a device <see cref="Session"/> and
+/// durable <see cref="Identity"/> the sign-in's login is bound to, making the cookie's subject that person's id, then (P1)
+/// records a device <see cref="Session"/> and
 /// stamps its id on the cookie so revocation is enforceable. <c>OnValidatePrincipal</c> rejects a principal whose
 /// session was revoked or whose person is no longer active, and projects the roles the person holds now from their
 /// compiled bag onto the request's principal. The cookie carries none of them, so a role removed stops authorizing
@@ -40,8 +41,8 @@ public sealed class IdentityAuthFlowHandler : IKoanAuthFlowHandler
             var person = await reconciler.ReconcileAsync(
                 new IdentityClaims(subject, displayName, picture, email, emailVerified, ctx.Provider), ct).ConfigureAwait(false);
 
-            // Person ≠ email merge: if this IdP sub merged onto an existing person, rewrite the cookie's subject to
-            // the canonical person id so downstream (roles, session, Membership) all resolve to ONE identity.
+            // A provider's subject is not the person (SEC-0040): the cookie's subject becomes the person's own id, so
+            // downstream (roles, session, Membership) all resolve to ONE identity. The login's own claims stay.
             if (!string.Equals(person.Id, subject, StringComparison.Ordinal))
             {
                 if (ctx.Identity.FindFirst(ClaimTypes.NameIdentifier) is { } nameId) ctx.Identity.RemoveClaim(nameId);

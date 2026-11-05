@@ -7,8 +7,10 @@ namespace Koan.Identity;
 
 /// <summary>
 /// SEC-0007 D1 — the durable <b>person</b>: the canonical subject every <c>…Subject</c> / <c>IdentityId</c> string
-/// resolves to. The entity <c>Id</c> is the stable subject (the claims <c>sub</c> on reconciliation, GUID v7
-/// otherwise). The ambient <c>Koan.Security.Trust.Identity.Current</c> is the transient
+/// resolves to. The entity <c>Id</c> is Koan's own, a GUID v7 made when a login is first seen (SEC-0040), never a
+/// provider's subject; the logins it holds are its <see cref="ExternalIdentityLink"/>s. A person stored before SEC-0040
+/// keeps the subject of their first login as their id, which that login still resolves to. The ambient
+/// <c>Koan.Security.Trust.Identity.Current</c> is the transient
 /// <i>claims view</i> of this durable person — a different concern (see the CA1724 suppression below).
 /// </summary>
 [SuppressMessage("Design", "CA1724:TypeNamesShouldNotMatchNamespaces",

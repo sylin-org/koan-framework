@@ -20,4 +20,13 @@ public enum SignInFailure
 
     /// <summary>The callback did not match the sign-in that was started: state, correlation or issuer.</summary>
     CallbackMismatch,
+
+    /// <summary>
+    /// Binding a login needs the person it binds to signed in, recently where <c>ReConsent:ForceOnLink</c> asks: they sign
+    /// in, then bind.
+    /// </summary>
+    SignInFirst,
+
+    /// <summary>The login being bound is another person's, and stays theirs.</summary>
+    LoginTaken,
 }

@@ -2,7 +2,6 @@ using System.Text.Encodings.Web;
 using Koan.Web.Auth.Connector.Atproto.Infrastructure;
 using Koan.Web.Auth.Connector.Atproto.Options;
 using Koan.Web.Auth.Connector.Atproto.Protocol;
-using Koan.Web.Auth.Domain;
 using Koan.Web.Auth.Infrastructure;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Http;
@@ -12,7 +11,7 @@ using Microsoft.Extensions.Options;
 namespace Koan.Web.Auth.Connector.Atproto.Hosting;
 
 internal sealed class AtprotoAuthenticationHandler(IOptionsMonitor<AtprotoAuthenticationOptions> options,
-    ILoggerFactory logger, UrlEncoder encoder, AtprotoSessions sessions, IExternalIdentityStore? identities = null)
+    ILoggerFactory logger, UrlEncoder encoder, AtprotoSessions sessions)
     : RemoteAuthenticationHandler<AtprotoAuthenticationOptions>(options, logger, encoder)
 {
     protected override async Task HandleChallengeAsync(AuthenticationProperties properties)
@@ -59,8 +58,8 @@ internal sealed class AtprotoAuthenticationHandler(IOptionsMonitor<AtprotoAuthen
             if (properties is null || !ValidateCorrelationId(properties)) return Failed(SignInFailure.CallbackMismatch, properties);
             var principal = await sessions.Complete(Request.QueryString.ToString(), Context.RequestAborted);
             var did = principal.FindFirst(AtprotoClaimTypes.Did)!.Value;
-            if (identities is not null)
-                await identities.Link(AtprotoSessions.External(did, principal.FindFirst(AtprotoClaimTypes.Handle)?.Value), Context.RequestAborted);
+            // SEC-0040: the verified login arrives as its person, or is bound to the signed-in person who asked.
+            await LoginArrival.Arrive(Context, properties, AtprotoSessions.External(did, principal.FindFirst(AtprotoClaimTypes.Handle)?.Value));
             properties.Items.Remove(Constants.RequestedScopes);
             properties.Items.Remove(Constants.Account);
             properties.Items.Remove(AuthConstants.Items.FailurePath);
@@ -73,6 +72,10 @@ internal sealed class AtprotoAuthenticationHandler(IOptionsMonitor<AtprotoAuthen
             Response.ContentType = "text/html; charset=utf-8";
             await Response.WriteAsync("<!doctype html><html lang=\"en\"><meta charset=\"utf-8\"><title>More access is needed</title><h1>Your account could not connect this access</h1><p>Your account provider did not grant the access needed for this connection. Your previous sign-in has been kept.</p><p>Try an account whose provider supports the requested access, or check the connection settings.</p><p><a href=\"" + ApplicationRoot() + "\">Return to the app</a></p></html>", Context.RequestAborted);
             return HandleRequestResult.Handle();
+        }
+        catch (SignInRefusedException refused)
+        {
+            return Failed(refused.Failure, properties);
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {

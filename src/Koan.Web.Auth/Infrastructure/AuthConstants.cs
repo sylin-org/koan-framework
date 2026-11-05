@@ -32,6 +32,18 @@ public static class AuthConstants
     {
         /// <summary>The failure landing named on the challenge (WEB-0080).</summary>
         public const string FailurePath = ".koan.failure";
+
+        /// <summary>The person a binding challenge binds the arriving login to (SEC-0040).</summary>
+        public const string Bind = ".koan.bind";
+
+        /// <summary>
+        /// The provider whose verified identity a sign-in made outside that provider's callback carries, such as a proof
+        /// exchanged for a session. Only trusted server code sets it.
+        /// </summary>
+        public const string Provider = ".koan.provider";
+
+        /// <summary>When the cookie's person signed in, in Unix seconds; a sliding renewal keeps it.</summary>
+        public const string SignedIn = ".koan.signed_in";
     }
 
     // Development helpers used by first-party samples/providers

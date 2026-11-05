@@ -159,7 +159,7 @@ public sealed class IdentityAccessSpec : IdentityHostScopedSpec
         ci.AddClaim(new Claim(ClaimTypes.NameIdentifier, id));
         var ctx = new AuthSignInContext
         {
-            Provider = "test",
+            Provider = null, // the application's own sign-in, naming its person
             Identity = ci,
             Services = scope.ServiceProvider,
             HttpContext = new DefaultHttpContext { RequestServices = scope.ServiceProvider },

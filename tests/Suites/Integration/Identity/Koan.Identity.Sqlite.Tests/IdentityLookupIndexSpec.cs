@@ -2,6 +2,7 @@ using AwesomeAssertions;
 using Koan.Core.Hosting.App;
 using Koan.Data.Core;
 using Koan.Identity.Impersonation;
+using Koan.Identity.Reconciliation;
 using Koan.Web.Auth.Domain;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.DependencyInjection;
@@ -21,6 +22,7 @@ public sealed class IdentityLookupIndexSpec
     public async Task Reads_of_a_persons_rows_by_their_id_are_planned_with_their_indexes()
     {
         const string person = "person:lookup";
+        const string subject = "subject:lookup";
         var path = Path.Combine(Path.GetTempPath(), $"koan-identity-lookup-{Guid.CreateVersion7():n}.db");
         try
         {
@@ -28,13 +30,15 @@ public sealed class IdentityLookupIndexSpec
             {
                 using var app = AppHost.PushScope(host.Services);
 
-                // A sign-in: the store links the provider identity, and reconciliation writes the email factor.
+                // A sign-in of a login bound to the person: the store finds them, and reconciliation writes the email factor.
+                var hash = IdentityReconciler.ProviderKeyHash(subject);
+                await new ExternalIdentityLink { Id = ExternalIdentityLink.KeyFor(subject, "probe", hash), IdentityId = person, Provider = "probe", ProviderKeyHash = hash }.Save();
                 var store = host.Services.GetRequiredService<IExternalIdentityStore>();
                 await store.Link(new ExternalIdentity
                 {
-                    UserId = person,
+                    Subject = subject,
                     Provider = "probe",
-                    ProviderKeyHash = "hash",
+                    ProviderKeyHash = hash,
                     ClaimsJson = """{ "email": "Lookup@Example.com", "email_verified": true }""",
                 });
 

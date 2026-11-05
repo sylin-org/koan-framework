@@ -112,6 +112,26 @@ from the store, and calls a subject with no row inactive. `ClientApprovals.Revok
 suspend, deactivation and erasure, in every scope `IMaintenanceScopes` names: under Koan.Tenancy, every tenant, with any
 tenant in scope or none (SEC-0033).
 
+A person's id is Koan's own (SEC-0040): a GUID v7, made when one of their logins is first seen, never a provider's subject.
+A login is an `ExternalIdentityLink`, its id composed from the subject, the provider and the subject's hash, and it is the
+one way from a credential back to its person. `IdentityReconciler.Login` reads it by id; a login not seen before is written
+with `Entity.Insert`, bound to a new person's id, and the writer that loses the insert reads the winner's row, so two first
+sign-ins of one login end on one person. The person row is then upserted by that id, so both write the same row; a link
+whose person row is missing gets it on the next sign-in. Its userinfo is replaced only when it changed, by `ReplaceIf` on
+the person it was read with, so a sign-in never writes back a login unbound meanwhile. A sign-in no provider made names its
+person by its subject. A person stored before SEC-0040 has the subject of their first login as id, which that login
+resolves to. The store must support insert-only writes; one that does not refuses the first sign-in with Koan's correction.
+
+`IdentityLinkService` owns the person's logins. `Bind` inserts the login for the person, refuses it when it is another
+person's, then removes the person's other login of that provider: the insert first, so a failure between the two leaves the
+person a login more, never one fewer. `Unbind` removes one of the person's own logins and refuses their last. A person
+holds at most one login per provider, so `ForPerson` reads as many rows as the providers they bound, by the indexed
+`IdentityId`, keeping only exact matches. Two concurrent binds of one provider by one person, or unbinds of a person's last
+two logins, are not serialized. `IdentityExternalIdentityStore` is the seam Web Auth hands each verified login to at the
+callback: `Link` reconciles it, and `Bind` binds it to the signed-in person, then reconciles it as that person, so the
+sign-in that follows finds them and no stray person is made. A principal that is impersonating (`koan_actor`) binds
+nothing: an operator acting as a person never gives them a login of their own (SEC-0007 D8).
+
 What `/me` and a sign-in read is indexed: `IdentityId` on `Session`, `IdentityEmail` and `ExternalIdentityLink`, and
 `Actor`-then-`Target` and `Target` on `ImpersonationGrant`. A returning sign-in reads its email factor by
 `IdentityEmail.KeyFor`, and only a factor not seen before asks whether the person holds another, one row at most.

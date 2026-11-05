@@ -38,6 +38,8 @@ public static class SignInFailureReturn
         SignInFailure.HandleUnresolved => "handle_unresolved",
         SignInFailure.AccessDenied => "access_denied",
         SignInFailure.CallbackMismatch => "callback_mismatch",
+        SignInFailure.SignInFirst => "sign_in_first",
+        SignInFailure.LoginTaken => "login_taken",
         _ => "sign_in_failed",
     };
 

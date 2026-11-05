@@ -177,13 +177,19 @@ internal static class ServiceCollectionExtensions
                     },
                     OnSigningIn = async ctx =>
                     {
+                        // SEC-0040: when the person signed in, which a sliding renewal keeps and a binding's recency reads.
+                        SignInTime.Stamp(ctx.HttpContext, ctx.Properties);
+                        // A provider's sign-in made outside its callback, such as a proof exchanged for a session, names
+                        // its provider in the properties; the cookie need not carry the name.
+                        ctx.Properties.Items.Remove(AuthConstants.Items.Provider, out var named);
+
                         var principal = ctx.Principal;
                         if (principal?.Identity is not ClaimsIdentity identity) return;
 
                         var dispatcher = ctx.HttpContext.RequestServices.GetService<AuthFlowDispatcher>();
                         if (dispatcher is null) return;
 
-                        var provider = ResolveProviderFromPath(ctx.HttpContext.Request.Path.Value);
+                        var provider = ResolveProviderFromPath(ctx.HttpContext.Request.Path.Value) ?? named;
                         ProviderClaimPolicy.Apply(identity, provider, ctx.HttpContext.RequestServices.GetService<AuthProviderPlan>());
                         var signInCtx = new AuthSignInContext
                         {

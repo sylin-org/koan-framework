@@ -202,7 +202,7 @@ public sealed class DeprovisioningSpec : IdentityHostScopedSpec
         await Task.Delay(15);
 
         var reconciler = _fx.Services.GetRequiredService<IIdentityReconciler>();
-        await reconciler.ReconcileAsync(new IdentityClaims("rec-noop", DisplayName: "NoOp", Provider: "dev"));
+        await reconciler.ReconcileAsync(new IdentityClaims("rec-noop", DisplayName: "NoOp"));
 
         (await Identity.Get("rec-noop"))!.UpdatedAt.Should().Be(before,
             "save-if-changed: a no-op reconcile must not full-row-replace the person (which is what could revert a concurrent Deactivation)");
