@@ -9,6 +9,7 @@ internal static class Constants
     internal const string Callback = "/auth/atproto/callback";
     internal const string Metadata = "/auth/atproto/client-metadata.json";
     internal const string RequestedScopes = ".atproto.requested_scopes";
+    internal const string Account = ".atproto.account";
     internal const string SessionProtectionPurpose = "Koan.Web.Auth.Atproto.Session.v1";
     internal const string StateProtectionPurpose = "Koan.Web.Auth.Atproto.State.v1";
     internal const string PropertiesPurpose = "Koan.Web.Auth.Atproto.Browser.v1";

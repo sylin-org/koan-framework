@@ -98,6 +98,33 @@ internal sealed class LoopbackPds : IAsyncDisposable
             if (self.AccessOf(context) is null) { context.Response.StatusCode = 401; return; }
             await self.Stream(context);
         });
+        app.MapPost("/xrpc/com.atproto.repo.putRecord", async (HttpContext context) =>
+        {
+            if (self.AccessOf(context) is not { } did) return Results.Json(new { error = "InvalidToken" }, statusCode: 401);
+            var put = (await System.Text.Json.Nodes.JsonNode.ParseAsync(context.Request.Body))!.AsObject();
+            if (put["repo"]!.GetValue<string>() != did) return Results.Json(new { error = "InvalidRequest" }, statusCode: 400);
+            var address = $"at://{did}/{put["collection"]}/{put["rkey"]}";
+            self.Records[address] = put["record"]!.ToJsonString();
+            return Results.Json(new { uri = address, cid = self.Next("cid") });
+        });
+        app.MapPost("/xrpc/com.atproto.repo.deleteRecord", async (HttpContext context) =>
+        {
+            if (self.AccessOf(context) is not { } did) return Results.Json(new { error = "InvalidToken" }, statusCode: 401);
+            var deleted = (await System.Text.Json.Nodes.JsonNode.ParseAsync(context.Request.Body))!.AsObject();
+            self.Records.TryRemove($"at://{did}/{deleted["collection"]}/{deleted["rkey"]}", out _);
+            return Results.Json(new { });
+        });
+        app.MapPost("/xrpc/com.atproto.repo.uploadBlob", async (HttpContext context) =>
+        {
+            if (self.AccessOf(context) is null) return Results.Json(new { error = "InvalidToken" }, statusCode: 401);
+            using var bytes = new MemoryStream();
+            await context.Request.Body.CopyToAsync(bytes);
+            return Results.Json(new { blob = new Dictionary<string, object>
+            {
+                ["$type"] = "blob", ["ref"] = new Dictionary<string, string> { ["$link"] = self.Next("bafkrei") },
+                ["mimeType"] = context.Request.ContentType ?? "", ["size"] = bytes.Length,
+            } });
+        });
         app.MapGet("/fixture/stream", self.Stream);
         app.MapGet("/fixture/blob", () => Results.Bytes(Enumerable.Repeat((byte)'b', self.BlobBytes).ToArray(), "application/octet-stream"));
         app.MapGet("/{**rest}", (string rest) => self.Document(rest));
@@ -105,6 +132,9 @@ internal sealed class LoopbackPds : IAsyncDisposable
         self.Origin = app.Urls.Single();
         return self;
     }
+
+    /// <summary>The records the PDS holds, by their <c>at://</c> address, each as its JSON.</summary>
+    public ConcurrentDictionary<string, string> Records { get; } = new(StringComparer.Ordinal);
 
     /// <summary>An account this PLC directory resolves, with its PDS and authorization server here.</summary>
     public void Account(string did, string handle) => _handles[did] = handle;
@@ -146,7 +176,8 @@ internal sealed class LoopbackPds : IAsyncDisposable
             var did = form["code"].ToString().Split(':', 2) is ["code", var subject] ? subject : "";
             if (!_handles.ContainsKey(did)) return Results.Json(new { error = "invalid_grant" }, statusCode: 400);
             Grant grant;
-            lock (_gate) _grants[did] = grant = new Grant(did) { Access = Next("access"), Refresh = Next("refresh") };
+            var scope = Pushed?["scope"].ToString() is { Length: > 0 } pushed ? pushed : "atproto";
+            lock (_gate) _grants[did] = grant = new Grant(did) { Access = Next("access"), Refresh = Next("refresh"), Scope = scope };
             return Issued(grant);
         }
 
@@ -204,7 +235,7 @@ internal sealed class LoopbackPds : IAsyncDisposable
 
     private IResult Issued(Grant grant) => Results.Json(new
     {
-        access_token = grant.Access, token_type = "DPoP", expires_in = 3600, refresh_token = grant.Refresh, scope = "atproto", sub = grant.Did,
+        access_token = grant.Access, token_type = "DPoP", expires_in = 3600, refresh_token = grant.Refresh, scope = grant.Scope, sub = grant.Did,
     });
 
     private string Next(string kind) => $"{kind}-{Interlocked.Increment(ref _issued)}";
@@ -248,6 +279,7 @@ internal sealed class LoopbackPds : IAsyncDisposable
         public string Did { get; } = did;
         public string Access { get; set; } = "";
         public string Refresh { get; set; } = "";
+        public string Scope { get; set; } = "atproto";
         public HashSet<string> Used { get; } = new(StringComparer.Ordinal);
         public bool Ended { get; set; }
     }

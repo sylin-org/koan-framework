@@ -120,6 +120,30 @@ collections are rewritten during token issuance and therefore fail the exact
 grant check. Reauthorization is required when the client ID or permission ceiling
 changes.
 
+A person who is already signed in is asked as themselves: `AtprotoChallenge.ForAccount(properties, did)`
+names the account the provider asks, in place of any `identifier` in the query.
+
+## Write in the person's own repository
+
+`IAtprotoRepository` in the `.Protocol` namespace writes the signed-in account's repository as that account, through
+its session: `Put(did, collection, rkey, record)` creates or replaces the record at its key and answers its `at://`
+address and content id, so the same put sent again lands once; `Delete(did, collection, rkey)` removes it, and one
+already gone is removed; `Upload(did, bytes, mimeType)` answers the blob reference a record names. `Holds(did, scopes)`
+says whether the session holds the grant a write needs, false where there is no session. Ask for that grant when the
+person first chooses the write, never at sign-in:
+
+```csharp
+if (!await repository.Holds(did, ["repo:site.standard.document"], ct))
+    return Challenge(AtprotoChallenge.ForAccount(
+        AtprotoChallenge.WithScopes(new AuthenticationProperties { RedirectUri = back }, "atproto", "repo:site.standard.document"),
+        did), "atproto");
+var written = await repository.Put(did, "site.standard.document", rkey, record, ct);
+```
+
+A refusal from the PDS is an `AtprotoRepositoryException` with its status and XRPC error name, never its text:
+`Transient` when the same call can pass later, `NeedsGrant` when the person grants the write again. A network failure
+is the transport's own exception. A test of the application replaces `IAtprotoRepository` with a double.
+
 `AtprotoSessions` in the `.Protocol` namespace sends XRPC through the native
 session using `Send(did, nsid, method, maximumResponseBytes, parameters, content, ct)`.
 It fixes the destination to that DID's verified PDS, applies SDK DPoP and refresh, and

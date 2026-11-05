@@ -43,7 +43,7 @@ internal sealed class SessionWorld : IAsyncDisposable
     }
 
     /// <summary>A process of the application.</summary>
-    public Node Node(Action<AtprotoOptions>? configure = null)
+    public Node Node(Action<AtprotoOptions>? configure = null, string[]? scopes = null)
     {
         var options = new AtprotoOptions { DevelopmentAllowedOrigins = [Pds.Origin], DevelopmentPlcDirectory = Pds.Origin };
         foreach (var did in Dids) options.DevelopmentHandles[HandleOf(did)] = did;
@@ -55,15 +55,16 @@ internal sealed class SessionWorld : IAsyncDisposable
         var store = new AtprotoSessionStore(Store.Protection());
         var network = new AtprotoHttp(settings, environment);
         var node = new Node(store, network, new AtprotoSessions(store, network, settings,
-            Microsoft.Extensions.Options.Options.Create(auth), new TestCatalog(), environment, new KoanWebBaseUrl(null)));
+            Microsoft.Extensions.Options.Options.Create(auth), new TestCatalog(scopes ?? ["atproto"]), environment, new KoanWebBaseUrl(null)));
         _nodes.Add(node);
         return node;
     }
 
     /// <summary>A server-first sign-in of <paramref name="did"/> through <paramref name="node"/>: its challenge, and the callback after the provider approves.</summary>
-    public async Task<ClaimsPrincipal> SignIn(Node node, string did)
+    public async Task<ClaimsPrincipal> SignIn(Node node, string did, params string[] scopes)
     {
-        var authorization = await node.Sessions.StartServer(Pds.Origin, new AuthenticationProperties(), "browser", TestContext.Current.CancellationToken);
+        var properties = scopes.Length == 0 ? new AuthenticationProperties() : Koan.Web.Auth.Connector.Atproto.AtprotoChallenge.WithScopes(new AuthenticationProperties(), scopes);
+        var authorization = await node.Sessions.StartServer(Pds.Origin, properties, "browser", TestContext.Current.CancellationToken);
         return await node.Sessions.Complete(Pds.Approval(LoopbackPds.StateOf(authorization), did), TestContext.Current.CancellationToken);
     }
 
@@ -93,10 +94,12 @@ internal sealed class TestEnvironment(string name = "Development") : IHostEnviro
     public IFileProvider ContentRootFileProvider { get; set; } = new NullFileProvider();
 }
 
-internal sealed class TestCatalog : IAuthProviderCatalog
+internal sealed class TestCatalog(string[] scopes) : IAuthProviderCatalog
 {
+    public TestCatalog() : this(["atproto"]) { }
+
     public IReadOnlyList<AuthProviderInfo> Providers { get; } =
-        [new("atproto", "AT Protocol", "atproto", "enabled", true, true, false, 200, "Specs", null, null, ["atproto"], "/auth/atproto/challenge")];
+        [new("atproto", "AT Protocol", "atproto", "enabled", true, true, false, 200, "Specs", null, null, scopes, "/auth/atproto/challenge")];
     public AuthProviderInfo? Default => Providers[0];
     public AuthProviderInfo? Find(string? id) => id == "atproto" ? Default : null;
 }

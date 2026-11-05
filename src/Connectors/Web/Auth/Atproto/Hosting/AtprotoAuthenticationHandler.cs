@@ -20,7 +20,8 @@ internal sealed class AtprotoAuthenticationHandler(IOptionsMonitor<AtprotoAuthen
       try
       {
         if (!sessions.Enabled) throw new InvalidOperationException("AT provider is inactive.");
-        var identifier = Request.Query["identifier"];
+        var identifier = properties.Items.TryGetValue(Constants.Account, out var account) && account is not null
+            ? new Microsoft.Extensions.Primitives.StringValues(account) : Request.Query["identifier"];
         if (identifier.Count > 1 || (identifier.Count == 1 && (string.IsNullOrWhiteSpace(identifier) || identifier.ToString().Length > 2048)))
             throw new InvalidOperationException("Supply one account handle or DID as identifier.");
         GenerateCorrelationId(properties);
@@ -61,6 +62,7 @@ internal sealed class AtprotoAuthenticationHandler(IOptionsMonitor<AtprotoAuthen
             if (identities is not null)
                 await identities.Link(AtprotoSessions.External(did, principal.FindFirst(AtprotoClaimTypes.Handle)?.Value), Context.RequestAborted);
             properties.Items.Remove(Constants.RequestedScopes);
+            properties.Items.Remove(Constants.Account);
             properties.Items.Remove(AuthConstants.Items.FailurePath);
             return HandleRequestResult.Success(new AuthenticationTicket(principal, properties, Scheme.Name));
         }

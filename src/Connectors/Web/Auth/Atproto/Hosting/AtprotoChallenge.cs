@@ -14,4 +14,14 @@ public static class AtprotoChallenge
         properties.Items[Constants.RequestedScopes] = JsonSerializer.Serialize(scopes);
         return properties;
     }
+
+    /// <summary>Asks <paramref name="identifier"/>, a handle or DID, for the grant: the account a signed-in person already
+    /// is, so the provider asks them and no one else. It takes the place of any <c>identifier</c> in the request's query.</summary>
+    public static AuthenticationProperties ForAccount(AuthenticationProperties properties, string identifier)
+    {
+        ArgumentNullException.ThrowIfNull(properties);
+        ArgumentException.ThrowIfNullOrWhiteSpace(identifier);
+        properties.Items[Constants.Account] = identifier;
+        return properties;
+    }
 }
