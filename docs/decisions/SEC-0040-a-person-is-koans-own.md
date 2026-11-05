@@ -87,6 +87,9 @@ held, each rare:
   cookie's sign-in and another at the arrival.
 - Ending an impersonation signs the operator in again, which counts as a recent sign-in.
 - Unbinding is allowed while impersonating.
+- Binding relies on SEC-0039's cross-site guard to refuse a POST from another site: an application that turns the guard
+  off leaves binding open to its own sibling subdomains, whose pages share the site and so send the `SameSite=Lax`
+  cookie.
 - A store must support insert-only writes (`DataCaps.Write.InsertOnly`: SQLite, MongoDB and in-memory today); another
   refuses the first sign-in with Koan's own correction, not at boot.
 
