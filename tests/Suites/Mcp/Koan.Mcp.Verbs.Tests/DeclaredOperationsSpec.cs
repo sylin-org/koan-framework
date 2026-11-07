@@ -42,7 +42,7 @@ public sealed class DeclaredOperationsSpec(ForumFixture forum) : IClassFixture<F
     {
         var board = Guid.CreateVersion7().ToString("N");
         foreach (var text in new[] { "a", "b", "c" })
-            (await forum.Route(HttpMethod.Post, "/boards/notices", new JObject { ["text"] = text, ["where"] = board }, Mara)).Status.Should().Be(200);
+            (await forum.Route(HttpMethod.Post, "/boards/notices", new JObject { ["text"] = text, ["where"] = board }, Mara)).Status.Should().Be(201);
 
         var tool = (JObject)(await forum.Call("read_notices", new JObject { ["on"] = board, ["size"] = 3 }, Mara))["structuredContent"]!;
         var route = JObject.Parse((await forum.Route(HttpMethod.Get, $"/boards/notices?on={board}&size=3", null, Mara)).Text);
@@ -58,7 +58,7 @@ public sealed class DeclaredOperationsSpec(ForumFixture forum) : IClassFixture<F
     {
         var board = Guid.CreateVersion7().ToString("N");
         foreach (var text in new[] { "c", "a", "b" })
-            (await forum.Route(HttpMethod.Post, "/boards/notices", new JObject { ["text"] = text, ["where"] = board }, Mara)).Status.Should().Be(200);
+            (await forum.Route(HttpMethod.Post, "/boards/notices", new JObject { ["text"] = text, ["where"] = board }, Mara)).Status.Should().Be(201);
 
         var first = await forum.Call("read_notices", new JObject { ["on"] = board }, Mara);
         var page = (JObject)first["structuredContent"]!;
