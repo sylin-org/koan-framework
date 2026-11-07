@@ -419,9 +419,9 @@ validation:
 - `Data<TEntity, TKey>.Page(order, after, size, query?)` reads `size + 1` rows as page 1, ordered by the keyset, with the query's
   filter, the rows where each nullable member is set, and the seek after `after`: for each member `k <= v AND (k < v OR rest)`
   (`>=`/`>` ascending), the identity last as `Id > last`. The extra row decides `Next`, the `KeysetKey` of the last row kept;
-  nothing is counted. The seek must push completely (`Keyset.Pushes`), checked before any I/O, and the adapter must report the
-  order and, where no residual remains, the page as handled; otherwise `NotSupportedException`. A residual in the caller's own
-  filter follows `FilterPushdownCoordinator` as any query does.
+  nothing is counted. The seek must push completely (`Keyset.Pushes`), and the caller's own filter with it (no residual from
+  `FilterPushdownCoordinator.Plan`), both checked before any I/O, and the adapter must report the order and the page as handled;
+  otherwise `NotSupportedException`. Every read is therefore `size + 1` rows the store chose; nothing is paged in memory.
 - `KeysetKey` carries the members' values; `Keyset.Write` and `Read` give its text form, typed by the members through
   `System.Text.Json`, so it reads back exactly. Koan.Web's `SealedCursor` seals that text for the wire (DATA-0170).
 

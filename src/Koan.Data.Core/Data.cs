@@ -859,8 +859,8 @@ public static partial class Data<TEntity, TKey>
 
     /// <summary>The page of at most <paramref name="size"/> rows of <paramref name="query"/>'s filter and partition after
     /// <paramref name="after"/> in <paramref name="order"/>, or the first page where it is null, and the key the next page continues from.
-    /// The order replaces any sort the query names. A provider that cannot compare the seek in its store, or apply the order and the page
-    /// itself, refuses with <see cref="NotSupportedException"/> rather than paging in memory.</summary>
+    /// The order replaces any sort the query names. A provider that cannot apply the whole filter and the seek in its store, or apply the
+    /// order and the page itself, refuses with <see cref="NotSupportedException"/> rather than paging in memory.</summary>
     public static async Task<KeysetPage<TEntity>> Page(Keyset<TEntity> order, KeysetKey? after, int size, QueryDefinition? query, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(order);
@@ -878,12 +878,17 @@ public static partial class Data<TEntity, TKey>
         // One row past the page says whether a next page exists, and the page itself is the key it continues from.
         var read = order.Continue(query with { Filter = Filter.Snapshot(query.Filter) }, after, checked(size + 1));
         var (adapterQuery, residual) = FilterPushdownCoordinator.Plan(read, ResolveFilterSupport(repo), typeof(TEntity));
+        // A residual would take the page in memory over every row past the key; the whole filter answers in the store, or nothing is read.
+        if (residual is not null)
+            throw new NotSupportedException(
+                $"The adapter {provider} backing {typeof(TEntity).Name} cannot apply the whole filter of a keyset page in its store, so the page " +
+                "would be taken in memory over every row after the key. Narrow by what the provider compares in its store, or use a provider that applies the filter.");
         var result = await DataQueryExecution<TEntity, TKey>.QueryCandidates(repo, q, adapterQuery, ct).ConfigureAwait(false);
-        if (!result.SortFullyHandled(adapterQuery) || (residual is null && !result.PaginationHandled))
+        if (!result.SortFullyHandled(adapterQuery) || !result.PaginationHandled)
             throw new NotSupportedException(
                 $"The adapter {provider} backing {typeof(TEntity).Name} did not apply a keyset order {(result.SortFullyHandled(adapterQuery) ? "page" : "itself")}, " +
                 "so a page in memory could repeat or skip a row the store orders differently. Use a provider that orders and pages in its store.");
-        var finalized = FilterPushdownCoordinator.Finalize(read, adapterQuery, residual, result);
+        var finalized = FilterPushdownCoordinator.Finalize(read, adapterQuery, null, result);
 
         await DataQueryExecution<TEntity, TKey>.MaterializeVisible(repo, finalized.Page, ct).ConfigureAwait(false);
         DataQueryExecution<TEntity, TKey>.ValidateEvidence(result.ReadEvidence, finalized.Page);

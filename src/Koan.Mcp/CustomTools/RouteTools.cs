@@ -25,7 +25,9 @@ namespace Koan.Mcp.CustomTools;
 /// </summary>
 internal static class RouteTools
 {
-    public static IEnumerable<McpCustomTool> Discover(IActionDescriptorCollectionProvider actions, bool addressed = false)
+    /// <summary>The tools of every [Tool] route; <paramref name="pagination"/> is the host's page bounds, which a declared collection's
+    /// <c>size</c> states as REST clamps it.</summary>
+    public static IEnumerable<McpCustomTool> Discover(IActionDescriptorCollectionProvider actions, PaginationSafetyBounds pagination, bool addressed = false)
     {
         var exposed = actions.ActionDescriptors.Items.OfType<ControllerActionDescriptor>()
             .Where(action => ToolAttribute.Exposes(action.MethodInfo, action.ControllerTypeInfo))
@@ -33,14 +35,14 @@ internal static class RouteTools
         // [HttpGet] and [HttpHead] on one action make two descriptors of one read, and that is one tool.
         return exposed.Where(action => !(Answers(action, HttpMethods.Head) && exposed.Any(other => other.MethodInfo == action.MethodInfo
                 && other.AttributeRouteInfo?.Template == action.AttributeRouteInfo?.Template && Answers(other, HttpMethods.Get))))
-            .Select(action => Build(action, addressed));
+            .Select(action => Build(action, pagination, addressed));
     }
 
     private static bool Answers(ControllerActionDescriptor action, string method)
         => action.ActionConstraints?.OfType<HttpMethodActionConstraint>().FirstOrDefault()?.HttpMethods.FirstOrDefault() is { } first
            && string.Equals(first, method, StringComparison.OrdinalIgnoreCase);
 
-    private static McpCustomTool Build(ControllerActionDescriptor action, bool addressed)
+    private static McpCustomTool Build(ControllerActionDescriptor action, PaginationSafetyBounds pagination, bool addressed)
     {
         var where = $"{action.ControllerTypeInfo.Name}.{action.MethodInfo.Name}";
         if (action.AttributeRouteInfo?.Template is not { } template)
@@ -53,7 +55,7 @@ internal static class RouteTools
         if (!ToolName.IsGood(name))
             throw new InvalidOperationException($"The tool name '{name}' of {where} is not {ToolName.Rule}. State one with [Tool(Name = ...)].");
 
-        var (schema, query, bodyField, takesAddress) = Input(action, pattern, method, where, addressed);
+        var (schema, query, bodyField, takesAddress) = Input(action, pattern, method, where, pagination, addressed);
         var isGet = HttpMethods.IsGet(method) || HttpMethods.IsHead(method);
         var description = action.MethodInfo.GetCustomAttribute<DescriptionAttribute>()?.Description;
         // What a route's method promises, and nothing it does not. Whether a POST only adds, or reaches beyond the application, is the action's to say: the specification reads a hint left out as "it may", and a false one here would tell every client that follows it something untrue.
@@ -72,7 +74,7 @@ internal static class RouteTools
     private static string Derive(RoutePattern pattern, string particle)
         => ToolName.Of(pattern.PathSegments.SelectMany(segment => segment.Parts).OfType<RoutePatternLiteralPart>().Select(part => part.Content).Append(particle));
 
-    private static (JObject Schema, IReadOnlySet<string> Query, string? BodyField, bool TakesAddress) Input(ControllerActionDescriptor action, RoutePattern pattern, string method, string where, bool addressed)
+    private static (JObject Schema, IReadOnlySet<string> Query, string? BodyField, bool TakesAddress) Input(ControllerActionDescriptor action, RoutePattern pattern, string method, string where, PaginationSafetyBounds pagination, bool addressed)
     {
         var properties = new JObject();
         var required = new JArray();
@@ -152,7 +154,7 @@ internal static class RouteTools
                 Field(KoanWebConstants.Query.After, typeof(string), [], false, asQuery: true);
                 properties[KoanWebConstants.Query.After]!["description"] = "Where the list continues: the 'next' of the page before. Left out, it starts at the beginning.";
                 Field(KoanWebConstants.Query.Size, typeof(int), [], false, asQuery: true);
-                properties[KoanWebConstants.Query.Size]!["description"] = $"The most rows the page holds, at most {operation.MaxSize}.";
+                properties[KoanWebConstants.Query.Size]!["description"] = $"The most rows the page holds, at most {PaginationPolicy.Of(operation.Pagination, pagination).MaxSize}.";
             }
             if (operation.Partitions is { } partitions && !properties.ContainsKey(KoanWebConstants.Query.Set))
             {

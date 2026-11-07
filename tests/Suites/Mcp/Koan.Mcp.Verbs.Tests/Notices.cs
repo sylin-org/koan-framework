@@ -35,7 +35,8 @@ public sealed class NoticesController : EntityController<Notice>, IModelHook<Not
     [HttpGet("")]
     [Tool(Name = "read_notices")]
     [Description("Read a board's notices, by what they say.")]
-    [Pagination(DefaultSize = 2, MaxSize = 5, DefaultSort = nameof(Notice.Text))]
+    // A MaxSize below the DefaultSize is raised to it, so a page holds at most 2: what the tool states and REST serves alike.
+    [Pagination(DefaultSize = 2, MaxSize = 1, DefaultSort = nameof(Notice.Text))]
     [Input<Listing>]
     public override Task<IActionResult> GetCollection(CancellationToken ct) => base.GetCollection(ct);
 

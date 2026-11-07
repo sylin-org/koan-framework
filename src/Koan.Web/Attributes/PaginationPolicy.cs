@@ -45,11 +45,11 @@ public sealed record PaginationPolicy
         => (page < 1 ? 1 : page, size < 1 ? DefaultSize : Math.Min(size, MaxSize));
 
     public static PaginationPolicy Resolve(IServiceProvider services, PaginationAttribute? attribute)
-    {
-        var bounds = services.GetService<IOptions<PaginationSafetyBounds>>()?.Value
-                     ?? PaginationSafetyBounds.Default;
-        return FromAttribute(attribute ?? PaginationAttributeDefaults.CreateDefault(), bounds);
-    }
+        => Of(attribute, services.GetService<IOptions<PaginationSafetyBounds>>()?.Value ?? PaginationSafetyBounds.Default);
+
+    /// <summary>The policy <paramref name="attribute"/> names under <paramref name="safety"/>, or the default one where it is null.</summary>
+    public static PaginationPolicy Of(PaginationAttribute? attribute, PaginationSafetyBounds safety)
+        => FromAttribute(attribute ?? PaginationAttributeDefaults.CreateDefault(), safety);
 }
 
 internal static class PaginationAttributeDefaults

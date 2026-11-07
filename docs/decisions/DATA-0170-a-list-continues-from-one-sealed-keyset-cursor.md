@@ -62,8 +62,9 @@ public sealed class TopicsController : EntityController<Post>, IRequestOptionsHo
 3. **The seek compares in the store.** The rows after a key are, for each member, those no further than the key's value and, at its
    own value, the rest of the order after the key's (`k <= v AND (k < v OR ...)` descending), so an index on the order answers each
    page as one range. It is an ordinary filter, pushed like every other, and the page is ordered by the same store, so both use the
-   store's own comparison of each member. A provider that cannot push the comparison is refused before it reads, and one that did
-   not apply the order or the page is refused after, each with `NotSupportedException`; Koan never pages a keyset in memory.
+   store's own comparison of each member. A provider that cannot push the comparison, or the caller's whole filter with it, is
+   refused before it reads, and one that did not apply the order or the page is refused after, each with `NotSupportedException`;
+   Koan never pages a keyset in memory, so every page reads at most `size + 1` rows.
 4. **A member that can hold null keeps the list to rows where it is set.** Stores place nulls differently, and a null has no place
    to continue from, so a `DateTimeOffset?` or `string` member adds `member != null` to every page.
 5. **A key leaves the server sealed.** `Keyset<T>.Write` and `Read` carry a key as text typed by the order's members, so it reads
@@ -72,7 +73,8 @@ public sealed class TopicsController : EntityController<Post>, IRequestOptionsHo
    another key ring opens to nothing. `SealedCursor.Refusal()` is the 400 that names `after`.
 6. **A declared controller's collection is keyset-only.** Its order is its `[Pagination]`'s `DefaultSort` (the identity alone where
    it names none), compiled where the routes are, so an order no list can continue through stops the host. It takes `after`, the
-   sealed key, and `size`, at most `[Pagination]`'s `MaxSize` and its `DefaultSize` when left out; it pages by nothing else, so
+   sealed key, and `size`, at most `[Pagination]`'s `MaxSize` as the host's page bounds (`Koan:Web:Pagination`) read it, the bound
+   its route tool states, and its `DefaultSize` when left out; it pages by nothing else, so
    `page`, `pageSize` and `all` are refused as words it does not take, and an `[Input]` member named after any of the five stops the
    host. It answers `{ "items": [...], "next": "..." }`, `next` null on the last page, with no offset, count, `X-Total-*`, `X-Page*`
    or `Link` header. An `after` that does not open is refused 400 naming `after`. The purpose it seals under is its controller's
@@ -130,8 +132,9 @@ lives.
   header, and `page` and a `size` that is no number are refused naming them.
 - `EntityStreamingSpec` (Koan.Tests.Data.Core, a provider that records its queries): a keyset page asks for one row past the page,
   as page one, in the order with the identity last, with the seek as one range, and counts nothing; a key reads back exactly as
-  written; a provider without comparison pushdown is refused before it reads, and one that did not apply the order after; an order
+  written; a provider without comparison pushdown is refused before it reads, and so is a filter it cannot apply whole, and one that
+  did not apply the order after; an order
   over an object is refused where it is built. The identity-seek specs of streams and the cutover hold unchanged.
 - `DeclaredOperationsSpec` (Koan.Mcp.Verbs.Tests, real HTTP and real `tools/call`): the collection's tool takes its input, `after` and
-  `size` with its bound; a list continues from the `next` its page answered, alike on both doors, and a cursor that does not open is
-  refused naming `after`.
+  `size` with its bound as the host's page policy reads it, and a page holds at most that bound on both doors; a list continues from
+  the `next` its page answered, alike on both doors, and a cursor that does not open is refused naming `after`.

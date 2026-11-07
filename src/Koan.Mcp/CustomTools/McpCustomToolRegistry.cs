@@ -27,15 +27,18 @@ public sealed class McpCustomToolRegistry
     private readonly ILogger<McpCustomToolRegistry> _logger;
     private readonly IActionDescriptorCollectionProvider? _actions;
     private readonly IOptions<McpServerOptions>? _options;
+    private readonly IOptions<Koan.Web.Infrastructure.PaginationSafetyBounds>? _pagination;
     private readonly object _sync = new();
     private IReadOnlyList<McpCustomTool>? _tools;
     private IReadOnlyDictionary<string, McpCustomTool>? _index;
 
-    public McpCustomToolRegistry(ILogger<McpCustomToolRegistry> logger, IActionDescriptorCollectionProvider? actions = null, IOptions<McpServerOptions>? options = null)
+    public McpCustomToolRegistry(ILogger<McpCustomToolRegistry> logger, IActionDescriptorCollectionProvider? actions = null, IOptions<McpServerOptions>? options = null,
+        IOptions<Koan.Web.Infrastructure.PaginationSafetyBounds>? pagination = null)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _actions = actions;
         _options = options;
+        _pagination = pagination;
     }
 
     /// <summary>All discovered custom tools.</summary>
@@ -124,7 +127,7 @@ public sealed class McpCustomToolRegistry
         }
 
         var addressed = _options?.Value.ReadByAddress == true;
-        if (_actions is not null) result.AddRange(RouteTools.Discover(_actions, addressed));
+        if (_actions is not null) result.AddRange(RouteTools.Discover(_actions, _pagination?.Value ?? Koan.Web.Infrastructure.PaginationSafetyBounds.Default, addressed));
         if (addressed) result.Add(AddressReader.Tool);
 
         _logger.LogDebug("Discovered {Count} custom MCP tool(s).", result.Count);

@@ -307,8 +307,10 @@ runs before the hold and its refusals are mapped there.
 ## Declared operations
 
 `EntityOperation.Of(action, controller)` compiles, once per action, what an operation of an `EntityController` serves and takes:
-whether the controller is `[Declared]`, the `[Writes]` members, the `[Input<T>]` type and members, the `[Partitions]` it serves, and
-for a declared collection its `Keyset<TEntity>` from `[Pagination]`'s `DefaultSort` and its `MaxSize` (DATA-0170).
+whether the controller is `[Declared]`, the `[Writes]` members, the `[Input<T>]` type and members, the `[Partitions]` it serves, the
+`[Pagination]` it pages by, and for a declared collection its `Keyset<TEntity>` from that `[Pagination]`'s `DefaultSort` (DATA-0170).
+`EntityController.GetPaginationPolicy` and `RouteTools` both bound it through `PaginationPolicy.Of` under the host's
+`PaginationSafetyBounds`, so the `size` a tool states is the one REST clamps to.
 The controller admits every request by it before anything else is read (the partition, then on a declared controller each query word,
 then the input), checks a write body's member names against the write set, and hands the endpoint `Insert` and `Writes`, which turn a
 create into an insert and record access's replacement demand into a per-member one. `RouteTools` draws a declared operation's schema

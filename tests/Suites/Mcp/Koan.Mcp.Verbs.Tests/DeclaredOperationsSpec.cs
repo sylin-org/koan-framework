@@ -32,7 +32,23 @@ public sealed class DeclaredOperationsSpec(ForumFixture forum) : IClassFixture<F
         Fields(tools["edit_notice"]).Should().BeEquivalentTo("notice", "text");
         Fields(tools["read_notice"]).Should().BeEquivalentTo("notice");
         Fields(tools["read_notices"]).Should().BeEquivalentTo("on", "after", "size");
-        tools["read_notices"]["inputSchema"]!["properties"]!["size"]!["description"]!.Value<string>().Should().Be("The most rows the page holds, at most 5.");
+        tools["read_notices"]["inputSchema"]!["properties"]!["size"]!["description"]!.Value<string>().Should().Be("The most rows the page holds, at most 2.");
+    }
+
+    /// <summary>DATA-0170: the bound a declared collection's tool states is the one its page is clamped to, on both doors: the
+    /// [Pagination] as the host's page policy reads it, not as it is written.</summary>
+    [Fact]
+    public async Task A_page_holds_at_most_the_bound_its_tool_states_on_both_doors()
+    {
+        var board = Guid.CreateVersion7().ToString("N");
+        foreach (var text in new[] { "a", "b", "c" })
+            (await forum.Route(HttpMethod.Post, "/boards/notices", new JObject { ["text"] = text, ["where"] = board }, Mara)).Status.Should().Be(200);
+
+        var tool = (JObject)(await forum.Call("read_notices", new JObject { ["on"] = board, ["size"] = 3 }, Mara))["structuredContent"]!;
+        var route = JObject.Parse((await forum.Route(HttpMethod.Get, $"/boards/notices?on={board}&size=3", null, Mara)).Text);
+
+        foreach (var page in new[] { tool, route })
+            page["items"]!.Select(notice => notice["text"]!.Value<string>()).Should().Equal(["a", "b"], "the tool states at most 2");
     }
 
     /// <summary>DATA-0170: a declared collection continues from the <c>next</c> its page answered, alike on both doors, and a cursor that

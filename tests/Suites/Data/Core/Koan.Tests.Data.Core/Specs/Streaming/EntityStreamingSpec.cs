@@ -222,6 +222,21 @@ public sealed class EntityStreamingSpec : IAsyncLifetime
         _repository.QueryCalls.Should().BeEmpty();
     }
 
+    /// <summary>DATA-0170: a filter the store cannot apply whole would leave the page to be taken in memory over every row after the key,
+    /// so the page is refused before anything is read.</summary>
+    [Fact]
+    public async Task A_keyset_page_whose_filter_the_provider_cannot_apply_in_its_store_is_refused_before_it_reads()
+    {
+        _repository.Reset(Rows(1, 2, 3), filterSupport: FilterSupport.Of(
+            Enum.GetValues<FilterOperator>(), Enum.GetValues<FilterOperator>(), nestedPaths: false));
+        var bySequence = Keyset<StreamingRecord>.By(order => order.OrderBy(record => record.Sequence));
+
+        var read = () => StreamingRecord.Page(bySequence, null, 2, record => record.Detail.Value == "kept", TestContext.Current.CancellationToken);
+
+        (await read.Should().ThrowAsync<NotSupportedException>()).Which.Message.Should().Contain("whole filter");
+        _repository.QueryCalls.Should().BeEmpty();
+    }
+
     [Fact]
     public async Task A_keyset_page_on_a_provider_that_does_not_apply_the_order_is_refused()
     {

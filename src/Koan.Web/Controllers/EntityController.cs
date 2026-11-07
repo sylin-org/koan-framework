@@ -248,28 +248,8 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
             throw new InvalidOperationException("RequestServices is not available.");
         }
 
-        var services = HttpContext.RequestServices;
-        var methodInfo = ControllerContext?.ActionDescriptor?.MethodInfo;
-
-        PaginationAttribute? LocateAttribute()
-        {
-            var methodAttr = methodInfo?.GetCustomAttribute<PaginationAttribute>();
-            if (methodAttr is not null)
-            {
-                return methodAttr;
-            }
-
-            var controllerAttr = GetType().GetCustomAttribute<PaginationAttribute>();
-            if (controllerAttr is not null)
-            {
-                return controllerAttr;
-            }
-
-            return null;
-        }
-
-        var attr = LocateAttribute();
-        return PaginationPolicy.Resolve(services, attr);
+        // The operation's [Pagination], as the route tool reads it, so both doors state and serve one bound.
+        return PaginationPolicy.Resolve(HttpContext.RequestServices, Operation.Pagination);
     }
 
     protected virtual QueryOptions BuildOptions()

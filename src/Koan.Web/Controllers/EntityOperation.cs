@@ -22,6 +22,7 @@ public sealed class EntityOperation
     {
         Declared = IsDeclared(controller);
         Partitions = controller.GetCustomAttribute<PartitionsAttribute>(inherit: true);
+        Pagination = action?.GetCustomAttribute<PaginationAttribute>(inherit: true) ?? controller.GetCustomAttribute<PaginationAttribute>(inherit: true);
         var entity = EntityOf(controller);
         if (action is null || entity is null) return;
         if (action.GetCustomAttribute<WritesAttribute>(inherit: true) is { } writes)
@@ -41,16 +42,14 @@ public sealed class EntityOperation
             // DATA-0170: a declared collection continues from a sealed key in the order its [Pagination] names, and pages by nothing else.
             if (InputMembers.FirstOrDefault(member => PagingWords.Any(word => Named(member, word))) is { } paging)
                 throw new InvalidOperationException($"The input of {controller.Name}.{action.Name} names '{paging.Name}', but a declared collection continues from 'after', a page of 'size' rows, and pages by nothing else. Name it otherwise.");
-            var pagination = action.GetCustomAttribute<PaginationAttribute>(inherit: true) ?? controller.GetCustomAttribute<PaginationAttribute>(inherit: true);
-            MaxSize = pagination?.MaxSize ?? Infrastructure.KoanWebConstants.Defaults.MaxPageSize;
             try
             {
                 Keyset = typeof(Koan.Data.Core.Querying.Keyset<>).MakeGenericType(entity)
-                    .GetMethod(nameof(Koan.Data.Core.Querying.Keyset<object>.By), [typeof(string)])!.Invoke(null, [pagination?.DefaultSort]);
+                    .GetMethod(nameof(Koan.Data.Core.Querying.Keyset<object>.By), [typeof(string)])!.Invoke(null, [Pagination?.DefaultSort]);
             }
             catch (TargetInvocationException error) when (error.InnerException is { } inner)
             {
-                throw new InvalidOperationException($"The order of {controller.Name}.{action.Name}, [Pagination(DefaultSort = \"{pagination?.DefaultSort}\")], is not one a list can continue through: {inner.Message}", inner);
+                throw new InvalidOperationException($"The order of {controller.Name}.{action.Name}, [Pagination(DefaultSort = \"{Pagination?.DefaultSort}\")], is not one a list can continue through: {inner.Message}", inner);
             }
         }
     }
@@ -74,8 +73,10 @@ public sealed class EntityOperation
     /// not one.</summary>
     public object? Keyset { get; }
 
-    /// <summary>The most rows a page of a declared collection holds, as its <see cref="PaginationAttribute"/> names it.</summary>
-    public int MaxSize { get; }
+    /// <summary>The <see cref="PaginationAttribute"/> this operation pages by, its action's or else its controller's, or null where neither names
+    /// one. <see cref="PaginationPolicy.Of"/> bounds it by the host's safety bounds, so REST clamps a page and the route tool states its bound
+    /// from the one policy.</summary>
+    public PaginationAttribute? Pagination { get; }
 
     /// <summary>The partitions the controller serves to a caller who names one, or null where it serves none.</summary>
     public PartitionsAttribute? Partitions { get; }
