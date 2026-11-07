@@ -279,7 +279,8 @@ still runs exactly once after user options even when an earlier options hook sho
 EntityEndpointService retains the visible before read for authorization and delta projection. A null
 does not prove physical absence: constrained creates call IInsertOnlyRepository on the Data facade
 resolved inside the requested set. Native collision answers without success audit or AfterSave: 409
-`id-taken` when the row it met is one the caller may now read and change, 404 otherwise (WEB-0086).
+`id-taken` when the caller's Read constraint admits the row it met, judged as a delete bound is (a counterpart by the
+store), and 404 only where that constraint hides it (WEB-0086).
 Create-containing constrained bulk requests reject before any persistence; there is no atomic mixed
 bulk-create contract. The correction is shared by REST and MCP. Constrained creates never issue an
 unfiltered prior-row read.

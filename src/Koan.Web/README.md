@@ -187,9 +187,9 @@ encryptor adds one through ASP.NET's `IDataProtectionBuilder`.
 
 ## Boundaries and failures
 
-- A constrained Create branch uses atomic insertion. An identity collision with a row the caller may see
-  and change answers 409 `id-taken`; any other stays existence-hiding 404, including identities hidden by
-  request predicates. Unsupported providers return 501 with `web.mutation.insertUnsupported`. Ordinary
+- A constrained Create branch uses atomic insertion. An identity collision with a row the caller may read
+  answers 409 `id-taken`; only a row their record access's Read constraint hides answers the
+  existence-hiding 404, and field access or row projection change nothing about it. Unsupported providers return 501 with `web.mutation.insertUnsupported`. Ordinary
   unconstrained upsert keeps its existing semantics.
 - Mutation constraints mean declared Create/Update predicates or stamps. A read-only realization
   does not constrain writes. Existing coarse authorization, including server grants, remains authoritative.

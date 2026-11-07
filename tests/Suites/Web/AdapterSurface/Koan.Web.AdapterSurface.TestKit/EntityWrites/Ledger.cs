@@ -15,7 +15,7 @@ public sealed class Ledger : Entity<Ledger>
 {
     public string Note { get; set; } = "";
 
-    /// <summary>Stamped on create by <see cref="LedgerAccess"/>, which makes a create an insert.</summary>
+    /// <summary>Stamped on create by <see cref="LedgerAccess"/>, which makes a create an insert; it also says who may read and change it.</summary>
     public string Desk { get; set; } = "";
 }
 
@@ -41,6 +41,7 @@ public static class LedgerNotes
     public const string Cancel = "cancel";
     public const string Replay = "replay";
     public const string Race = "race";
+    public const string HiddenRace = "race-hidden";
     public const string CancelCode = "ledger.cancelled";
     public const string AfterWord = "ledger-closed";
 }
@@ -53,11 +54,22 @@ public static class LedgerRules
         : context.Proceed());
 }
 
-/// <summary>Stamps the desk on create, so a create is an insert and an id another write took first is a conflict.</summary>
+/// <summary>
+/// Stamps the front desk on create, so a create is an insert and an id another write took first is a conflict. The caller changes only
+/// the front desk's ledgers and reads every ledger but the back desk's.
+/// </summary>
 public sealed class LedgerAccess : EntityAccess<Ledger>
 {
-    public override IAccessFilter<Ledger> Constrain(IAccessFilter<Ledger> filter, AccessAction action)
-        => action == AccessAction.Create ? filter.Stamp(ledger => ledger.Desk, "front") : filter;
+    public const string Front = "front";
+    public const string Back = "back";
+
+    public override IAccessFilter<Ledger> Constrain(IAccessFilter<Ledger> filter, AccessAction action) => action switch
+    {
+        AccessAction.Create => filter.Stamp(ledger => ledger.Desk, Front),
+        AccessAction.Update => filter.Where(ledger => ledger.Desk == Front),
+        AccessAction.Read => filter.Where(ledger => ledger.Desk != Back),
+        _ => filter
+    };
 }
 
 /// <summary>Writes a line beside every ledger before it is saved, and refuses, stops or replays as the ledger's note says.</summary>
@@ -83,6 +95,7 @@ public sealed class LedgerHook : IModelHook<Ledger>, IEmitHook<Ledger>
         await new LedgerLine { LedgerId = model.Id }.Save(ctx.Ct);
         if (model.Note == LedgerNotes.RefuseBefore) throw new Refusal(Reason.Invalid("note", "A ledger cannot say that."));
         if (model.Note == LedgerNotes.Race) await new Ledger { Id = model.Id, Note = "first" }.Save(ctx.Ct);
+        if (model.Note == LedgerNotes.HiddenRace) await new Ledger { Id = model.Id, Note = "first", Desk = LedgerAccess.Back }.Save(ctx.Ct);
     }
 
     public Task OnAfterSave(HookContext<Ledger> ctx, Ledger model)

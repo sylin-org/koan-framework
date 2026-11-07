@@ -218,10 +218,11 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
     private static Filter? DeleteBound(EntityAccess<TEntity> accessor)
         => ConstrainFor(accessor, AccessAction.Delete).Filter ?? ConstrainFor(accessor, AccessAction.Read).Filter;
 
-    // SEC-0019: the rows among ids that the delete bound admits, in request order. A row-only bound is checked on the
-    // loaded row; a counterpart bound only the store can answer, so it runs as one scoped query through the Data
-    // facade, the path a governed read takes. A connector without counterpart reads refuses there, as reads do.
-    private static async Task<List<TEntity>> RowsInDeleteBound(IReadOnlyCollection<TKey> ids, Filter? bound, CancellationToken ct)
+    // SEC-0019: the rows among ids that a record-access bound (a delete's, or an insert conflict's Read) admits, in request
+    // order. A row-only bound is checked on the loaded row; a counterpart bound only the store can answer, so it runs as one
+    // scoped query through the Data facade, the path a governed read takes. A connector without counterpart reads refuses
+    // there, as reads do.
+    private static async Task<List<TEntity>> RowsInBound(IReadOnlyCollection<TKey> ids, Filter? bound, CancellationToken ct)
     {
         var rows = new List<TEntity>(ids.Count);
         if (Filter.HasCounterpart(bound))
@@ -912,7 +913,7 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
             {
                 var inserted = await ((IInsertOnlyRepository<TEntity, TKey>)repo).Insert(request.Model, context.CancellationToken);
                 if (inserted.Outcome == MutationOutcome.Conflict)
-                    return Ended(new EntityModelResult<TEntity>(context, null, null, await InsertConflict(context, mutation.Update, request.Model.Id)));
+                    return Ended(new EntityModelResult<TEntity>(context, null, null, await InsertConflict(context, request.Model.Id)));
                 written = inserted.Entity!;
             }
             else written = await request.Model.Upsert<TEntity, TKey>(context.CancellationToken);
@@ -1033,7 +1034,7 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         var (deleted, answer) = await Write(context, "delete", async () =>
         {
             // SEC-0004: a row outside the principal's scope is a 404, never deleted (existence-hiding, matches reads).
-            var model = (await RowsInDeleteBound([request.Id], bound, context.CancellationToken)).SingleOrDefault();
+            var model = (await RowsInBound([request.Id], bound, context.CancellationToken)).SingleOrDefault();
             if (model is null)
                 return Ended(new EntityModelResult<TEntity>(context, null, null, new NotFoundResult()));
             Prior(context, model, "delete");
@@ -1082,7 +1083,7 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
                 // SEC-0004: trust no id — a row must be in scope to be deleted (out-of-scope ids are silently skipped,
                 // the same hidden-row semantics as a single delete). This bounding runs BEFORE the dry-run report so a
                 // rehearsal cannot leak the existence of out-of-scope ids. The loaded rows feed the delete hooks.
-                rows = await RowsInDeleteBound(targets, bound, context.CancellationToken);
+                rows = await RowsInBound(targets, bound, context.CancellationToken);
                 targets = rows.Select(row => row.Id).ToList();
             }
 
@@ -1405,12 +1406,14 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         message = "This connector or identity shape cannot guarantee atomic insertion. Select a connector and identity shape that support insert-only writes."
     }) { StatusCode = StatusCodes.Status501NotImplemented };
 
-    // WEB-0086: an insert that met a row it could not see first. A row the caller may now see and change answers 409 id-taken, as a race
-    // with another create does; any other stays existence-hiding, as the update path is for a row outside the caller's scope.
-    private static async Task<IActionResult> InsertConflict(EntityRequestContext context, AccessFilter<TEntity>? update, TKey id)
+    // WEB-0086: an insert that met a row it could not see first. A row the caller may read answers 409 id-taken, as a race with another
+    // create does; only a row their Read constraint hides stays existence-hiding, as a read of it is. Readability is the record access
+    // a read applies, judged as RowsInBound judges a bound, so a counterpart is answered by the store; field access and row projection
+    // shape what a read shows, never whether the row exists.
+    private static async Task<IActionResult> InsertConflict(EntityRequestContext context, TKey id)
     {
-        var taken = await Data<TEntity, TKey>.Get(id, context.CancellationToken);
-        return taken is not null && PassesRequestPredicates(taken, update?.Filter)
+        var read = ResolveAccessor(context) is { } accessor ? ConstrainFor(accessor, AccessAction.Read).Filter : null;
+        return (await RowsInBound([id], read, context.CancellationToken)).Count > 0
             ? Answers.Refused(context.User, Reason.Conflict(KoanWebConstants.Codes.Mutation.IdTaken, "Something already has this id, so nothing was written."))
             : new NotFoundResult();
     }

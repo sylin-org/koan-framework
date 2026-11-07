@@ -99,13 +99,24 @@ public abstract class EntityWriteSpecsBase<TFactory> : IClassFixture<TFactory>
     }
 
     [Fact]
-    public async Task A_create_whose_id_another_write_took_first_answers_id_taken()
+    public async Task A_create_whose_id_another_write_took_first_answers_id_taken_where_the_caller_may_read_that_row()
     {
+        // The row the race wrote is on no desk: the caller may read it, though not change it.
         var id = NewId();
         var answer = await Post(id, LedgerNotes.Race);
 
         answer.StatusCode.Should().Be(HttpStatusCode.Conflict);
         (await Problem(answer)).GetProperty("word").GetString().Should().Be("id-taken");
+        (await Stored(id)).Should().Be(Holds ? (false, 0) : (true, 1));
+    }
+
+    [Fact]
+    public async Task A_create_whose_id_another_write_took_first_answers_not_found_where_the_callers_read_hides_that_row()
+    {
+        var id = NewId();
+        var answer = await Post(id, LedgerNotes.HiddenRace);
+
+        answer.StatusCode.Should().Be(HttpStatusCode.NotFound);
         (await Stored(id)).Should().Be(Holds ? (false, 0) : (true, 1));
     }
 

@@ -48,9 +48,11 @@ of this through `Send`: one hold, and the one refusal mapping.
    A lifecycle cancellation is mapped once, in `Answers`: a 409 conflict whose word is the handler's code, or `conflict` where it names
    none, and whose detail is its reason. A seam denial answers through `Answers.Denied`: a refusal with its reason, otherwise the one
    sentence of its kind.
-5. **A create whose id another write took first answers 409 `id-taken`** where the caller may see and change that row, as a create that
-   lost a race to a visible row does; any other collision stays the existence-hiding 404, as the update path answers a row outside the
-   caller's scope.
+5. **A create whose id another write took first answers 409 `id-taken`** wherever the caller may read that row, as a create that lost a
+   race to a visible row does, whether or not they may change it. Only a row their record access hides, through its Read constraint,
+   stays the existence-hiding 404, as a read of it answers. The constraint is judged as a read judges it: a row predicate on the row,
+   a counterpart by the store, through the Data facade. Field access and row projection shape what a read shows, never whether the
+   row exists for the caller, so they change nothing here.
 6. **A hook that stops a write with a row answers it as written.** The emit composes that row as it would a saved one, so a replay
    answers exactly as its first write did, and what the hold did stands.
 7. **An entity tool carries the problem.** `ResponseTranslator` hands a refusal the endpoint answered as a `Problem` to the edge, which
