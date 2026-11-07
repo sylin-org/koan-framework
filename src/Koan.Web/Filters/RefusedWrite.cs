@@ -48,8 +48,8 @@ internal sealed class RefusedWrite : IAsyncAlwaysRunResultFilter
         await next().ConfigureAwait(false);
     }
 
-    /// <summary>The refusal of a body that could not bind: a JSON body bound to the entity as the operation refuses it, and otherwise each
-    /// field binding could not take, as the form's own reading named it.</summary>
+    /// <summary>The refusal of a body that could not bind: a JSON body bound to the entity as the operation refuses it, and otherwise one past
+    /// its route's limit as too large, or each field binding could not take, as the form's own reading named it.</summary>
     private static async Task<Problem?> Unbound(ResultExecutingContext context)
     {
         var http = context.HttpContext;
@@ -78,6 +78,6 @@ internal sealed class RefusedWrite : IAsyncAlwaysRunResultFilter
                 return (Answers.Refused(http, reason) as ObjectResult)?.Value as Problem;
         }
 
-        return (Answers.Unbound(context.ModelState) as ObjectResult)?.Value as Problem;
+        return (Answers.Unbound(http, context.ModelState) as ObjectResult)?.Value as Problem;
     }
 }

@@ -204,8 +204,12 @@ public static class Answers
         _ => new Problem(StatusCodes.Status403Forbidden, "This isn't open to you.").ToResult(),
     };
 
-    internal static IActionResult Unbound(ModelStateDictionary state)
-        => new Problem(StatusCodes.Status400BadRequest, Errors: new ValidationProblemDetails(state).Errors.AsReadOnly()).ToResult();
+    /// <summary>What a request whose binding failed answers: a body past its route's limit is too large, since ASP.NET's form provider
+    /// reports one as a model error and its length says which it was; otherwise each field binding could not take.</summary>
+    internal static IActionResult Unbound(HttpContext http, ModelStateDictionary state)
+        => http.Request.ContentLength > http.Features.Get<Microsoft.AspNetCore.Http.Features.IHttpMaxRequestBodySizeFeature>()?.MaxRequestBodySize
+            ? TooLarge()
+            : new Problem(StatusCodes.Status400BadRequest, Errors: new ValidationProblemDetails(state).Errors.AsReadOnly()).ToResult();
 
     private static void Log(HttpContext http, Exception cause)
         => http.RequestServices.GetService<ILoggerFactory>()?.CreateLogger(typeof(Answers))

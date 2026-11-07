@@ -43,6 +43,20 @@ public sealed class DeclaredWriteBodySpec(ForumFixture forum) : IClassFixture<Fo
     }
 
     [Fact]
+    public async Task A_form_create_where_no_change_answers_is_read_by_its_route_within_its_own_limit()
+    {
+        var made = await forum.Form("/signs", new Dictionary<string, string> { ["text"] = "By form" }, Mara);
+        made.Status.Should().Be(303, made.Text);
+
+        var lost = "Lost " + Guid.CreateVersion7().ToString("N");
+        var over = await forum.Form("/signs", new Dictionary<string, string> { ["text"] = lost, ["frame"] = TooMany }, Mara);
+        over.Status.Should().Be(413);
+        over.Kind.Should().Be("invalid");
+        using var app = forum.App();
+        (await Sign.Query(sign => sign.Text == lost, TestContext.Current.CancellationToken)).Should().BeEmpty();
+    }
+
+    [Fact]
     public async Task A_body_that_cannot_bind_is_refused_naming_its_field_on_both_doors()
     {
         var id = await PutUp("Steady");

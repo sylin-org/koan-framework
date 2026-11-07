@@ -26,7 +26,7 @@ public sealed class Sign : Entity<Sign>
 /// <summary>What putting up a sign takes beside it.</summary>
 public sealed record Hanging([property: Description("The shape of the frame it hangs in.")] SignShape? Frame = null);
 
-/// <summary>Puts up and changes signs, a change taking a body of at most <see cref="Small"/> bytes.</summary>
+/// <summary>Puts up and changes signs, each taking a body of at most <see cref="Small"/> bytes.</summary>
 [Route("/signs")]
 [Declared]
 public sealed class SignsController : EntityController<Sign>
@@ -37,6 +37,7 @@ public sealed class SignsController : EntityController<Sign>
     [Description("Put up a sign.")]
     [Writes(nameof(Sign.Id), nameof(Sign.Text), nameof(Sign.Shape))]
     [Input<Hanging>]
+    [RequestSizeLimit(Small)]
     public override Task<IActionResult> Upsert(Sign model, CancellationToken ct) => base.Upsert(model, ct);
 
     [HttpPatch("{sign}")]

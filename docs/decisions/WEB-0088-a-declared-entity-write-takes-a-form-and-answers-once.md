@@ -134,6 +134,7 @@ takes one.
 - `DeclaredOperationsSpec` (Koan.Mcp.Verbs.Tests): a create answers `201` alike on REST and on `tools/call`.
 - `DeclaredWriteBodySpec` (Koan.Mcp.Verbs.Tests, real Kestrel): a form route no declared controller serves keeps its own
   `[RequestSizeLimit]` beside one that does and answers `413` past it; a form change within its route's limit is sent on and one past
-  it answers `413`, writing nothing; a create and a change whose body is `[]`, or names an enum word or an input value that names
+  it answers `413`, writing nothing; a form create, which no change answers at, is read by its route and answers `413` past that
+  route's own limit, as `Answers.Unbound` says of a model error that is a body past its limit; a create and a change whose body is `[]`, or names an enum word or an input value that names
   nothing, are refused naming the field, alike on REST and `tools/call`. `DeclaredControllerSpecsBase.A_body_that_cannot_bind_is_refused_naming_its_field`
   (AdapterSurface, SQLite and in memory) does the same on REST.

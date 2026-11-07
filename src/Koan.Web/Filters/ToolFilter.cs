@@ -2,7 +2,6 @@ using System.Globalization;
 using System.Text.Json;
 using Koan.Web.Controllers;
 using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
@@ -26,12 +25,7 @@ internal sealed class ToolFilter : IResourceFilter, IActionFilter, IExceptionFil
 
     public void OnActionExecuting(ActionExecutingContext context)
     {
-        if (context.ModelState.IsValid) return;
-        // ASP.NET's form provider reports a body past the limit as a model error: its length says which it was.
-        var http = context.HttpContext;
-        context.Result = http.Request.ContentLength > http.Features.Get<IHttpMaxRequestBodySizeFeature>()?.MaxRequestBodySize
-            ? Answers.TooLarge()
-            : Answers.Unbound(context.ModelState);
+        if (!context.ModelState.IsValid) context.Result = Answers.Unbound(context.HttpContext, context.ModelState);
     }
 
     public void OnActionExecuted(ActionExecutedContext context) { }
