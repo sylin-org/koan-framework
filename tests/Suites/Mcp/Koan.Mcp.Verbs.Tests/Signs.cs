@@ -21,6 +21,8 @@ public sealed class Sign : Entity<Sign>
     public string Text { get; set; } = "";
 
     public SignShape Shape { get; set; }
+
+    public int Lines { get; set; }
 }
 
 /// <summary>What putting up a sign takes beside it.</summary>
@@ -35,7 +37,7 @@ public sealed class SignsController : EntityController<Sign>
 
     [Tool(Name = "put_up_sign")]
     [Description("Put up a sign.")]
-    [Writes(nameof(Sign.Id), nameof(Sign.Text), nameof(Sign.Shape))]
+    [Writes(nameof(Sign.Id), nameof(Sign.Text), nameof(Sign.Shape), nameof(Sign.Lines))]
     [Input<Hanging>]
     [RequestSizeLimit(Small)]
     public override Task<IActionResult> Upsert(Sign model, CancellationToken ct) => base.Upsert(model, ct);
@@ -43,7 +45,7 @@ public sealed class SignsController : EntityController<Sign>
     [HttpPatch("{sign}")]
     [Tool(Name = "reshape_sign")]
     [Description("Change what a sign says or its shape.")]
-    [Writes(nameof(Sign.Text), nameof(Sign.Shape))]
+    [Writes(nameof(Sign.Text), nameof(Sign.Shape), nameof(Sign.Lines))]
     [RequestSizeLimit(Small)]
     public override Task<IActionResult> Patch(string sign, CancellationToken ct) => base.Patch(sign, ct);
 }

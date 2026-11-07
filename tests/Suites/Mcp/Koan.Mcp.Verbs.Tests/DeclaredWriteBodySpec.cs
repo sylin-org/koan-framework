@@ -81,6 +81,10 @@ public sealed class DeclaredWriteBodySpec(ForumFixture forum) : IClassFixture<Fo
                          await forum.Tool("put_up_sign", new JObject { ["text"] = lost, ["frame"] = "Triangle" }, Mara)),
                      ("shape", await forum.Route(HttpMethod.Patch, $"/signs/{id}", new JObject { ["shape"] = "Triangle" }, Mara),
                          await forum.Tool("reshape_sign", new JObject { ["sign"] = id, ["shape"] = "Triangle" }, Mara)),
+                     ("lines", await forum.Route(HttpMethod.Post, "/signs", new JObject { ["text"] = lost, ["lines"] = 1.5 }, Mara),
+                         await forum.Tool("put_up_sign", new JObject { ["text"] = lost, ["lines"] = 1.5 }, Mara)),
+                     ("lines", await forum.Route(HttpMethod.Patch, $"/signs/{id}", new JObject { ["lines"] = 1.5 }, Mara),
+                         await forum.Tool("reshape_sign", new JObject { ["sign"] = id, ["lines"] = 1.5 }, Mara)),
                  })
         {
             route.Status.Should().Be(400, route.ToString());
@@ -94,6 +98,7 @@ public sealed class DeclaredWriteBodySpec(ForumFixture forum) : IClassFixture<Fo
         using var app = forum.App();
         (await Sign.Query(sign => sign.Text == lost, TestContext.Current.CancellationToken)).Should().BeEmpty();
         (await Text(id)).Should().Be("Steady");
+        (await Sign.Get(id, TestContext.Current.CancellationToken))!.Lines.Should().Be(0, "a change it could not take wrote nothing");
     }
 
     private async Task<string> PutUp(string text)

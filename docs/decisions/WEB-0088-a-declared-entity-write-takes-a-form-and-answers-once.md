@@ -91,8 +91,9 @@ public sealed class NoticeVerbsController : ControllerBase
    refusal's reason inline. A body that cannot bind is that same problem, naming each field it could not take.
 7. **A body that cannot bind is refused as every other refusal of the write is,** sent as JSON or as a form, on REST and through a
    route tool: one that is not a JSON object answers `Reason.Invalid` saying a write is one, and a value that cannot be the member of
-   the entity or of the declared input it names, an enum word that names nothing among them, answers `Reason.Invalid` naming that
-   field, word `invalid`, never ASP.NET's validation document or a converter's message.
+   the entity or of the declared input it names, an enum word that names nothing or a fraction sent for a whole number among them,
+   judged from its text as a JSON body is read rather than converted, answers `Reason.Invalid` naming that field, word `invalid`,
+   never ASP.NET's validation document or a converter's message.
 
 ## Consequences
 

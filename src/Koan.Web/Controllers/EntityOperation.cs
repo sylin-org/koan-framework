@@ -129,13 +129,15 @@ public sealed class EntityOperation
     }
 
     /// <summary>What <paramref name="value"/>, sent as <paramref name="name"/>, is refused for where it cannot be <paramref name="type"/>; null where
-    /// it can, or where it is no value.</summary>
+    /// it can, or where it is no value. The value is read from its text, as a JSON body is read, so what the body's binding cannot take (1.5 for
+    /// a whole number) is refused here too rather than converted.</summary>
     internal static Reason? Unfit(string name, JToken value, Type type, JsonSerializer serializer)
     {
         if (value.Type == JTokenType.Null) return null;
         try
         {
-            value.ToObject(type, serializer);
+            using var reader = new JsonTextReader(new StringReader(value.ToString(Formatting.None)));
+            serializer.Deserialize(reader, type);
             return null;
         }
         catch (Exception error) when (error is JsonException or FormatException or InvalidCastException or ArgumentException or OverflowException)
