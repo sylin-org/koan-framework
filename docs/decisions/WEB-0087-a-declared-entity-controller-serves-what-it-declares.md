@@ -13,9 +13,13 @@ related:
   - WEB-0086
   - SEC-0004
   - WEB-0073
+amended_by: DATA-0170
 ---
 
 # WEB-0087: A declared entity controller serves what it declares, and each operation declares what it writes, takes and hooks
+
+> **Amended by [DATA-0170](DATA-0170-a-list-continues-from-one-sealed-keyset-cursor.md) (2026-11-07): a declared collection is keyset-only,**
+> continuing from a sealed `after`, a page of `size` rows, in its `[Pagination]`'s order; declaring `Page` does not open numbered paging there.
 
 ## Context
 

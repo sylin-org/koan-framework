@@ -36,14 +36,16 @@ conditional on their earlier read or provide atomic mixed bulk writes.
   - `Item.All(ct)`
   - `Item.Query(predicate, ct)`
   - `Item.FirstPage(size, ct)` and `Item.Page(pageNumber, pageSize, ct)`
+  - `Item.Page(order, after, size, ct)` for a list a reader continues: `order` is a `Keyset<Item>` built once, the page answers
+    `Items` and `Next`, the key the next page continues from, and nothing is counted (DATA-0170)
   - `Item.QueryStream(predicate, ct)`
 - List-returning `All`/`Query` operations preserve null count intent, even with sort and pagination. Use
   `QueryWithCount` when the caller needs a total; it defaults to the optimized count strategy unless the
   query selects another strategy explicitly.
 - `AllStream`/`QueryStream` lazily compose numbered pages only when the selected adapter proves provider-bounded
   paging and complete ordering. Otherwise they reject correctively before query/yield; there is no materializing
-  fallback. `batchSize` bounds Koan-visible candidates, not opaque driver buffers. No public cursor or resume-token
-  API exists.
+  fallback. `batchSize` bounds Koan-visible candidates, not opaque driver buffers. A list read a page at a time
+  continues from a `KeysetKey` through `Item.Page(order, after, size, ct)`.
 - If a first-class static isn’t available, you can fall back to the generic facade (second-class): `Data<TEntity, TKey>.Query(...)`.
 
 Host-owned persistence policy composes beside the normal zero-configuration bootstrap:

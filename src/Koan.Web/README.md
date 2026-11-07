@@ -290,6 +290,11 @@ public sealed class NoticesController : EntityController<Notice>, IModelHook<Not
   that hook for its own requests only, after the registered hooks and before the access floor. Implement only the steps you need.
   An undeclared controller carrying `[Tool]` is answered on MCP by its entity's own tools, which never run the controller, so one that
   is a hook or gates an override stops the host at start until it is `[Declared]`.
+- **Lists:** a declared collection is keyset-only. `[Pagination(DefaultSize = 20, MaxSize = 50, DefaultSort = "-LastActivityAt")]`
+  on its `GetCollection` override names its order, the identity breaking ties; it takes `after`, the sealed `next` of the page
+  before, and `size`, at most `MaxSize`, and answers `{ "items": [...], "next": "..." }`, `next` null on the last page, with no
+  count, no offset and no total header. An `after` that does not open is refused naming it. An emit hook composing a page reads
+  `ctx.Next`. A list you page yourself seals its key with `SealedCursor` (DATA-0170).
 - **Gates:** a gate an override declares is judged before binding, tool or not. A declared collection answers in the format the caller
   accepts. See [WEB-0087](https://github.com/sylin-org/koan-framework/blob/main/docs/decisions/WEB-0087-a-declared-entity-controller-serves-what-it-declares.md).
 

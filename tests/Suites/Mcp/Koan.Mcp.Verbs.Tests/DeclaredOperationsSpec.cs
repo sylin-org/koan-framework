@@ -17,7 +17,7 @@ public sealed class DeclaredOperationsSpec(ForumFixture forum) : IClassFixture<F
     {
         var names = (await forum.Tools(Mara)).Select(tool => tool["name"]!.Value<string>()!).ToArray();
 
-        names.Should().Contain(["read_notice", "post_notice", "edit_notice"]);
+        names.Should().Contain(["read_notices", "read_notice", "post_notice", "edit_notice"]);
         names.Should().NotContain(name => name.StartsWith("notice_", StringComparison.Ordinal), "the entity has no tools of its own on a declared controller");
         names.Should().NotContain(name => name.StartsWith("boards_notices", StringComparison.Ordinal), "an operation it does not override is no tool");
     }
@@ -31,6 +31,35 @@ public sealed class DeclaredOperationsSpec(ForumFixture forum) : IClassFixture<F
         tools["post_notice"]["inputSchema"]!["properties"]!["where"]!["description"]!.Value<string>().Should().Be("The board it goes on; left out, the general board.");
         Fields(tools["edit_notice"]).Should().BeEquivalentTo("notice", "text");
         Fields(tools["read_notice"]).Should().BeEquivalentTo("notice");
+        Fields(tools["read_notices"]).Should().BeEquivalentTo("on", "after", "size");
+        tools["read_notices"]["inputSchema"]!["properties"]!["size"]!["description"]!.Value<string>().Should().Be("The most rows the page holds, at most 5.");
+    }
+
+    /// <summary>DATA-0170: a declared collection continues from the <c>next</c> its page answered, alike on both doors, and a cursor that
+    /// does not open is refused naming <c>after</c>.</summary>
+    [Fact]
+    public async Task A_list_continues_from_the_next_its_page_answered_on_both_doors()
+    {
+        var board = Guid.CreateVersion7().ToString("N");
+        foreach (var text in new[] { "c", "a", "b" })
+            (await forum.Route(HttpMethod.Post, "/boards/notices", new JObject { ["text"] = text, ["where"] = board }, Mara)).Status.Should().Be(200);
+
+        var first = await forum.Call("read_notices", new JObject { ["on"] = board }, Mara);
+        var page = (JObject)first["structuredContent"]!;
+        page["items"]!.Select(notice => notice["text"]!.Value<string>()).Should().Equal("a", "b");
+        var next = page["next"]!.Value<string>()!;
+
+        var tool = (JObject)(await forum.Call("read_notices", new JObject { ["on"] = board, ["after"] = next }, Mara))["structuredContent"]!;
+        var route = JObject.Parse((await forum.Route(HttpMethod.Get, $"/boards/notices?on={board}&after={Uri.EscapeDataString(next)}", null, Mara)).Text);
+        foreach (var last in new[] { tool, route })
+        {
+            last["items"]!.Select(notice => notice["text"]!.Value<string>()).Should().Equal("c");
+            last["next"]!.Type.Should().Be(JTokenType.Null, "no notice follows the last page");
+        }
+
+        var refused = await forum.Tool("read_notices", new JObject { ["on"] = board, ["after"] = "not-a-cursor" }, Mara);
+        refused.Status.Should().Be(400);
+        refused.Text.Should().StartWith("after:");
     }
 
     [Fact]

@@ -407,9 +407,23 @@ validation:
 - `FirstPage(size)` and `Page(pageNumber, pageSize)` return one materialized page.
 - Iterate page numbers until a returned page contains fewer than `pageSize` items.
 - Supply an explicit stable sort when repeated or concurrent writes could otherwise change page
-  membership. No provider-agnostic cursor/resume-token API exists today.
+  membership, or continue the list from a key instead (below).
 - Numbered paging limits the result returned to the caller. Some adapters may still perform
   in-memory fallback work; Koan does not yet promise universally bounded provider execution.
+
+## Keyset pages
+
+- `Keyset<TEntity>` (`Querying/Keyset.cs`) is a declared order plus the Entity identity, which breaks ties in the direction of the
+  last member named. It is built once (`By(order => ...)` or `By("-Member")`), refusing a member that holds many values or is an
+  object, and an identity outside the provider-stable `string`, `Guid`, `int`, `long`.
+- `Data<TEntity, TKey>.Page(order, after, size, query?)` reads `size + 1` rows as page 1, ordered by the keyset, with the query's
+  filter, the rows where each nullable member is set, and the seek after `after`: for each member `k <= v AND (k < v OR rest)`
+  (`>=`/`>` ascending), the identity last as `Id > last`. The extra row decides `Next`, the `KeysetKey` of the last row kept;
+  nothing is counted. The seek must push completely (`Keyset.Pushes`), checked before any I/O, and the adapter must report the
+  order and, where no residual remains, the page as handled; otherwise `NotSupportedException`. A residual in the caller's own
+  filter follows `FilterPushdownCoordinator` as any query does.
+- `KeysetKey` carries the members' values; `Keyset.Write` and `Read` give its text form, typed by the members through
+  `System.Text.Json`, so it reads back exactly. Koan.Web's `SealedCursor` seals that text for the wire (DATA-0170).
 
 ## Streaming semantics
 
@@ -434,7 +448,7 @@ validation:
   provider-stable tie-break in the store's own order, not a CLR/cross-provider collation promise. A
   different business member named `id` does not suppress it, but models declaring both `Id` and `id`
   are not portable persistence models and are outside the qualified-adapter contract.
-- When the order leads with the identity, `IdentitySeek` continues each page after the last identity the
+- When the order leads with the identity, a `Keyset<T>` of the identity alone continues each page after the last identity the
   previous page returned (`Id > last`, or `<` descending), always as page 1, so no offset moves under
   concurrent writes and no page number bounds the read (DATA-0151). The seek is pushed like any filter and
   compared by the store, which also orders the page; a provider that cannot push it falls back to numbered

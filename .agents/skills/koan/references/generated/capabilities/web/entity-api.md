@@ -54,7 +54,9 @@ A controller marked `[Declared]` serves only the operations it overrides, each a
 `[Writes(...)]` names the members a write writes, `[Input<T>]` what it takes beside them, `KeyOf` maps an address to a row, and a
 controller that implements a hook runs as that hook for its own requests. Every controller refuses a caller-chosen `?set=` partition
 unless it declares `[Partitions(...)]`
-([WEB-0087](../../decisions/WEB-0087-a-declared-entity-controller-serves-what-it-declares.md)).
+([WEB-0087](../../decisions/WEB-0087-a-declared-entity-controller-serves-what-it-declares.md)). A declared collection continues from a
+sealed `after`, a page of `size` rows, in the order its `[Pagination]` declares, and counts nothing
+([DATA-0170](../../decisions/DATA-0170-a-list-continues-from-one-sealed-keyset-cursor.md)).
 
 Query-style verbs (`POST /query`, `GET /new`, bulk forms) exist beside these; see the surface
 reference. The `?filter=` payload speaks the closed query filter vocabulary —

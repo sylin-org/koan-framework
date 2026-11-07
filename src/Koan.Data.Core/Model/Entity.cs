@@ -167,6 +167,14 @@ namespace Koan.Data.Core.Model
         public static Task<IReadOnlyList<TEntity>> Page(int page, int size, Action<Koan.Data.Core.Sorting.ISortBuilder<TEntity>> sort, CancellationToken ct = default)
             => Data<TEntity, TKey>.Page(page, size, sort, ct);
 
+        // Keyset pages (DATA-0170): a list continues after the last row a page held, in a declared order, and counts nothing.
+        public static Task<Koan.Data.Core.Querying.KeysetPage<TEntity>> Page(Koan.Data.Core.Querying.Keyset<TEntity> order, Koan.Data.Core.Querying.KeysetKey? after, int size, CancellationToken ct = default)
+            => Data<TEntity, TKey>.Page(order, after, size, ct);
+        public static Task<Koan.Data.Core.Querying.KeysetPage<TEntity>> Page(Koan.Data.Core.Querying.Keyset<TEntity> order, Koan.Data.Core.Querying.KeysetKey? after, int size, Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default)
+            => Data<TEntity, TKey>.Page(order, after, size, predicate, ct);
+        public static Task<Koan.Data.Core.Querying.KeysetPage<TEntity>> Page(Koan.Data.Core.Querying.Keyset<TEntity> order, Koan.Data.Core.Querying.KeysetKey? after, int size, QueryDefinition? query, CancellationToken ct = default)
+            => Data<TEntity, TKey>.Page(order, after, size, query, ct);
+
         // All with sort — lambda form only (string form ambiguous with existing partition overload; use
         // Entity.All(new QueryDefinition().WithSort("...")) for the string surface).
         public static Task<IReadOnlyList<TEntity>> All(Action<Koan.Data.Core.Sorting.ISortBuilder<TEntity>> sort, CancellationToken ct = default)

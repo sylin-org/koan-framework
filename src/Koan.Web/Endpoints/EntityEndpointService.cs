@@ -17,6 +17,7 @@ using Koan.Data.Core;
 using Koan.Data.Core.Commands;
 using Koan.Data.Core.Lifecycle;
 using Koan.Data.Core.Model;
+using Koan.Data.Core.Querying;
 using Koan.Data.Core.Relationships;
 using Koan.Data.Abstractions.Filtering;
 using Koan.Data.Abstractions.Instructions;
@@ -415,8 +416,9 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         long total;
         try
         {
-            queryResult = await QueryCollection(query, context.Options.Q, request.AllowRawQuery,
-                safetyLimit, context.CancellationToken);
+            queryResult = request.Keyset is { } keyset
+                ? await ContinueCollection(query, keyset, context)
+                : await QueryCollection(query, context.Options.Q, request.AllowRawQuery, safetyLimit, context.CancellationToken);
             total = queryResult.Total;
         }
         catch (FreeTextRefusedException refused)
@@ -521,6 +523,8 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         }
         if (proof is not null && !proof.IsValid(context, list))
             return new EntityCollectionResult<TEntity>(context, [], 0, null, ReadEvidenceChanged(context));
+        // DATA-0170: a declared collection answers its rows with where the list continues, unless an emit hook composed its own answer.
+        var continued = request.Keyset is not null && (!emit.replaced || emit.payload is EmitDecision.DeferredProjection);
 
         // Framework containers are built after custom hooks, so no hook can mutate an unproved
         // map entry or relationship wrapper. A terminal projection has already selected its view.
@@ -546,7 +550,9 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
             payload = ApplyShape(shape, list);
         }
 
-        if (await AdmitFieldOutput(context, payload) is { } fieldOutputDenied)
+        if (continued) payload = new ContinuedList(payload, context.Next);
+
+        if (await AdmitFieldOutput(context, payload is ContinuedList answer ? answer.Items : payload) is { } fieldOutputDenied)
             return new EntityCollectionResult<TEntity>(context, [], 0, null, fieldOutputDenied);
 
         ApplyViewHeader(context, request.Accept);
@@ -1615,6 +1621,21 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
 
     private static BadRequestObjectResult FreeTextRefused(FreeTextRefusedException refused)
         => new(new { code = refused.Code, message = refused.Message });
+
+    /// <summary>DATA-0170: a page of a declared collection after the key its <c>after</c> opened to, in its declared order, and the sealed key
+    /// of the next page on the request. A provider-native <c>q</c> never composes with it.</summary>
+    private static async Task<RepositoryQueryResult> ContinueCollection(QueryDefinition query, KeysetRead keyset, EntityRequestContext context)
+    {
+        if (!string.IsNullOrWhiteSpace(context.Options.Q))
+            throw new FreeTextRefusedException(KoanWebConstants.Codes.Read.FreeTextUnsupported, FreeTextUnsupportedMessage);
+        var page = await Data<TEntity, TKey>.Page((Keyset<TEntity>)keyset.Order, keyset.After, keyset.Size, query, context.CancellationToken);
+        context.Next = page.Next is { } next ? keyset.Seal(next) : null;
+        return new RepositoryQueryResult(page.Items, page.Items.Count, true, false, page.ReadEvidence);
+    }
+
+    /// <summary>DATA-0170: a declared collection's answer, its rows and the <c>after</c> of the next page, null on the last.</summary>
+    private sealed record ContinuedList(object Items,
+        [property: Newtonsoft.Json.JsonProperty(NullValueHandling = Newtonsoft.Json.NullValueHandling.Include)] string? Next);
 
     private async Task<RepositoryQueryResult> QueryCollection(QueryDefinition query, string? q, bool allowRawQuery,
         int absoluteMaxRecords, CancellationToken cancellationToken)

@@ -12,9 +12,13 @@ related:
   - DATA-0143
   - DATA-0148
   - DATA-0149
+amended_by: DATA-0170
 ---
 
 # DATA-0151: A stream in identity order continues after the last identity it read
+
+> **Amended by [DATA-0170](DATA-0170-a-list-continues-from-one-sealed-keyset-cursor.md) (2026-11-07): `IdentitySeek` is a `Keyset<T>` of the identity alone,**
+> and a list read a page at a time seeks over a caller's order too, a nullable member narrowing it to rows where it is set. Streams still page a caller's order by number.
 
 Amends [DATA-0107](DATA-0107-provider-bounded-entity-streams.md) and
 [DATA-0113](DATA-0113-bulk-reads-use-the-strongest-strategy.md), which stay dated records.

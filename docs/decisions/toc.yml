@@ -464,6 +464,8 @@
       href: DATA-0168-a-read-starts-no-write.md
     - name: DATA-0169 A sequence has a committed head a reader waits on, and every hold runs by one clock
       href: DATA-0169-a-sequence-has-a-committed-head-and-a-hold-runs-by-one-clock.md
+    - name: DATA-0170 A list continues from one sealed keyset cursor over a declared order
+      href: DATA-0170-a-list-continues-from-one-sealed-keyset-cursor.md
 - name: Web (WEB)
   items:
     - name: WEB-0010 Separate AI web surface

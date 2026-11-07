@@ -841,6 +841,58 @@ public static partial class Data<TEntity, TKey>
     }
 
     // ------------------------------------------------------------------
+    // Keyset pages (DATA-0170)
+    // ------------------------------------------------------------------
+
+    /// <summary>The page of at most <paramref name="size"/> rows after <paramref name="after"/> in <paramref name="order"/>, or the first
+    /// page where it is null, and the key the next page continues from. Nothing is counted.</summary>
+    public static Task<KeysetPage<TEntity>> Page(Keyset<TEntity> order, KeysetKey? after, int size, CancellationToken ct = default)
+        => Page(order, after, size, (QueryDefinition?)null, ct);
+
+    /// <summary>The page of at most <paramref name="size"/> rows matching <paramref name="predicate"/> after <paramref name="after"/> in
+    /// <paramref name="order"/>, or the first page where it is null, and the key the next page continues from.</summary>
+    public static Task<KeysetPage<TEntity>> Page(Keyset<TEntity> order, KeysetKey? after, int size, Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(predicate);
+        return Page(order, after, size, QueryDefinition.All.Where(Lower(predicate)), ct);
+    }
+
+    /// <summary>The page of at most <paramref name="size"/> rows of <paramref name="query"/>'s filter and partition after
+    /// <paramref name="after"/> in <paramref name="order"/>, or the first page where it is null, and the key the next page continues from.
+    /// The order replaces any sort the query names. A provider that cannot compare the seek in its store, or apply the order and the page
+    /// itself, refuses with <see cref="NotSupportedException"/> rather than paging in memory.</summary>
+    public static async Task<KeysetPage<TEntity>> Page(Keyset<TEntity> order, KeysetKey? after, int size, QueryDefinition? query, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(order);
+        if (size <= 0) throw new ArgumentOutOfRangeException(nameof(size));
+        query ??= QueryDefinition.All;
+        using var partition = EntityContext.With(partition: query.Partition);
+        var repo = Repo;
+        var q = repo as IQueryRepository<TEntity, TKey> ?? RequireQuery(repo);
+        var provider = repo.GetType().Name;
+        if (!order.Pushes(ResolveFilterSupport(repo)))
+            throw new NotSupportedException(
+                $"The adapter {provider} backing {typeof(TEntity).Name} cannot compare a keyset order's members in its store, so it cannot continue a list " +
+                "from a key. Use a provider that pushes comparisons, or read the rows with a numbered page.");
+
+        // One row past the page says whether a next page exists, and the page itself is the key it continues from.
+        var read = order.Continue(query with { Filter = Filter.Snapshot(query.Filter) }, after, checked(size + 1));
+        var (adapterQuery, residual) = FilterPushdownCoordinator.Plan(read, ResolveFilterSupport(repo), typeof(TEntity));
+        var result = await DataQueryExecution<TEntity, TKey>.QueryCandidates(repo, q, adapterQuery, ct).ConfigureAwait(false);
+        if (!result.SortFullyHandled(adapterQuery) || (residual is null && !result.PaginationHandled))
+            throw new NotSupportedException(
+                $"The adapter {provider} backing {typeof(TEntity).Name} did not apply a keyset order {(result.SortFullyHandled(adapterQuery) ? "page" : "itself")}, " +
+                "so a page in memory could repeat or skip a row the store orders differently. Use a provider that orders and pages in its store.");
+        var finalized = FilterPushdownCoordinator.Finalize(read, adapterQuery, residual, result);
+
+        await DataQueryExecution<TEntity, TKey>.MaterializeVisible(repo, finalized.Page, ct).ConfigureAwait(false);
+        DataQueryExecution<TEntity, TKey>.ValidateEvidence(result.ReadEvidence, finalized.Page);
+        if (finalized.Page.Count <= size) return new KeysetPage<TEntity>(finalized.Page, null, result.ReadEvidence);
+        var items = finalized.Page.Take(size).ToArray();
+        return new KeysetPage<TEntity>(items, order.KeyOf(items[^1]), result.ReadEvidence);
+    }
+
+    // ------------------------------------------------------------------
     // Partition-scoped helpers (ambient via EntityContext)
     // ------------------------------------------------------------------
     public static IDisposable WithPartition(string? partition) =>

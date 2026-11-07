@@ -224,12 +224,12 @@ internal sealed class DataEntityRootAccessor<TEntity>(IServiceProvider services)
             SortBuilder<TEntity>.Build(sort => sort.OrderBy(entity => entity.Id));
 
         /// <summary>The identity seek this provider applies, or null when it cannot push one (NK-206).</summary>
-        internal static IdentitySeek? Seek(Koan.Core.Capabilities.CapabilitySet capabilities) => IdentitySeek.For(
-            typeof(TEntity),
-            IdentityOrder,
-            static _ => true,
-            capabilities.Detail<Koan.Data.Abstractions.Filtering.FilterSupport>(DataCaps.Query.Filter)
-                ?? Koan.Data.Abstractions.Filtering.FilterSupport.None);
+        internal static Keyset<TEntity>? Seek(Koan.Core.Capabilities.CapabilitySet capabilities)
+            => Keyset<TEntity>.IdentityFirst(IdentityOrder, static _ => true) is { } seek
+               && seek.Pushes(capabilities.Detail<Koan.Data.Abstractions.Filtering.FilterSupport>(DataCaps.Query.Filter)
+                              ?? Koan.Data.Abstractions.Filtering.FilterSupport.None)
+                ? seek
+                : null;
 
         // Each page continues after the last identity read rather than at a numbered offset, so a page costs the
         // same however deep into the root it is, and the root's size is not capped by an Int32 offset.
@@ -248,7 +248,7 @@ internal sealed class DataEntityRootAccessor<TEntity>(IServiceProvider services)
                 ?? throw new NotSupportedException(
                     $"Adapter '{provider}' cannot apply an identity seek for '{typeof(TEntity).FullName}'.");
             var definition = QueryDefinition.All.WithSort(IdentityOrder);
-            if (after is not null) definition = seek.Continue(definition, after);
+            if (after is not null) definition = definition.Where(seek.After(new KeysetKey([after])));
             definition = definition
                 .WithPagination(1, pageSize)
                 .WithCountStrategy(null);

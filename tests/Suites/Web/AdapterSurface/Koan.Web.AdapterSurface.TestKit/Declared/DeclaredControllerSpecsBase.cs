@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
 using AwesomeAssertions;
+using Koan.Data.Core;
 using Xunit;
 
 namespace Koan.Web.AdapterSurface.TestKit.Declared;
@@ -212,6 +213,119 @@ public abstract class DeclaredControllerSpecsBase<TFactory> : IClassFixture<TFac
         (await Problem(answer)).GetProperty("errors").GetProperty("with")[0].GetString().Should().Be("This address takes no 'with'.");
         (await Client.GetAsync($"/api/plain-cards/{id}?with=all", Ct)).StatusCode.Should().Be(HttpStatusCode.OK, "an undeclared controller takes what it always took");
     }
+
+    /// <summary>DATA-0170: a (text, id) order returns every row present for the whole reading once, a row inserted ahead of the cursor
+    /// too, and none inserted behind it, across a tie on the text at a page's edge.</summary>
+    [Fact]
+    public async Task A_list_by_text_continues_from_its_sealed_cursor_and_reads_every_row_once_across_an_insert()
+    {
+        var board = Board();
+        await Pins(board, ("b", 0), ("d", 0), ("f", 0), ("f", 0), ("h", 0), ("j", 0));
+
+        var first = await List($"/api/pins/by-label?on={board}");
+        Labels(first).Should().Equal("b", "d");
+        await Pins(board, ("e", 0), ("a", 0));
+        var labels = new List<string>(Labels(first));
+        for (var next = Next(first); next is not null;)
+        {
+            var page = await List($"/api/pins/by-label?on={board}&after={Uri.EscapeDataString(next)}");
+            labels.AddRange(Labels(page));
+            next = Next(page);
+        }
+
+        labels.Should().Equal(["b", "d", "e", "f", "f", "h", "j"], "the row inserted ahead is read, the one behind is not, and the tie at the edge loses nothing");
+    }
+
+    /// <summary>DATA-0170: a (date desc, id) order does the same, two instants shared, through the page its emit hook composes from
+    /// <c>ctx.Next</c>.</summary>
+    [Fact]
+    public async Task A_list_newest_first_continues_through_the_page_its_emit_composes()
+    {
+        var board = Board();
+        await Pins(board, ("t5", 5), ("t4", 4), ("t3a", 3), ("t3b", 3), ("t2", 2), ("t1", 1));
+
+        var labels = new List<string>();
+        string? address = $"/api/pins/newest?on={board}";
+        var pages = 0;
+        while (address is not null)
+        {
+            var page = await List(address);
+            labels.AddRange(page.GetProperty("labels").EnumerateArray().Select(label => label.GetString()!));
+            address = page.TryGetProperty("older", out var older) ? older.GetString() : null;
+            if (++pages == 1) await Pins(board, ("t9", 9), ("t3c", 3), ("t0", 0));
+        }
+
+        // The identity follows the order's direction, so pins of one instant come by descending id: t3c, t3b, t3a.
+        labels.Should().Equal(["t5", "t4", "t3c", "t3b", "t3a", "t2", "t1", "t0"],
+            "every row present for the whole reading comes once, newest first; the newer one behind the cursor is not read, the ones ahead are");
+    }
+
+    [Fact]
+    public async Task An_after_that_does_not_open_is_refused_naming_it()
+    {
+        var board = Board();
+        await Pins(board, ("a", 0), ("b", 0), ("c", 0));
+        var next = Next(await List($"/api/pins/by-label?on={board}"))!;
+        var middle = next.Length / 2;
+        var altered = next[..middle] + (next[middle] == 'A' ? 'B' : 'A') + next[(middle + 1)..];
+
+        foreach (var path in new[]
+                 {
+                     $"/api/pins/by-label?on={board}&after={Uri.EscapeDataString(altered)}",
+                     $"/api/pins/by-label?on={board}&after=not-a-cursor",
+                     $"/api/pins/newest?on={board}&after={Uri.EscapeDataString(next)}",
+                 })
+        {
+            var answer = await Client.GetAsync(path, Ct);
+            answer.StatusCode.Should().Be(HttpStatusCode.BadRequest, path);
+            (await Problem(answer)).GetProperty("errors").TryGetProperty("after", out _).Should().BeTrue(path);
+        }
+    }
+
+    [Fact]
+    public async Task A_declared_list_counts_nothing_and_pages_by_nothing_but_its_cursor()
+    {
+        var board = Board();
+        await Pins(board, ("a", 0), ("b", 0), ("c", 0), ("d", 0));
+
+        var answer = await Client.GetAsync($"/api/pins/by-label?on={board}&size=50", Ct);
+        answer.StatusCode.Should().Be(HttpStatusCode.OK);
+        answer.Headers.Select(header => header.Key).Should().NotContain(["X-Total-Count", "X-Total-Pages", "X-Page", "X-Page-Size", "Link"]);
+        Labels(await answer.Content.ReadFromJsonAsync<JsonElement>(Ct)).Should().Equal(["a", "b", "c"], "a page holds at most its bound");
+
+        var paged = await Client.GetAsync($"/api/pins/by-label?on={board}&page=2", Ct);
+        paged.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await Problem(paged)).GetProperty("errors").TryGetProperty("page", out _).Should().BeTrue();
+        var sized = await Client.GetAsync($"/api/pins/by-label?on={board}&size=many", Ct);
+        sized.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await Problem(sized)).GetProperty("errors").TryGetProperty("size", out _).Should().BeTrue();
+    }
+
+    private static string Board() => Guid.CreateVersion7().ToString("N");
+
+    private static int _pinned;
+
+    private static readonly DateTimeOffset Pinned = new DateTimeOffset(2026, 11, 7, 9, 0, 0, TimeSpan.Zero).AddTicks(1234567);
+
+    private async Task Pins(string board, params (string Label, int Hour)[] pins)
+    {
+        using var scope = Koan.Core.Hosting.App.AppHost.PushScope(Factory.Services);
+        // Ids rise with each pin written, so a tie in the order is broken the same way on every store.
+        foreach (var (label, hour) in pins)
+            await new Pin { Id = $"{board}-{Interlocked.Increment(ref _pinned):D4}-{label}", Label = label, Board = board, PinnedAt = Pinned.AddHours(hour) }.Save(Ct);
+    }
+
+    private async Task<JsonElement> List(string path)
+    {
+        var answer = await Client.GetAsync(path, Ct);
+        answer.StatusCode.Should().Be(HttpStatusCode.OK, await answer.Content.ReadAsStringAsync(Ct));
+        return await answer.Content.ReadFromJsonAsync<JsonElement>(Ct);
+    }
+
+    private static IReadOnlyList<string> Labels(JsonElement page)
+        => page.GetProperty("items").EnumerateArray().Select(pin => pin.GetProperty("label").GetString()!).ToArray();
+
+    private static string? Next(JsonElement page) => page.GetProperty("next").GetString();
 
     private async Task<string> Create(string title, string? place = null)
     {

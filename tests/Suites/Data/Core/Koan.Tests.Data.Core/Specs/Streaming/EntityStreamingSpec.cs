@@ -182,6 +182,65 @@ public sealed class EntityStreamingSpec : IAsyncLifetime
         _repository.QueryCalls.Should().HaveCount(2);
     }
 
+    /// <summary>DATA-0170: a keyset page asks the store for one row past the page, after the key of the last row read, in the declared
+    /// order with the identity breaking ties, and counts nothing.</summary>
+    [Fact]
+    public async Task A_keyset_page_continues_in_the_store_after_the_last_key_and_counts_nothing()
+    {
+        _repository.Reset(Rows(1, 2, 3, 4, 5));
+        var bySequence = Keyset<StreamingRecord>.By(order => order.OrderBy(record => record.Sequence));
+
+        var first = await StreamingRecord.Page(bySequence, null, 2, TestContext.Current.CancellationToken);
+        var second = await StreamingRecord.Page(bySequence, first.Next, 2, TestContext.Current.CancellationToken);
+        var last = await StreamingRecord.Page(bySequence, second.Next, 2, TestContext.Current.CancellationToken);
+
+        first.Items.Select(record => record.Sequence).Should().Equal(1, 2);
+        second.Items.Select(record => record.Sequence).Should().Equal(3, 4);
+        last.Items.Select(record => record.Sequence).Should().Equal(5);
+        last.Next.Should().BeNull("no row follows the last page");
+        bySequence.Read(bySequence.Write(first.Next!)).Should().Be(first.Next, "a key reads back exactly as it was written");
+        _repository.QueryCalls.Should().OnlyContain(query => query.EffectivePage() == 1 && query.EffectivePageSize() == 3 && query.CountStrategy == null);
+        _repository.QueryCalls[0].Sort.Select(spec => spec.Path.DotPath).Should().Equal(nameof(StreamingRecord.Sequence), nameof(StreamingRecord.Id));
+        Filter.Equivalent(_repository.QueryCalls[1].Filter, Filter.All(
+                new FieldFilter(FieldPath.Of(nameof(StreamingRecord.Sequence)), FilterOperator.Gte, FilterValue.Of(2)),
+                Filter.Any(
+                    new FieldFilter(FieldPath.Of(nameof(StreamingRecord.Sequence)), FilterOperator.Gt, FilterValue.Of(2)),
+                    Seek("0002"))))
+            .Should().BeTrue("the seek is one range of the order, then the identity at the key's own value");
+        _repository.CountCalls.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task A_keyset_page_on_a_provider_that_cannot_compare_in_its_store_is_refused_before_it_reads()
+    {
+        _repository.Reset(Rows(1, 2, 3), filterSupport: FilterSupport.None);
+        var bySequence = Keyset<StreamingRecord>.By(order => order.OrderBy(record => record.Sequence));
+
+        var read = () => StreamingRecord.Page(bySequence, null, 2, TestContext.Current.CancellationToken);
+
+        (await read.Should().ThrowAsync<NotSupportedException>()).Which.Message.Should().Contain("cannot compare");
+        _repository.QueryCalls.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task A_keyset_page_on_a_provider_that_does_not_apply_the_order_is_refused()
+    {
+        _repository.Reset(Rows(1, 2, 3), sortHandled: false);
+        var bySequence = Keyset<StreamingRecord>.By(order => order.OrderBy(record => record.Sequence));
+
+        var read = () => StreamingRecord.Page(bySequence, null, 2, TestContext.Current.CancellationToken);
+
+        (await read.Should().ThrowAsync<NotSupportedException>()).Which.Message.Should().Contain("did not apply");
+    }
+
+    [Fact]
+    public void A_keyset_order_over_a_member_that_holds_many_values_or_a_nested_object_is_refused()
+    {
+        var detail = () => Keyset<StreamingRecord>.By(order => order.OrderBy(record => record.Detail));
+
+        detail.Should().Throw<InvalidOperationException>().WithMessage("*Detail*");
+    }
+
     [Fact]
     public async Task Materialized_item_query_preserves_null_count_intent_while_explicit_count_still_counts()
     {

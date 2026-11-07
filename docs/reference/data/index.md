@@ -70,6 +70,7 @@ candidate settings without changing the active source.
 | One known Entity | `Todo.Get(id, ct)` | Keyed lookup |
 | A filtered, bounded result | `Todo.Query(predicate, ct)` | Materialized result; provider execution varies |
 | One UI or API page | `Todo.FirstPage(size, ct)` or `Todo.Page(number, size, ct)` | Caller supplies the bound |
+| A list a reader continues, page after page | `Todo.Page(Keyset<Todo>.By(o => o.OrderByDescending(t => t.DueAt)), after, size, ct)` → `Items`, `Next` | One range of the order per page; nothing counted; refused where the store cannot compare it ([DATA-0170](../../decisions/DATA-0170-a-list-continues-from-one-sealed-keyset-cursor.md)) |
 | A large sequential workload | `Todo.AllStream(...)` or `Todo.QueryStream(...)` | Only on a provider that proves bounded paging |
 | Create or update | `entity.Save(ct)` | One logical write |
 | Create without replacing an existing identity | `entity.Insert(ct: ct)` | Qualified native insertion; conflict leaves the stored row unchanged |
@@ -341,7 +342,8 @@ phases, prior values, protected fields, bulk behavior, transactions, and deliber
 
 A shared vocabulary does not hide physical cost:
 
-- Prefer an explicit page when a request result can grow.
+- Prefer an explicit page when a request result can grow, and a keyset page (`Keyset<T>`) when a reader continues it: a numbered
+  page repeats or skips a row when another writer changes the rows before it, and a keyset page does not.
 - Use `All()` only when fully materializing the visible set is intentional.
 - Use Entity streams only when the elected connector advertises provider-bounded paging.
 - Treat a capability rejection as a design correction, not a reason to add a silent full-set fallback.

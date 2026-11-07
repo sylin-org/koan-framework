@@ -43,6 +43,10 @@ public sealed class HookContext<TEntity>
     /// where it declares no input of that type.</summary>
     public TInput? Input<TInput>() where TInput : class => Request.Input as TInput;
 
+    /// <summary>The <c>after</c> that continues a declared collection past this page (DATA-0170), or null on its last page; set before the
+    /// collection's emit, so an emit hook composing a page can link the next one.</summary>
+    public string? Next => Request.Next;
+
     public void Warn(string msg) => Request.Warn(msg);
 
     public IReadOnlyList<string> Warnings => Request.Warnings as IReadOnlyList<string> ?? Request.Warnings.ToArray();

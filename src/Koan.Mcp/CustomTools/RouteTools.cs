@@ -20,7 +20,8 @@ namespace Koan.Mcp.CustomTools;
 /// Projects <c>[Tool]</c> actions as custom tools (ARCH-0141). Name, description and input schema all come from the action,
 /// which has no other definition: its route, its parameters and the properties of its input type. Where the application reads by
 /// address (AI-0042), a route with values also takes an <c>address</c> in their place. An operation of a declared entity controller takes
-/// what it declares (WEB-0087): its route values, the members it writes, its input and, where its controller serves partitions, <c>set</c>.
+/// what it declares (WEB-0087): its route values, the members it writes, its input, a collection's <c>after</c> and <c>size</c> (DATA-0170) and, where its
+/// controller serves partitions, <c>set</c>.
 /// </summary>
 internal static class RouteTools
 {
@@ -144,6 +145,14 @@ internal static class RouteTools
                 var argument = constructor?.GetParameters().FirstOrDefault(p => string.Equals(p.Name, member.Name, StringComparison.OrdinalIgnoreCase));
                 ICustomAttributeProvider[] sources = argument is null ? [member] : [member, argument];
                 Field(EntityOperation.WireName(member), member.PropertyType, sources, sources.Any(s => s.IsDefined(typeof(RequiredAttribute), true)), asQuery: bodiless);
+            }
+            // DATA-0170: a declared collection continues from the `next` of the page before, a page of at most its bound.
+            if (operation.Keyset is not null)
+            {
+                Field(KoanWebConstants.Query.After, typeof(string), [], false, asQuery: true);
+                properties[KoanWebConstants.Query.After]!["description"] = "Where the list continues: the 'next' of the page before. Left out, it starts at the beginning.";
+                Field(KoanWebConstants.Query.Size, typeof(int), [], false, asQuery: true);
+                properties[KoanWebConstants.Query.Size]!["description"] = $"The most rows the page holds, at most {operation.MaxSize}.";
             }
             if (operation.Partitions is { } partitions && !properties.ContainsKey(KoanWebConstants.Query.Set))
             {

@@ -27,7 +27,7 @@ Three properties decide most of it.
   by that identifier yourself is not portable.
 - **A stream in identity order holds still under concurrent writes.** Each page continues after the
   last identity read, so a row present for the whole read is returned exactly once. A stream ordered
-  by your own key, and an explicit numbered page, still drift when rows are inserted or deleted.
+  by your own key, and an explicit numbered page, still drift when rows are inserted or deleted; a keyset page does not.
 
 Pass a `CancellationToken` to every one of them.
 
@@ -124,8 +124,22 @@ for (var pageNumber = 1; ; pageNumber++)
 ```
 
 `Page` returns one materialized list and is useful for UI/request boundaries. Adapter fallback rules
-still apply to ordinary paging; do not infer the stronger stream capability from this API. Koan has no
-public cursor, Pager, continuation token, or resume API.
+still apply to ordinary paging; do not infer the stronger stream capability from this API.
+
+## Continue a list from its last page
+
+```csharp
+static readonly Keyset<Product> ByName = Keyset<Product>.By(order => order.OrderBy(product => product.Name));
+
+var page = await Product.Page(ByName, after, 50, product => product.Listed, ct);
+// page.Items: at most 50, by name, the identity breaking ties; page.Next: where the next page starts, null on the last
+```
+
+Each page is one range of the order after the last row the page before held, so a row present for the whole reading is read
+once whatever is inserted or removed ahead of it, each page costs the same, and nothing is counted. The store compares and orders;
+a provider that cannot is refused with `NotSupportedException`. A nullable member keeps the list to rows where it is set. A key that
+leaves the server travels sealed: `SealedCursor.Seal` and `Open` in Koan.Web, and a `[Declared]` controller's collection does this
+for you (DATA-0170).
 
 ## Consistency boundary
 

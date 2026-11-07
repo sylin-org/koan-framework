@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using Koan.Data.Abstractions.Filtering;
 using Koan.Data.Core.Model;
 using Koan.Web.Attributes;
 using Koan.Web.Controllers;
@@ -23,11 +24,21 @@ public sealed class Notice : Entity<Notice>
 /// <summary>What posting a notice takes beside it.</summary>
 public sealed record Posting([property: Description("The board it goes on; left out, the general board.")] string? Where = null);
 
-/// <summary>Reads, posts and edits notices, and nothing else, on both doors.</summary>
+/// <summary>Which board a list of notices reads.</summary>
+public sealed record Listing([property: Description("The board to read.")] string? On = null);
+
+/// <summary>Lists, reads, posts and edits notices, and nothing else, on both doors.</summary>
 [Route("/boards/notices")]
 [Declared]
-public sealed class NoticesController : EntityController<Notice>, IModelHook<Notice>
+public sealed class NoticesController : EntityController<Notice>, IModelHook<Notice>, IRequestOptionsHook<Notice>
 {
+    [HttpGet("")]
+    [Tool(Name = "read_notices")]
+    [Description("Read a board's notices, by what they say.")]
+    [Pagination(DefaultSize = 2, MaxSize = 5, DefaultSort = nameof(Notice.Text))]
+    [Input<Listing>]
+    public override Task<IActionResult> GetCollection(CancellationToken ct) => base.GetCollection(ct);
+
     [HttpGet("{notice}")]
     [Tool(Name = "read_notice")]
     [Description("Read a notice.")]
@@ -44,6 +55,13 @@ public sealed class NoticesController : EntityController<Notice>, IModelHook<Not
     [Description("Change what a notice says.")]
     [Writes(nameof(Notice.Text))]
     public override Task<IActionResult> Patch(string notice, CancellationToken ct) => base.Patch(notice, ct);
+
+    public Task OnBuildingOptions(HookContext<Notice> ctx, QueryOptions opts)
+    {
+        // Only the list takes a board; a read by id finds its notice wherever it is.
+        if (ctx.Input<Listing>() is { } listing) opts.Filter = Filter.And(opts.Filter, Filter.Eq(nameof(Notice.Board), listing.On ?? "general"));
+        return Task.CompletedTask;
+    }
 
     public Task OnBeforeSave(HookContext<Notice> ctx, Notice model)
     {

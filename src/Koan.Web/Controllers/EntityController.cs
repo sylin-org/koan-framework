@@ -18,6 +18,7 @@ using Koan.Data.Abstractions;
 using Koan.Data.Core;
 using Koan.Data.Core.Commands;
 using Koan.Data.Core.Model;
+using Koan.Data.Core.Querying;
 using Koan.Web.Attributes;
 using Koan.Web.Authorization;
 using Koan.Web.Endpoints;
@@ -313,6 +314,7 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
     public virtual async Task<IActionResult> GetCollection(CancellationToken ct)
     {
         if (Admit() is { } refused) return refused;
+        if (Operation.Keyset is Keyset<TEntity> order) return await Continue(order, ct);
         var query = HttpContext.Request.Query;
         var policy = GetPaginationPolicy();
         var paginationRequested = query.ContainsKey("page") || query.ContainsKey("pageSize") || query.ContainsKey("size");
@@ -413,6 +415,61 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
             return ResolveShortCircuit(result);
         }
 
+        return PrepareResponse(result.Payload ?? result.Items);
+    }
+
+    /// <summary>
+    /// A declared collection (DATA-0170): a page of at most <c>size</c> rows, bounded by its <see cref="PaginationAttribute"/>, after the row
+    /// its sealed <c>after</c> names, in the order its <c>DefaultSort</c> declares with the identity breaking ties, answered as its rows and the
+    /// <c>after</c> of the next page; no offset, count or total header. An <c>after</c> that does not open is refused, naming it.
+    /// </summary>
+    private async Task<IActionResult> Continue(Keyset<TEntity> order, CancellationToken ct)
+    {
+        var query = HttpContext.Request.Query;
+        var policy = GetPaginationPolicy();
+        var size = policy.DefaultSize;
+        if (query.TryGetValue(KoanWebConstants.Query.Size, out var asked)
+            && !int.TryParse(asked.ToString(), NumberStyles.Integer, CultureInfo.InvariantCulture, out size))
+            return this.Refused(Reason.Invalid(KoanWebConstants.Query.Size, $"'{KoanWebConstants.Query.Size}' is a whole number of rows, at most {policy.MaxSize}."));
+        size = policy.Clamp(1, size).Size;
+
+        var protection = HttpContext.RequestServices.GetRequiredService<Microsoft.AspNetCore.DataProtection.IDataProtectionProvider>();
+        var purpose = GetType().FullName ?? GetType().Name;
+        Koan.Data.Core.Querying.KeysetKey? after = null;
+        if (query.TryGetValue(KoanWebConstants.Query.After, out var sealedAfter) && !string.IsNullOrEmpty(sealedAfter.ToString())
+            && (after = SealedCursor.Open(protection, purpose, order, sealedAfter.ToString())) is null)
+            return this.Refused(SealedCursor.Refusal());
+
+        QueryOptions options;
+        try
+        {
+            options = BuildOptions();
+        }
+        catch (Koan.Data.Abstractions.Sorting.InvalidSortFieldException ex)
+        {
+            return BadRequest(new { error = ex.Message, field = ex.Field });
+        }
+        if (!query.TryGetValue("view", out var requestedView) || string.IsNullOrWhiteSpace(requestedView))
+            options.View = DefaultCollectionView;
+        options.Page = 0;
+        options.PageSize = 0;
+
+        var request = new EntityCollectionRequest
+        {
+            Context = CreateRequestContext(options, ct),
+            Set = query.TryGetValue(KoanWebConstants.Query.Set, out var set) ? set.ToString() : null,
+            Policy = policy,
+            AbsoluteMaxRecords = policy.AbsoluteMaxRecords,
+            Accept = HttpContext.Request.Headers["Accept"].ToString(),
+            BasePath = HttpContext.Request.Path.HasValue ? HttpContext.Request.Path.Value : "/",
+            QueryParameters = ToQueryDictionary(query),
+            AllowRawQuery = AllowRawQuery,
+            Keyset = new KeysetRead(order, after, size, key => SealedCursor.Seal(protection, purpose, order, key)),
+        };
+
+        var result = await EndpointService.GetCollection(request);
+        ApplyResponseMetadata(result);
+        if (result.IsShortCircuited) return ResolveShortCircuit(result);
         return PrepareResponse(result.Payload ?? result.Items);
     }
 

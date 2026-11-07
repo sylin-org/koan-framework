@@ -31,6 +31,35 @@ public sealed class EntityCollectionRequest
     /// including the MCP edge: a <c>q</c> still set when the read executes is then refused, never run.
     /// </summary>
     public bool AllowRawQuery { get; init; }
+
+    /// <summary>
+    /// DATA-0170: a declared collection's read, which continues from a key in its declared order and counts nothing, in place of a
+    /// numbered page; null for every other collection.
+    /// </summary>
+    public KeysetRead? Keyset { get; init; }
+}
+
+/// <summary>
+/// DATA-0170: what a declared collection continues by: its order (a <c>Keyset&lt;TEntity&gt;</c>), the key its <c>after</c> opened to, the
+/// rows a page holds, and how the key of the next page is sealed for the caller.
+/// </summary>
+public sealed class KeysetRead
+{
+    internal KeysetRead(object order, Koan.Data.Core.Querying.KeysetKey? after, int size, Func<Koan.Data.Core.Querying.KeysetKey, string> seal)
+    {
+        Order = order;
+        After = after;
+        Size = size;
+        Seal = seal;
+    }
+
+    internal object Order { get; }
+
+    internal Koan.Data.Core.Querying.KeysetKey? After { get; }
+
+    internal int Size { get; }
+
+    internal Func<Koan.Data.Core.Querying.KeysetKey, string> Seal { get; }
 }
 
 public sealed class EntityQueryRequest

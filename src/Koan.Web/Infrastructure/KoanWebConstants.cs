@@ -168,5 +168,15 @@ public static class KoanWebConstants
 
         // Common set/partition selector already used across endpoints
         public const string Set = "set";
+
+        // DATA-0170: a declared collection continues from a sealed key, a page at a time.
+        public const string After = "after";
+        public const string Size = "size";
+    }
+
+    /// <summary>DATA-0170: what seals a declared collection's key, one purpose per list.</summary>
+    public static class Keyset
+    {
+        public const string Purpose = "Koan.Web.Keyset";
     }
 }

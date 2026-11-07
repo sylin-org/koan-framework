@@ -307,13 +307,18 @@ runs before the hold and its refusals are mapped there.
 ## Declared operations
 
 `EntityOperation.Of(action, controller)` compiles, once per action, what an operation of an `EntityController` serves and takes:
-whether the controller is `[Declared]`, the `[Writes]` members, the `[Input<T>]` type and members, and the `[Partitions]` it serves.
+whether the controller is `[Declared]`, the `[Writes]` members, the `[Input<T>]` type and members, the `[Partitions]` it serves, and
+for a declared collection its `Keyset<TEntity>` from `[Pagination]`'s `DefaultSort` and its `MaxSize` (DATA-0170).
 The controller admits every request by it before anything else is read (the partition, then on a declared controller each query word,
 then the input), checks a write body's member names against the write set, and hands the endpoint `Insert` and `Writes`, which turn a
 create into an insert and record access's replacement demand into a per-member one. `RouteTools` draws a declared operation's schema
 from the same plan, and `PartitionsAttribute.Refusal` is the one partition rule the controller and the entity tools of an
 `EntityController` both ask. `[Declared]` is its own controller model convention: it removes inherited entity operations, keeps an
 override's own route selectors only, lifts `[Produces]` off a collection and a query, and keeps a create's body readable after binding.
+A declared collection pages through `EntityController.Continue`: it opens `after` with `SealedCursor` under its controller type's
+purpose, bounds `size` by the policy, and hands the endpoint a `KeysetRead`; the endpoint reads the page through `Data.Page`, sets
+`EntityRequestContext.Next` (`HookContext.Next`) before the emit, and answers `{ items, next }` unless an emit hook replaced it, with
+no count or paging header. `RouteTools` adds `after` and `size` to its schema.
 `EntityHooksAreNotActions` removes a controller's hook methods from its actions, and `HookRunner` adds `EntityRequestContext.Owner`
 after the registered hooks of each kind, before the access floor. `[Writes]` and `[Input]` refuse, when the routes are composed, anywhere but a declared
 controller's operation.

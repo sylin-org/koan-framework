@@ -11,7 +11,8 @@ namespace Koan.Web.Attributes;
 /// tools where <c>[Tool]</c> says so; an override's own HTTP attribute is its route, in place of the one it inherits; <c>POST ""</c> only
 /// creates, so a row already holding the id answers <c>409 id-taken</c>; a query or body word an operation does not take
 /// (<see cref="InputAttribute{TInput}"/>) is refused with its field named; and a collection or query answers in the format the caller accepts,
-/// JSON by default, so an emit hook's record reaches the application's formatter.
+/// JSON by default, so an emit hook's record reaches the application's formatter. Its collection continues from a sealed <c>after</c>, a
+/// page of <c>size</c> rows, in the order its <see cref="PaginationAttribute"/>'s <c>DefaultSort</c> declares (DATA-0170), and counts nothing.
 /// </summary>
 /// <example>
 /// <code>
@@ -45,6 +46,10 @@ public sealed class DeclaredAttribute : Attribute, IControllerModelConvention
             switch (action.ActionMethod.Name)
             {
                 case nameof(EntityController<,>.GetCollection):
+                    // DATA-0170: its order is compiled where the routes are, so an order no list can continue through stops the host.
+                    _ = EntityOperation.Of(action.ActionMethod, controller.ControllerType);
+                    Negotiated(action);
+                    break;
                 case nameof(EntityController<,>.Query):
                     Negotiated(action);
                     break;

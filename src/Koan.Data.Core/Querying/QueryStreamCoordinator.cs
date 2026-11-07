@@ -83,16 +83,18 @@ internal static class QueryStreamCoordinator
         var (adapterBase, residual) = FilterPushdownCoordinator.Plan(query, filterSupport, typeof(TEntity));
         var residualPredicate = residual is null ? null : InMemoryFilterEvaluator.Compile<TEntity>(residual);
 
-        // A read ordered by the identity continues from the last identity it returned; any other order still
-        // pages by number, because a seek over a caller's key would need each store's null placement.
-        var seek = IdentitySeek.For(typeof(TEntity), query.Sort, IsEntityIdentifier<TEntity, TKey>, filterSupport);
+        // A read ordered by the identity continues from the last identity it returned; a stream in any other order
+        // pages by number. A list read a page at a time seeks over its own order through Keyset (DATA-0170).
+        var seek = Keyset<TEntity>.IdentityFirst(query.Sort, IsEntityIdentifier<TEntity, TKey>) is { } identityFirst && identityFirst.Pushes(filterSupport)
+            ? identityFirst
+            : null;
         object? cursor = null;
         var pageNumber = 1;
         var selectedRecorded = false;
         while (true)
         {
             ct.ThrowIfCancellationRequested();
-            var adapterPage = (cursor is null ? adapterBase : seek!.Continue(adapterBase, cursor))
+            var adapterPage = (cursor is null ? adapterBase : adapterBase.Where(Filter.And(adapterBase.Filter, seek!.After(new KeysetKey([cursor])))))
                 .WithPagination(pageNumber, batchSize)
                 .WithCountStrategy(null);
             RepositoryQueryResult<TEntity> result;
@@ -281,7 +283,7 @@ internal static class QueryStreamCoordinator
     }
 
     // This floor is intentionally separate from caller-sort admission. A stream ordered by the identity
-    // seeks on it in the store (IdentitySeek), so the identity needs only an order the store applies the same
+    // seeks on it in the store (Keyset), so the identity needs only an order the store applies the same
     // way to ORDER BY and to a comparison. That holds for any key the store keeps as one scalar; it is proven
     // for these on SQLite, PostgreSQL and MongoDB. No other key shape is inferred merely because business
     // fields of that CLR type have portable ordering.
