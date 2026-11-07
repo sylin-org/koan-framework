@@ -308,6 +308,7 @@ public sealed class ScopedMutationContext : IWebContextContributor
 }
 
 [Route("scoped-mutation")]
+[Koan.Web.Attributes.Partitions(Any = true)]
 public sealed class ScopedMutationController : EntityController<ScopedMutationMemo>
 {
     [HttpPost("rehearse")]

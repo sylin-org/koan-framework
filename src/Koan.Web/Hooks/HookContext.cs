@@ -39,6 +39,10 @@ public sealed class HookContext<TEntity>
     /// <c>OnBeforeSave</c> or <c>OnBeforeDelete</c> of a single write, and null on a read or a batch.</summary>
     public TEntity? Prior => Request.Items.TryGetValue(EntityMutationProbe.BeforeKey, out var prior) && prior is TEntity row ? row : default;
 
+    /// <summary>What the operation took beside the entity's members, as it declared it with <c>[Input&lt;TInput&gt;]</c> (WEB-0087), or null
+    /// where it declares no input of that type.</summary>
+    public TInput? Input<TInput>() where TInput : class => Request.Input as TInput;
+
     public void Warn(string msg) => Request.Warn(msg);
 
     public IReadOnlyList<string> Warnings => Request.Warnings as IReadOnlyList<string> ?? Request.Warnings.ToArray();

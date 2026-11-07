@@ -245,6 +245,51 @@ public sealed class PostHook : IModelHook<Post>
 - **The prior row** is `HookContext<T>.Prior`, read where the hold opens. A hook that stops a write with a row answers it through the
   emit, as the first write was. See [WEB-0086](https://github.com/sylin-org/koan-framework/blob/main/docs/decisions/WEB-0086-an-entity-write-commits-as-one-and-refuses-like-a-command.md).
 
+## A declared entity controller
+
+`[Declared]` makes an `EntityController<T>` serve what it overrides and nothing else, and each override declares what it writes and
+what it takes beside the entity:
+
+```csharp
+public sealed record Placing([property: Description("The board it goes on.")] string? Where = null);
+
+[Route("/boards/notices")]
+[Declared]
+public sealed class NoticesController : EntityController<Notice>, IModelHook<Notice>
+{
+    [HttpGet("{notice}")]
+    [Tool(Name = "read_notice")]
+    public override Task<IActionResult> GetById(string notice, CancellationToken ct) => base.GetById(notice, ct);
+
+    [Tool(Name = "post_notice")]
+    [Writes(nameof(Notice.Id), nameof(Notice.Text))]
+    [Input<Placing>]
+    public override Task<IActionResult> Upsert(Notice model, CancellationToken ct) => base.Upsert(model, ct);
+
+    public Task OnBeforeSave(HookContext<Notice> ctx, Notice notice)
+    {
+        if (ctx.Prior is null) notice.Board = ctx.Input<Placing>()?.Where ?? "general";
+        return Task.CompletedTask;
+    }
+}
+```
+
+- **What is served:** the overrides, each at its own HTTP attribute's route in place of the inherited one, and as a tool where `[Tool]`
+  says so. Everything it inherits is neither, and the entity has no `{entity}_{op}` tools there. `POST ""` only creates: a row holding
+  the id answers `409 id-taken`.
+- **Addresses:** override `KeyOf(segment, ct)` to answer a slug, a handle or another key; a singleton routes `[HttpGet("")]` and
+  `[HttpPatch("")]` and answers its one id from `KeyOf`. `KeyOf` works on any `EntityController`.
+- **What it takes:** `[Writes]` names the members a write writes; a body naming another is refused 400 with that field, an omitted
+  member keeps its value on `PATCH` and its default or stamped value on `POST`, and record access admits the members named.
+  `[Input<T>]` declares values that are not the entity's, from the query and the same body, read by hooks with `ctx.Input<T>()`. Any
+  query word an operation does not take, `filter`, `page` or `with` among them, is refused with its name.
+- **Partitions:** every `EntityController` refuses `?set=` unless it declares `[Partitions("archive")]` or `[Partitions(Any = true)]`;
+  its entity tools follow the same rule.
+- **Hooks:** a controller that implements `IModelHook<T>`, `IRequestOptionsHook<T>`, `ICollectionHook<T>` or `IEmitHook<T>` runs as
+  that hook for its own requests only, after the registered hooks and before the access floor. Implement only the steps you need.
+- **Gates:** a gate an override declares is judged before binding, tool or not. A declared collection answers in the format the caller
+  accepts. See [WEB-0087](https://github.com/sylin-org/koan-framework/blob/main/docs/decisions/WEB-0087-a-declared-entity-controller-serves-what-it-declares.md).
+
 ## A request answered in process
 
 `KoanWebPipeline` answers a request of the application here, through its whole pipeline — routing, authentication,

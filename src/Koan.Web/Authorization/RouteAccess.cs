@@ -14,9 +14,12 @@ namespace Koan.Web.Authorization;
 internal static class RouteAccess
 {
     /// <summary>Whether <paramref name="action"/>, reached through <paramref name="controller"/>, declares a gate, so it is judged before
-    /// anything is bound. An operation an <see cref="EntityController{TEntity,TKey}"/> answers is judged by its entity's own gate.</summary>
+    /// anything is bound. An operation an <see cref="EntityController{TEntity,TKey}"/> answers is judged by its entity's own gate, and also by a
+    /// gate its override declares, or, on a declared controller, its class (WEB-0087), whether or not it is a tool.</summary>
     public static bool Judged(MethodInfo action, Type controller)
-        => !IsEntityOperation(action) && (Gates(action) || Gates(controller));
+        => IsEntityOperation(action)
+            ? Gates(action) || EntityOperation.IsDeclared(controller) && Gates(controller)
+            : Gates(action) || Gates(controller);
 
     /// <summary>Whether <paramref name="action"/> says who may reach it: a gate, or <see cref="OpenAttribute"/>.</summary>
     public static bool Declared(MethodInfo action, Type controller)
@@ -35,9 +38,7 @@ internal static class RouteAccess
         return false;
     }
 
-    private static bool IsEntityOperation(MethodInfo action)
-        => action.GetBaseDefinition().DeclaringType is { IsGenericType: true } declaring
-           && declaring.GetGenericTypeDefinition() == typeof(EntityController<,>);
+    private static bool IsEntityOperation(MethodInfo action) => EntityOperation.IsEntityOperation(action);
 }
 
 /// <summary>ARCH-0146 — stops the host at start, where the application turned it on (<see cref="AuthorizeOptions.RoutesDeclareAccess"/>), over

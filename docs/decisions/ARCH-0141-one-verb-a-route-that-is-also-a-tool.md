@@ -12,7 +12,7 @@ related:
   - SEC-0011
   - SEC-0017
   - WEB-0083
-amended_by: ARCH-0142, SEC-0039, ARCH-0143, ARCH-0144, AI-0042, ARCH-0146
+amended_by: ARCH-0142, SEC-0039, ARCH-0143, ARCH-0144, AI-0042, ARCH-0146, WEB-0087
 ---
 
 # ARCH-0141: One verb is one route, and a tool call is a request to it
@@ -35,6 +35,9 @@ amended_by: ARCH-0142, SEC-0039, ARCH-0143, ARCH-0144, AI-0042, ARCH-0146
 
 > **Amended by [ARCH-0146](ARCH-0146-a-route-that-declares-access-is-judged-before-binding.md) (2026-11-04): the gate is its own filter, on every `[Tool]` action and every routed action that declares access,**
 > and a decision may refuse with a reason or allow with a value the action reads. Rule 5's "asked by `[Tool]`'s filter" no longer holds.
+
+> **Amended by [WEB-0087](WEB-0087-a-declared-entity-controller-serves-what-it-declares.md) (2026-11-07): on a `[Declared]` entity controller the operations it overrides are its own route tools, taking what each declares,**
+> and the entity has no tools of its own there, so the compatibility line on a controller's overrides and `[Pagination]` reaching REST alone holds only for an undeclared controller with `[Tool]`.
 
 ## Context
 

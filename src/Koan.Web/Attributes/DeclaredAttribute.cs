@@ -1,0 +1,80 @@
+using Koan.Web.Controllers;
+using Koan.Web.Filters;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ApplicationModels;
+using Microsoft.AspNetCore.Mvc.Routing;
+
+namespace Koan.Web.Attributes;
+
+/// <summary>
+/// An <see cref="EntityController{TEntity,TKey}"/> that serves what it declares (WEB-0087): only the operations it overrides are routes, and
+/// tools where <c>[Tool]</c> says so; an override's own HTTP attribute is its route, in place of the one it inherits; <c>POST ""</c> only
+/// creates, so a row already holding the id answers <c>409 id-taken</c>; a query or body word an operation does not take
+/// (<see cref="InputAttribute{TInput}"/>) is refused with its field named; and a collection or query answers in the format the caller accepts,
+/// JSON by default, so an emit hook's record reaches the application's formatter.
+/// </summary>
+/// <example>
+/// <code>
+/// [Route("t/{tangent}")]
+/// [Declared]
+/// public sealed class TopicsController : EntityController&lt;Post&gt;
+/// {
+///     [HttpGet("{topic}")]
+///     [Tool(Name = "read_topic")]
+///     public override Task&lt;IActionResult&gt; GetById(string topic, CancellationToken ct) => base.GetById(topic, ct);
+/// }
+/// </code>
+/// A singleton routes its key operations at <c>""</c> (<c>[HttpGet("")]</c>, <c>[HttpPatch("")]</c>) and names its one id by overriding
+/// <c>KeyOf</c>.
+/// </example>
+[AttributeUsage(AttributeTargets.Class, Inherited = true, AllowMultiple = false)]
+public sealed class DeclaredAttribute : Attribute, IControllerModelConvention
+{
+    void IControllerModelConvention.Apply(ControllerModel controller)
+    {
+        foreach (var action in controller.Actions.ToArray())
+        {
+            if (!EntityOperation.IsEntityOperation(action.ActionMethod)) continue;
+            if (EntityOperation.IsInherited(action.ActionMethod))
+            {
+                controller.Actions.Remove(action);
+                continue;
+            }
+
+            OwnRoute(action);
+            switch (action.ActionMethod.Name)
+            {
+                case nameof(EntityController<,>.GetCollection):
+                case nameof(EntityController<,>.Query):
+                    Negotiated(action);
+                    break;
+                case nameof(EntityController<,>.Upsert):
+                    if (!action.Filters.Contains(BufferedBody.Instance)) action.Filters.Add(BufferedBody.Instance);
+                    break;
+            }
+        }
+    }
+
+    /// <summary>An override that states its own route answers there alone, not also at the route it inherits.</summary>
+    private static void OwnRoute(ActionModel action)
+    {
+        var own = action.ActionMethod.GetCustomAttributes(inherit: false).OfType<IRouteTemplateProvider>()
+            .Select(provider => (provider.GetType(), provider.Template)).ToHashSet();
+        if (own.Count == 0) return;
+        var kept = new HashSet<(Type, string?)>();
+        foreach (var selector in action.Selectors.ToArray())
+        {
+            var provider = selector.AttributeRouteModel?.Attribute ?? selector.EndpointMetadata.OfType<IRouteTemplateProvider>().FirstOrDefault();
+            var key = provider is null ? default : (provider.GetType(), provider.Template);
+            if (provider is null || !own.Contains(key) || !kept.Add(key)) action.Selectors.Remove(selector);
+        }
+    }
+
+    /// <summary>A collection answers in the format the caller accepts, JSON where it names none.</summary>
+    private static void Negotiated(ActionModel action)
+    {
+        foreach (var produces in action.Filters.OfType<ProducesAttribute>().ToArray()) action.Filters.Remove(produces);
+        foreach (var selector in action.Selectors)
+            foreach (var produces in selector.EndpointMetadata.OfType<ProducesAttribute>().ToArray()) selector.EndpointMetadata.Remove(produces);
+    }
+}

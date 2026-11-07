@@ -71,6 +71,13 @@ public sealed class EntityRequestContext
 
     public IDictionary<string, object?> Items { get; } = new Dictionary<string, object?>();
 
+    /// <summary>The controller answering this request, which runs as a hook of its own requests where it implements one (WEB-0087); null on
+    /// a door with no controller.</summary>
+    internal object? Owner { get; set; }
+
+    /// <summary>What the operation took beside the entity's members, bound from the request (WEB-0087), or null where it declares nothing.</summary>
+    internal object? Input { get; set; }
+
     public void Warn(string message)
     {
         if (!string.IsNullOrWhiteSpace(message))

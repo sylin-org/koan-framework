@@ -201,6 +201,15 @@ public sealed class ResponseTranslator
             message, rendered, headers, warnings, diagnostics);
     }
 
+    /// <summary>A refusal the edge answers before the endpoint runs (WEB-0087), carried as the endpoint's own refusal is.</summary>
+    public McpToolExecutionResult Refused(McpToolDefinition tool, IActionResult refusal)
+    {
+        var status = StatusOf(refusal) ?? StatusCodes.Status400BadRequest;
+        var problem = refusal is ObjectResult { Value: Problem said } ? ToolAnswers.Json(said) : null;
+        return McpToolExecutionResult.Refused(CodeFor(status), RefusalMessage(tool, status, null, problem), null,
+            new Dictionary<string, string>(), [], new JObject(), problem);
+    }
+
     private static int? StatusOf(IActionResult action) => action switch
     {
         ObjectResult objectResult => objectResult.StatusCode ?? StatusCodes.Status200OK,

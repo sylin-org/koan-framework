@@ -7,6 +7,7 @@ date: 2026-11-04
 title: A routed action that declares access is judged once, before anything is bound, and the action reads what its gate found
 amends:
   - ARCH-0141
+amended_by: WEB-0087
 related:
   - ARCH-0143
   - ARCH-0145
@@ -15,6 +16,9 @@ related:
 ---
 
 # ARCH-0146: A routed action that declares access is judged once, before anything is bound, and the action reads what its gate found
+
+> **Amended by [WEB-0087](WEB-0087-a-declared-entity-controller-serves-what-it-declares.md) (2026-11-07): an entity operation's override that declares a gate is judged by it before binding, whether or not it is a tool,**
+> and on a `[Declared]` controller so is its class's gate; rule 1's "keeps its entity's own gate" still holds for what it inherits.
 
 ## Context
 

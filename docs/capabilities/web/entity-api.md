@@ -50,6 +50,12 @@ offers one (SQLite), so a hook's rows commit with the row or neither does, and a
 `Refusal` or a lifecycle `Cancel` answers a problem document with its word, not a 500
 ([WEB-0086](../../decisions/WEB-0086-an-entity-write-commits-as-one-and-refuses-like-a-command.md)).
 
+A controller marked `[Declared]` serves only the operations it overrides, each at its own route, with `POST` that only creates;
+`[Writes(...)]` names the members a write writes, `[Input<T>]` what it takes beside them, `KeyOf` maps an address to a row, and a
+controller that implements a hook runs as that hook for its own requests. Every controller refuses a caller-chosen `?set=` partition
+unless it declares `[Partitions(...)]`
+([WEB-0087](../../decisions/WEB-0087-a-declared-entity-controller-serves-what-it-declares.md)).
+
 Query-style verbs (`POST /query`, `GET /new`, bulk forms) exist beside these; see the surface
 reference. The `?filter=` payload speaks the closed query filter vocabulary —
 [the query filter vocabulary](../data/entities.md#the-query-filter-vocabulary) is the operator table. When an external contract needs an exotic verb, subclass and delegate to the same

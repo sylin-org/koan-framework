@@ -80,6 +80,14 @@ public sealed class EntityUpsertRequest<TEntity, TKey>
     public string? Accept { get; init; }
     // AN11: rehearse the mutation — run the hook/validation pipeline + project the delta, commit nothing.
     public bool DryRun { get; init; }
+
+    /// <summary>Whether the write only creates (WEB-0087): a row already holding the id answers 409 id-taken, or 404 where the caller's read
+    /// hides it.</summary>
+    public bool Insert { get; init; }
+
+    /// <summary>The members the body named, where the operation declares what it writes (WEB-0087): record access admits each of them, where
+    /// it otherwise admits a replacement of the whole entity.</summary>
+    public IReadOnlyCollection<string>? Writes { get; init; }
 }
 
 public sealed class EntityUpsertManyRequest<TEntity> where TEntity : class
@@ -141,5 +149,9 @@ public sealed class EntityPatchRequest<TEntity, TKey> where TEntity : class
     public bool DryRun { get; init; }
     // Request-scoped null-policy override; when absent the governed path falls back to IOptions<KoanWebOptions>.
     public Koan.Data.Abstractions.Instructions.PatchOptions? Options { get; init; }
+
+    /// <summary>The members a JSON body named, where the operation declares what it writes (WEB-0087): record access admits each of them,
+    /// where it otherwise admits a replacement of the whole entity.</summary>
+    public IReadOnlyCollection<string>? Writes { get; init; }
 }
 

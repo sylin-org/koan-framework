@@ -45,14 +45,13 @@ public sealed class ToolAttribute(string? particle = null) : Attribute, IControl
     private bool? _openWorld;
 
     /// <summary>Whether <paramref name="action"/> of <paramref name="controller"/> is a tool. An action inherited from
-    /// <see cref="EntityController{TEntity,TKey}"/> is not: its operations are the entity's own tools.</summary>
+    /// <see cref="EntityController{TEntity,TKey}"/> is not: its operations are the entity's own tools. On a
+    /// <see cref="DeclaredAttribute">declared</see> controller its overrides are its own actions, so <c>[Tool]</c> on the class exposes them
+    /// too, and the entity has no tools of its own there (WEB-0087).</summary>
     public static bool Exposes(MethodInfo action, Type controller)
         => action.IsDefined(typeof(ToolAttribute), inherit: false)
-           || (controller.IsDefined(typeof(ToolAttribute), inherit: false) && !IsEntityOperation(action));
-
-    private static bool IsEntityOperation(MethodInfo action)
-        => action.GetBaseDefinition().DeclaringType is { IsGenericType: true } declaring
-           && declaring.GetGenericTypeDefinition() == typeof(EntityController<,>);
+           || (controller.IsDefined(typeof(ToolAttribute), inherit: false)
+               && (!EntityOperation.IsEntityOperation(action) || EntityOperation.IsDeclared(controller) && !EntityOperation.IsInherited(action)));
 
     void IControllerModelConvention.Apply(ControllerModel controller)
     {

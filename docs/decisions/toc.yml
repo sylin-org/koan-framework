@@ -532,6 +532,8 @@
       href: WEB-0085-a-server-rendered-page-hands-its-card.md
     - name: WEB-0086 An entity write commits as one and refuses like a command
       href: WEB-0086-an-entity-write-commits-as-one-and-refuses-like-a-command.md
+    - name: WEB-0087 A declared entity controller serves what it declares
+      href: WEB-0087-a-declared-entity-controller-serves-what-it-declares.md
 - name: Flow (FLOW)
   items:
     - name: FLOW-0070 Flow commands bus

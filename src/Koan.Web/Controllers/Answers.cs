@@ -42,8 +42,9 @@ public static class Answers
     /// <inheritdoc cref="Refused(ControllerBase, Reason)"/>
     public static IActionResult Refused(HttpContext http, Reason reason) => Refused(http.User, reason);
 
-    /// <summary>The one mapping of a reason, for a door that knows its reader and holds no request, as an entity write's endpoint does.</summary>
-    internal static IActionResult Refused(ClaimsPrincipal? reader, Reason reason)
+    /// <summary>The one mapping of a reason, for a door that knows its reader and holds no request, as an entity write's endpoint and an
+    /// entity tool do.</summary>
+    public static IActionResult Refused(ClaimsPrincipal? reader, Reason reason)
     {
         ArgumentNullException.ThrowIfNull(reason);
         var detail = reason.Kind == ReasonKind.Absent ? Nothing : reason.Text;

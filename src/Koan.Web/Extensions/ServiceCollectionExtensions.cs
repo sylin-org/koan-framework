@@ -62,6 +62,8 @@ public static class ServiceCollectionExtensions
         services.TryAddEnumerable(ServiceDescriptor.Transient<IConfigureOptions<MvcOptions>, OptionalTransformerInputFormatterConfigurator>());
         // ARCH-0146: every routed action that declares access is judged before binding, and the host can refuse one that declares nothing.
         services.TryAddEnumerable(ServiceDescriptor.Transient<IConfigureOptions<MvcOptions>, Filters.GateFilter.Convention>());
+        // WEB-0087: a controller that is a hook of its own requests answers none through its hook methods.
+        services.TryAddEnumerable(ServiceDescriptor.Transient<IConfigureOptions<MvcOptions>, Controllers.EntityHooksAreNotActions>());
         services.TryAddEnumerable(ServiceDescriptor.Singleton<Microsoft.Extensions.Hosting.IHostedService, Authorization.RouteAccessStartCheck>());
         services.TryAddEnumerable(ServiceDescriptor.Transient<IPostConfigureOptions<MvcOptions>, Serialization.FieldAccessMvcOptions>());
         services.AddKoanOptions<WebPipelineOptions>(ConfigurationConstants.Web.Section + ":Pipeline");

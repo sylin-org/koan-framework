@@ -147,6 +147,17 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         }
     }
 
+    // WEB-0087: a write that declares its members is admitted by the members its body names; any other replaces the whole entity.
+    private static void Admit(FieldAccess fields, IReadOnlyCollection<string>? writes)
+    {
+        if (writes is null)
+        {
+            fields.DemandReplacement();
+            return;
+        }
+        foreach (var member in writes) fields.DemandWritePath(member);
+    }
+
     private static Task<IActionResult?> AdmitFieldOutput(EntityRequestContext context, object? payload)
         => AdmitFields(context, fields =>
         {
@@ -194,8 +205,9 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
     }
 
     // WEB-0077: a delete must raise the model delete hooks per row when any may exist. A custom pipeline may hold hooks
-    // the default runner cannot see, so it always does.
-    private bool RaisesDeleteHooks => _hookPipeline is not DefaultEntityHookPipeline<TEntity> pipeline || pipeline.HasModelHooks;
+    // the default runner cannot see, so it always does; so does a controller that is a model hook of its own requests (WEB-0087).
+    private bool RaisesDeleteHooks(EntityRequestContext context)
+        => _hookPipeline is not DefaultEntityHookPipeline<TEntity> pipeline || pipeline.HasModelHooks || context.Owner is IModelHook<TEntity>;
 
     // WEB-0077: BeforeDelete for every row of a batch, before any is deleted. The first short circuit refuses the batch.
     private async Task<bool> BeforeDeleteAll(HookContext<TEntity> hookContext, IEnumerable<TEntity> rows)
@@ -838,7 +850,7 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
     {
         var context = request.Context;
         if (await Gate(context, EntityAuthorizeActions.Write).ConfigureAwait(false) is { } denied) return ModelDenied(context, denied);
-        if (await AdmitFields(context, fields => fields.DemandReplacement()) is { } fieldDenied)
+        if (await AdmitFields(context, fields => Admit(fields, request.Writes)) is { } fieldDenied)
             return new EntityModelResult<TEntity>(context, null, null, fieldDenied);
         await AnnotateAccess(context).ConfigureAwait(false);
         using var _ = EntityContext.With(partition: string.IsNullOrWhiteSpace(request.Set) ? null : request.Set);
@@ -871,6 +883,9 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
                 ? await Data<TEntity, TKey>.Get(id, context.CancellationToken)
                 : null;
             Prior(context, before, before is null ? "create" : "update");
+            // WEB-0087: a write that only creates meets a row holding its id as an insert that lost a race does.
+            if (request.Insert && before is not null)
+                return Ended(new EntityModelResult<TEntity>(context, null, null, await InsertConflict(context, id!)));
             if (mutation.Create is not null)
             {
                 // create (no existing row) → STAMP the owner onto the payload — server-truth that overwrites a forged
@@ -890,7 +905,7 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
                 }
             }
 
-            var requiresInsert = mutation.Create is not null && before is null;
+            var requiresInsert = (request.Insert || mutation.Create is not null) && before is null;
             if (requiresInsert && (repo is not IInsertOnlyRepository<TEntity, TKey> ||
                 !DataCaps.Describe(repo, repo.GetType().Name).Has(DataCaps.Write.InsertOnly)))
                 return Ended(new EntityModelResult<TEntity>(context, null, null, InsertUnsupported()));
@@ -1072,7 +1087,7 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         using var _ = EntityContext.With(partition: string.IsNullOrWhiteSpace(request.Set) ? null : request.Set);
         var accessor = ResolveAccessor(context);
         var bound = accessor is null ? null : DeleteBound(accessor);
-        var hooked = RaisesDeleteHooks;
+        var hooked = RaisesDeleteHooks(context);
         var hookContext = _hookPipeline.CreateContext(context);
         return await WriteBatch(context, "deleteMany", async () =>
         {
@@ -1142,7 +1157,7 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
             filter = Filter.And(filter, bound) ?? filter;
         }
 
-        var hooked = RaisesDeleteHooks;
+        var hooked = RaisesDeleteHooks(request.Context);
         var hookContext = _hookPipeline.CreateContext(request.Context);
         return await WriteBatch(request.Context, "deleteByQuery", async () =>
         {
@@ -1181,7 +1196,7 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         // entity whose delete hooks may run loads its rows too, so each one passes BeforeDelete and AfterDelete. Only
         // an entity with neither keeps RemoveAll.
         var bound = accessor is null ? null : DeleteBound(accessor);
-        var hooked = RaisesDeleteHooks;
+        var hooked = RaisesDeleteHooks(request.Context);
         if (bound is null && !hooked && request.DryRun)
         {
             // Unconstrained: name the effect rather than scan the whole set for a count — honest A10 posture.
@@ -1228,8 +1243,8 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         {
             if (request.Patch is JsonPatchDocument<TEntity> document)
                 fields.DemandPatch(document.Operations.Select(operation => new PatchOp(operation.op, operation.path, operation.from, null)));
-            else if (request.Patch is Newtonsoft.Json.Linq.JToken token)
-                fields.DemandReplacement();
+            else if (request.Patch is Newtonsoft.Json.Linq.JToken)
+                Admit(fields, request.Writes);
             else throw new NotSupportedException("Field access requires a supported typed patch document.");
         }) is { } fieldDenied) return new EntityModelResult<TEntity>(context, null, null, fieldDenied);
         await AnnotateAccess(context).ConfigureAwait(false);

@@ -148,7 +148,8 @@ public sealed class McpEntityRegistry
                 effectiveAttribute,
                 descriptor,
                 tools,
-                displayName);
+                displayName,
+                toolsetType);
 
             registrations.Add(registration);
             AddIndex(registrationIndex, type.FullName, registration);
@@ -276,7 +277,9 @@ public sealed class McpEntityRegistry
         {
             if (baseType.IsGenericType
                 && (baseType.GetGenericTypeDefinition() == typeof(EntityToolset<,>)
-                    || (baseType.GetGenericTypeDefinition() == typeof(Koan.Web.Controllers.EntityController<,>) && toolsetType.IsDefined(typeof(Koan.Web.Attributes.ToolAttribute), inherit: false))))
+                    || (baseType.GetGenericTypeDefinition() == typeof(Koan.Web.Controllers.EntityController<,>) && toolsetType.IsDefined(typeof(Koan.Web.Attributes.ToolAttribute), inherit: false)
+                        // WEB-0087: a declared controller's overrides are route tools, and the entity has no tools of its own there.
+                        && !Koan.Web.Controllers.EntityOperation.IsDeclared(toolsetType))))
             {
                 return baseType.GetGenericArguments()[0];
             }

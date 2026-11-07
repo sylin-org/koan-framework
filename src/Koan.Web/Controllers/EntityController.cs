@@ -1,9 +1,13 @@
 using System;
+using System.Collections.Concurrent;
+using System.ComponentModel;
+using System.Globalization;
 using System.Linq;
 using System.Reflection;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.JsonPatch;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Controllers;
 using Microsoft.AspNetCore.Mvc.ModelBinding.Validation;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.DependencyInjection;
@@ -12,6 +16,7 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Koan.Data.Abstractions;
 using Koan.Data.Core;
+using Koan.Data.Core.Commands;
 using Koan.Data.Core.Model;
 using Koan.Web.Attributes;
 using Koan.Web.Authorization;
@@ -28,7 +33,10 @@ namespace Koan.Web.Controllers;
 
 /// <summary>
 /// Generic controller providing CRUD endpoints for any aggregate.
-/// Integrates pluggable hooks, pagination, capability headers, and content shaping.
+/// Integrates pluggable hooks, pagination, capability headers, and content shaping. A derived controller that implements
+/// <see cref="IModelHook{TEntity}"/>, <see cref="IRequestOptionsHook{TEntity}"/>, <see cref="ICollectionHook{TEntity}"/> or
+/// <see cref="IEmitHook{TEntity}"/> runs as that hook for its own requests (WEB-0087); one marked <see cref="DeclaredAttribute"/> serves only
+/// the operations it overrides; a request naming a partition it does not serve (<see cref="PartitionsAttribute"/>) is refused.
 /// </summary>
 [ApiController]
 public abstract class EntityController<TEntity, TKey> : ControllerBase
@@ -36,6 +44,9 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
     where TKey : notnull
 {
     private IEntityEndpointService<TEntity, TKey>? _endpointService;
+    private EntityOperation? _operation;
+    private object? _input;
+    private static readonly ConcurrentDictionary<Type, bool> MapsKeys = new();
 
     protected EntityController()
     {
@@ -65,7 +76,128 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
         => e?.ToString() ?? "";
 
     private EntityRequestContext CreateRequestContext(QueryOptions options, CancellationToken ct)
-        => ContextBuilder.Build(options, ct, HttpContext, HttpContext?.User);
+    {
+        var context = ContextBuilder.Build(options, ct, HttpContext, HttpContext?.User);
+        // WEB-0087: this controller runs as a hook of its own requests, and its hooks read what the operation took.
+        context.Owner = this;
+        context.Input = _input;
+        return context;
+    }
+
+    /// <summary>What the operation answering this request serves and takes (WEB-0087).</summary>
+    private EntityOperation Operation
+        => _operation ??= EntityOperation.Of((ControllerContext?.ActionDescriptor as ControllerActionDescriptor)?.MethodInfo, GetType());
+
+    /// <summary>
+    /// The id of the row an address names (WEB-0087). <c>GetById</c>, <c>Patch</c> and <c>Delete</c> ask it with their key segment, as the
+    /// route gave it, or <c>""</c> for a singleton that routes them at <c>""</c>, and then read the row by that id with every filter, as a read
+    /// by id does; null answers 404. Left alone the segment is the id. Override it to answer at another address of the row, such as a handle
+    /// or a slug, or to name the one row of a singleton.
+    /// </summary>
+    protected virtual ValueTask<TKey?> KeyOf(string segment, CancellationToken ct)
+    {
+        if (typeof(TKey) == typeof(string)) return ValueTask.FromResult((TKey?)(object)segment);
+        try
+        {
+            return ValueTask.FromResult((TKey?)TypeDescriptor.GetConverter(typeof(TKey)).ConvertFromInvariantString(segment));
+        }
+        catch (Exception error) when (error is FormatException or NotSupportedException or ArgumentException)
+        {
+            return ValueTask.FromResult(default(TKey?));
+        }
+    }
+
+    /// <summary>The row an address names: its segment where <see cref="KeyOf"/> is left alone, otherwise what it answers.</summary>
+    private async ValueTask<(bool Found, TKey Key)> Keyed(TKey id, CancellationToken ct)
+    {
+        var maps = MapsKeys.GetOrAdd(GetType(), static type => type.GetMethod(nameof(KeyOf), BindingFlags.Instance | BindingFlags.NonPublic,
+            [typeof(string), typeof(CancellationToken)])?.DeclaringType != typeof(EntityController<TEntity, TKey>));
+        if (!maps) return (true, id);
+        var key = await KeyOf(id is null ? "" : Convert.ToString(id, CultureInfo.InvariantCulture) ?? "", ct);
+        return key is null ? (false, default!) : (true, key);
+    }
+
+    /// <summary>
+    /// What a request is refused with before anything else is read (WEB-0087), or null where it is admitted: a partition this controller does
+    /// not serve; on a declared controller, a query word, or a word of a body that is all words, the operation does not take; and a value of
+    /// the declared input that cannot be one. What it admits of the input is what this request's hooks read.
+    /// </summary>
+    private IActionResult? Admit(JObject? body = null, bool bodyIsWords = false)
+    {
+        var query = HttpContext.Request.Query;
+        var partition = query.TryGetValue(KoanWebConstants.Query.Set, out var named) ? named.ToString()
+            : bodyIsWords && body?[KoanWebConstants.Query.Set] is JValue { Type: JTokenType.String } inBody ? inBody.ToString() : null;
+        if (PartitionsAttribute.Refusal(GetType(), partition) is { } unserved) return this.Refused(unserved);
+
+        var operation = Operation;
+        if (operation.Declared)
+        {
+            foreach (var word in query.Keys)
+                if (!operation.Takes(word)) return this.Refused(EntityOperation.NotTaken(word));
+            if (bodyIsWords && body is not null)
+                foreach (var word in body.Properties())
+                    if (!operation.Takes(word.Name)) return this.Refused(EntityOperation.NotTaken(word.Name));
+        }
+
+        return operation.Input is null ? null : BindInput(operation, body);
+    }
+
+    /// <summary>The declared input, each member from the body where it names it and otherwise from the query.</summary>
+    private IActionResult? BindInput(EntityOperation operation, JObject? body)
+    {
+        var query = HttpContext.Request.Query;
+        var serializer = JsonSerializer.Create(HttpContext.RequestServices.GetRequiredService<IOptions<MvcNewtonsoftJsonOptions>>().Value.SerializerSettings);
+        var values = new JObject();
+        foreach (var member in operation.InputMembers)
+        {
+            var name = EntityOperation.WireName(member);
+            var many = member.PropertyType != typeof(string) && typeof(System.Collections.IEnumerable).IsAssignableFrom(member.PropertyType);
+            var token = body?.GetValue(name, StringComparison.OrdinalIgnoreCase)
+                        ?? (query.TryGetValue(name, out var given)
+                            ? many ? new JArray(given.Select(value => (JToken)new JValue(value))) : new JValue(given.ToString())
+                            : null);
+            if (token is null || token.Type == JTokenType.Null) continue;
+            try
+            {
+                token.ToObject(member.PropertyType, serializer);
+            }
+            catch (Exception error) when (error is JsonException or FormatException or InvalidCastException or ArgumentException or OverflowException)
+            {
+                return this.Refused(Reason.Invalid(name, $"'{name}' cannot take this value."));
+            }
+            values[member.Name] = token;
+        }
+
+        _input = values.ToObject(operation.Input!, serializer);
+        return null;
+    }
+
+    /// <summary>The members a body names that this write writes, or the refusal of the first it does not write (WEB-0087); an input member is
+    /// the input's, not the entity's.</summary>
+    private (IActionResult? Refused, IReadOnlyCollection<string>? Writes) Written(EntityOperation operation, IEnumerable<string> names)
+    {
+        if (operation.Writes is null) return (null, null);
+        var writes = new List<string>();
+        foreach (var name in names)
+        {
+            if (operation.Written(name) is { } member) writes.Add(member.Name);
+            else if (!operation.InputMembers.Any(input => EntityOperation.Named(input, name)))
+                return (this.Refused(Reason.Invalid(name, $"This address does not write '{name}'.")), null);
+        }
+        return (null, writes);
+    }
+
+    /// <summary>A declared create's body as it was sent, kept readable by its buffering (WEB-0087).</summary>
+    private async Task<JObject?> SentBody(CancellationToken ct)
+    {
+        var body = HttpContext.Request.Body;
+        if (!body.CanSeek) throw new InvalidOperationException("A declared create's body was not kept readable after binding.");
+        body.Position = 0;
+        using var reader = new System.IO.StreamReader(body, System.Text.Encoding.UTF8, detectEncodingFromByteOrderMarks: true, leaveOpen: true);
+        var raw = await reader.ReadToEndAsync(ct);
+        body.Position = 0;
+        return string.IsNullOrWhiteSpace(raw) ? null : JToken.Parse(raw) as JObject;
+    }
 
     private IActionResult ResolveShortCircuit(EntityEndpointResult result)
     {
@@ -177,7 +309,7 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
     [Produces(MediaTypeNames.Application.Json)]
     public virtual async Task<IActionResult> GetCollection(CancellationToken ct)
     {
-
+        if (Admit() is { } refused) return refused;
         var query = HttpContext.Request.Query;
         var policy = GetPaginationPolicy();
         var paginationRequested = query.ContainsKey("page") || query.ContainsKey("pageSize") || query.ContainsKey("size");
@@ -321,6 +453,7 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
             return BadRequest(new { error = "Invalid request body." });
         }
 
+        if (Admit(jobj, bodyIsWords: true) is { } refused) return refused;
         if (jobj.TryGetValue("filter", out var f)) filterJson = f.ToString(Formatting.None);
         if (jobj.TryGetValue("page", out var pageToken) && TryCoerceQueryInt(pageToken, out var pageValue))
         {
@@ -421,6 +554,7 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
     [HttpGet("new")]
     public virtual async Task<IActionResult> GetNew(CancellationToken ct)
     {
+        if (Admit() is { } refused) return refused;
         var options = BuildOptions();
         var context = CreateRequestContext(options, ct);
         var request = new EntityGetNewRequest
@@ -437,13 +571,16 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
     [HttpGet("{id}")]
     public virtual async Task<IActionResult> GetById([FromRoute] TKey id, CancellationToken ct)
     {
+        if (Admit() is { } refused) return refused;
+        var (found, key) = await Keyed(id, ct);
+        if (!found) return NotFound();
         var options = BuildOptions();
         var context = CreateRequestContext(options, ct);
         var query = HttpContext.Request.Query;
         var request = new EntityGetByIdRequest<TKey>
         {
             Context = context,
-            Id = id,
+            Id = key,
             Set = query.TryGetValue("set", out var setVal) ? setVal.ToString() : null,
             With = GetRelationshipParameter(query),
             Accept = HttpContext.Request.Headers["Accept"].ToString()
@@ -458,7 +595,19 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
     public virtual async Task<IActionResult> Upsert([FromBody][ValidateNever] TEntity model, CancellationToken ct)
     {
         if (model is null) return BadRequest(new { error = "Request body is required" });
-        return await ExecuteUpsert(model, ct);
+        // WEB-0087: a declared create only creates, writes what it declares, and takes its input from the same body.
+        var operation = Operation;
+        JObject? body = null;
+        IReadOnlyCollection<string>? writes = null;
+        if (operation.Declared && (operation.Writes is not null || operation.Input is not null))
+        {
+            body = await SentBody(ct);
+            var written = Written(operation, body?.Properties().Select(member => member.Name) ?? []);
+            if (written.Refused is { } stranger) return stranger;
+            writes = written.Writes;
+        }
+        if (Admit(body) is { } refused) return refused;
+        return await ExecuteUpsert(model, ct, default!, writes, operation.Declared);
     }
 
     // WEB-0073: governed full-replace shim. The verb adds no authority of its own - the body travels
@@ -469,6 +618,7 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
     [HttpPut("{id}")]
     public virtual async Task<IActionResult> Put([FromRoute] TKey id, CancellationToken ct)
     {
+        if (Admit() is { } refused) return refused;
         Microsoft.AspNetCore.Http.HttpRequestRewindExtensions.EnableBuffering(HttpContext.Request);
         string raw;
         using (var reader = new System.IO.StreamReader(HttpContext.Request.Body, System.Text.Encoding.UTF8, detectEncodingFromByteOrderMarks: true, leaveOpen: true))
@@ -522,10 +672,8 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
         return await ExecuteUpsert(model, ct, id);
     }
 
-    private Task<IActionResult> ExecuteUpsert(TEntity model, CancellationToken ct)
-        => ExecuteUpsert(model, ct, default!);
-
-    private async Task<IActionResult> ExecuteUpsert(TEntity model, CancellationToken ct, TKey routeId)
+    private async Task<IActionResult> ExecuteUpsert(TEntity model, CancellationToken ct, TKey routeId,
+        IReadOnlyCollection<string>? writes = null, bool insert = false)
     {
         var options = BuildOptions();
         var context = CreateRequestContext(options, ct);
@@ -536,7 +684,9 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
             Model = model,
             RouteId = routeId,
             Set = query.TryGetValue("set", out var setVal) ? setVal.ToString() : null,
-            Accept = HttpContext.Request.Headers["Accept"].ToString()
+            Accept = HttpContext.Request.Headers["Accept"].ToString(),
+            Insert = insert,
+            Writes = writes
         };
         var result = await EndpointService.Upsert(request);
         ApplyResponseMetadata(result);
@@ -548,6 +698,7 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
     public virtual async Task<IActionResult> UpsertMany([FromBody][ValidateNever] IEnumerable<TEntity> models, CancellationToken ct)
     {
         if (models is null) return BadRequest(new { error = "Request body is required" });
+        if (Admit() is { } refused) return refused;
         var list = models.ToList();
         var options = BuildOptions();
         var context = CreateRequestContext(options, ct);
@@ -567,13 +718,16 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
     [HttpDelete("{id}")]
     public virtual async Task<IActionResult> Delete([FromRoute] TKey id, CancellationToken ct)
     {
+        if (Admit() is { } refused) return refused;
+        var (found, key) = await Keyed(id, ct);
+        if (!found) return NotFound();
         var options = BuildOptions();
         var context = CreateRequestContext(options, ct);
         var query = HttpContext.Request.Query;
         var request = new EntityDeleteRequest<TKey>
         {
             Context = context,
-            Id = id,
+            Id = key,
             Set = query.TryGetValue("set", out var setVal) ? setVal.ToString() : null,
             Accept = HttpContext.Request.Headers["Accept"].ToString()
         };
@@ -586,6 +740,7 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
     [HttpDelete("bulk")]
     public virtual async Task<IActionResult> DeleteMany([FromBody] IEnumerable<TKey> ids, CancellationToken ct)
     {
+        if (Admit() is { } refused) return refused;
         var list = ids?.ToList() ?? new List<TKey>();
         var options = BuildOptions();
         var context = CreateRequestContext(options, ct);
@@ -605,6 +760,7 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
     [HttpDelete("")]
     public virtual async Task<IActionResult> DeleteByQuery([FromQuery] string? q, CancellationToken ct)
     {
+        if (Admit() is { } refused) return refused;
         if (string.IsNullOrWhiteSpace(q)) return BadRequest();
         var options = BuildOptions();
         var context = CreateRequestContext(options, ct);
@@ -624,6 +780,7 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
     [HttpDelete("all")]
     public virtual async Task<IActionResult> DeleteAll(CancellationToken ct)
     {
+        if (Admit() is { } refused) return refused;
         var options = BuildOptions();
         var context = CreateRequestContext(options, ct);
         var query = HttpContext.Request.Query;
@@ -650,7 +807,6 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
         Infrastructure.KoanWebConstants.ContentTypes.ApplicationJson)]
     public virtual async Task<IActionResult> Patch([FromRoute] TKey id, CancellationToken ct)
     {
-
         // Buffer the body so we can parse it with the right shape per Content-Type.
         Microsoft.AspNetCore.Http.HttpRequestRewindExtensions.EnableBuffering(HttpContext.Request);
         string raw;
@@ -666,6 +822,10 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
 
         object patch;
         var kind = EntityPatchKind.PartialJson;
+        var operation = Operation;
+        JObject? words = null;
+        IReadOnlyCollection<string>? writes = null;
+        JToken? payloadId = null;
         try
         {
             if (string.Equals(mediaType, Infrastructure.KoanWebConstants.ContentTypes.ApplicationJsonPatch, StringComparison.OrdinalIgnoreCase))
@@ -674,21 +834,30 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
                     ? new JsonPatchDocument<TEntity>()
                     : JsonConvert.DeserializeObject<JsonPatchDocument<TEntity>>(raw)
                         ?? new JsonPatchDocument<TEntity>();
+                // WEB-0087: each operation writes the member its path, and a move's source, begin with.
+                var written = Written(operation, doc.Operations
+                    .SelectMany(change => new[] { change.path, string.Equals(change.op, "move", StringComparison.OrdinalIgnoreCase) ? change.from : null })
+                    .Where(path => !string.IsNullOrEmpty(path)).Select(path => path!.TrimStart('/').Split('/')[0]));
+                if (written.Refused is { } stranger) return stranger;
                 patch = doc;
                 kind = EntityPatchKind.JsonPatch6902;
             }
             else
             {
                 var token = string.IsNullOrWhiteSpace(raw) ? JValue.CreateNull() : JToken.Parse(raw);
-
-                // Defense-in-depth: an id inside the payload must agree with the route.
-                if (token["id"] is not null)
+                payloadId = token["id"];
+                if (operation.Writes is not null || operation.Input is not null)
                 {
-                    var payloadId = token["id"]!.ToObject<TKey>();
-                    if (payloadId is not null && !Equals(payloadId, id))
-                    {
-                        return BadRequest(new { code = Infrastructure.KoanWebConstants.Codes.Patch.IdMismatch, message = "Route id does not match payload id." });
-                    }
+                    // WEB-0087: the body names what it writes, and the declared input travels in it beside those members.
+                    if (token is not JObject members) return this.Refused(Reason.Invalid("A change is one JSON object of the members it writes."));
+                    var written = Written(operation, members.Properties().Select(member => member.Name));
+                    if (written.Refused is { } stranger) return stranger;
+                    writes = written.Writes;
+                    words = members;
+                    var kept = (JObject)members.DeepClone();
+                    foreach (var input in members.Properties().Where(member => operation.InputMembers.Any(item => EntityOperation.Named(item, member.Name))))
+                        kept.Remove(input.Name);
+                    token = kept;
                 }
 
                 patch = token!;
@@ -701,13 +870,28 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
             return BadRequest(new { error = $"Invalid PATCH body for content type '{mediaType}': {ex.Message}" });
         }
 
+        if (Admit(words) is { } refused) return refused;
+        var (found, key) = await Keyed(id, ct);
+        if (!found) return NotFound();
+
+        // Defense-in-depth: an id inside the payload must agree with the row the route names.
+        if (payloadId is not null && payloadId.Type != JTokenType.Null)
+        {
+            TKey? stated;
+            try { stated = payloadId.ToObject<TKey>(); }
+            catch (Exception ex) { return BadRequest(new { error = $"Invalid PATCH body for content type '{mediaType}': {ex.Message}" }); }
+            if (stated is not null && !Equals(stated, key))
+                return BadRequest(new { code = Infrastructure.KoanWebConstants.Codes.Patch.IdMismatch, message = "Route id does not match payload id." });
+        }
+
         // SEC-0004: route through the governed choke point - gate, row-scope constrain, stamps, hooks and
         // audit all live there. The data-layer Patch instruction bypasses every one of those and must never
         // be called directly from a public surface.
-        return await PatchNormalized(id, patch, kind, ct);
+        return await PatchNormalized(key, patch, kind, ct, writes);
     }
 
-    private async Task<IActionResult> PatchNormalized(TKey id, object patch, EntityPatchKind kind, CancellationToken ct)
+    private async Task<IActionResult> PatchNormalized(TKey id, object patch, EntityPatchKind kind, CancellationToken ct,
+        IReadOnlyCollection<string>? writes)
     {
         var options = BuildOptions();
         var context = CreateRequestContext(options, ct);
@@ -724,6 +908,7 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
             Set = set,
             Accept = HttpContext.Request.Headers["Accept"].ToString(),
             Options = TryBuildPatchOptionsOverride(query) ?? BuildPatchOptions(),
+            Writes = writes,
         };
 
         var result = await EndpointService.Patch(request);

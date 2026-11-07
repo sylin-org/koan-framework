@@ -4,6 +4,8 @@ using System.ComponentModel.DataAnnotations;
 using System.Reflection;
 using Koan.Web.Attributes;
 using Koan.Web.Authorization;
+using Koan.Web.Controllers;
+using Koan.Web.Infrastructure;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.ActionConstraints;
 using Microsoft.AspNetCore.Mvc.Controllers;
@@ -17,7 +19,8 @@ namespace Koan.Mcp.CustomTools;
 /// <summary>
 /// Projects <c>[Tool]</c> actions as custom tools (ARCH-0141). Name, description and input schema all come from the action,
 /// which has no other definition: its route, its parameters and the properties of its input type. Where the application reads by
-/// address (AI-0042), a route with values also takes an <c>address</c> in their place.
+/// address (AI-0042), a route with values also takes an <c>address</c> in their place. An operation of a declared entity controller takes
+/// what it declares (WEB-0087): its route values, the members it writes, its input and, where its controller serves partitions, <c>set</c>.
 /// </summary>
 internal static class RouteTools
 {
@@ -78,6 +81,9 @@ internal static class RouteTools
         var isRead = HttpMethods.IsGet(method) || HttpMethods.IsHead(method);
         var bodiless = isRead || HttpMethods.IsDelete(method);
         bool AsQuery(BindingSource? source) => source == BindingSource.Query || (bodiless && source != BindingSource.Body);
+        var operation = EntityOperation.IsEntityOperation(action.MethodInfo) ? EntityOperation.Of(action.MethodInfo, action.ControllerTypeInfo) : null;
+        var declared = operation?.Declared == true;
+        var tookBody = false;
 
         void Field(string name, Type type, ICustomAttributeProvider[] sources, bool isRequired, bool asQuery)
         {
@@ -100,6 +106,8 @@ internal static class RouteTools
 
             var attributes = new ICustomAttributeProvider[] { parameter.ParameterInfo };
             var bound = parameter.BindingInfo?.BinderModelName ?? parameter.Name;
+            // A declared operation takes no value its route and body do not name: a singleton's key is its controller's to know.
+            if (declared && !routed.ContainsKey(bound) && source != BindingSource.Body) continue;
             if (routed.TryGetValue(bound, out var route))
                 Field(route.Name, parameter.ParameterType, attributes, IsRequired(route), asQuery: false);
             else if (!IsComplex(parameter.ParameterType))
@@ -110,8 +118,10 @@ internal static class RouteTools
             }
             else
             {
+                tookBody |= source == BindingSource.Body;
                 var constructor = parameter.ParameterType.GetConstructors().OrderByDescending(c => c.GetParameters().Length).FirstOrDefault();
-                foreach (var property in parameter.ParameterType.GetProperties(BindingFlags.Public | BindingFlags.Instance).Where(p => p.CanWrite))
+                foreach (var property in parameter.ParameterType.GetProperties(BindingFlags.Public | BindingFlags.Instance).Where(p => p.CanWrite)
+                             .Where(p => source != BindingSource.Body || operation?.Writes is not { } writes || writes.Any(member => member.Name == p.Name)))
                 {
                     var argument = constructor?.GetParameters().FirstOrDefault(p => string.Equals(p.Name, property.Name, StringComparison.OrdinalIgnoreCase));
                     ICustomAttributeProvider[] sources = argument is null ? [property] : [property, argument];
@@ -119,6 +129,28 @@ internal static class RouteTools
                                 ?? property.GetCustomAttribute<Newtonsoft.Json.JsonPropertyAttribute>()?.PropertyName ?? Camel(property.Name);
                     Field(named, property.PropertyType, sources, sources.Any(s => s.IsDefined(typeof(RequiredAttribute), true)), AsQuery(source));
                 }
+            }
+        }
+
+        if (declared)
+        {
+            // What a declared operation writes travels in its body, its input beside it or in a read's query, and its partition in the query.
+            if (!tookBody && operation!.Writes is { } writes)
+                foreach (var member in writes)
+                    Field(EntityOperation.WireName(member), member.PropertyType, [member], member.IsDefined(typeof(RequiredAttribute), true), asQuery: false);
+            var constructor = operation!.Input?.GetConstructors().OrderByDescending(c => c.GetParameters().Length).FirstOrDefault();
+            foreach (var member in operation.InputMembers)
+            {
+                var argument = constructor?.GetParameters().FirstOrDefault(p => string.Equals(p.Name, member.Name, StringComparison.OrdinalIgnoreCase));
+                ICustomAttributeProvider[] sources = argument is null ? [member] : [member, argument];
+                Field(EntityOperation.WireName(member), member.PropertyType, sources, sources.Any(s => s.IsDefined(typeof(RequiredAttribute), true)), asQuery: bodiless);
+            }
+            if (operation.Partitions is { } partitions && !properties.ContainsKey(KoanWebConstants.Query.Set))
+            {
+                Field(KoanWebConstants.Query.Set, typeof(string), [], false, asQuery: true);
+                properties[KoanWebConstants.Query.Set]!["description"] = partitions.Any
+                    ? "The partition to act in; left out, the entity's own rows."
+                    : $"The partition to act in, one of {string.Join(", ", partitions.Names)}; left out, the entity's own rows.";
             }
         }
 

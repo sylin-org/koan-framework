@@ -581,6 +581,7 @@ public sealed class CounterpartPage : Entity<CounterpartPage>
 }
 
 [Route("counterpart-pages")]
+[Koan.Web.Attributes.Partitions(Any = true)]
 public sealed class CounterpartPagesController : EntityController<CounterpartPage>;
 
 public sealed class CounterpartEndpointState
