@@ -71,12 +71,14 @@ public sealed class NoticesController : EntityController<Notice>, IModelHook<Not
 3. **`KeyOf(segment, ct)` maps an address to a row's id,** for `GetById`, `Patch` and `Delete` on any `EntityController`. Left alone the
    segment is the id; overridden, it answers a slug, a handle or a DID, or the one id of a singleton, which is asked with `""`. The row is
    then read by that id with every filter, as a read by id is; null answers 404.
-4. **`POST ""` only creates on a declared controller.** The prior read (WEB-0086) finding a row answers `409 id-taken`, or 404 where the
-   caller's read hides it, as an insert that lost a race does, and it inserts where the provider declares insert-only writes, refusing with
-   501 elsewhere, as a constrained create already does.
-5. **A caller-chosen partition is refused on every `EntityController`,** with `set` named, unless the controller declares the partitions
-   it serves: `[Partitions("archive")]`, or `[Partitions(Any = true)]`. The entity tools of an `EntityController` that carries `[Tool]` take
-   the same rule from it. A terse `[McpEntity]` and an `EntityToolset<T>` are not controllers and keep accepting one.
+4. **`POST ""` only creates on a declared controller.** The prior read (WEB-0086) finding a row hands it to the hooks as `Prior`, so a
+   hook that knows the write as a replay short-circuits with that row and the retry answers as the first write did; where none does, the
+   create answers `409 id-taken`, or 404 where the caller's read hides it, as an insert that lost a race does. It inserts where the
+   provider declares insert-only writes, refusing with 501 elsewhere, as a constrained create already does.
+5. **A caller-chosen partition is refused on every `EntityController`,** with `set` named, wherever the request names it (the query, or
+   the body of a query, which reads its own over the query's), unless the controller declares the partitions it serves:
+   `[Partitions("archive")]`, or `[Partitions(Any = true)]`. The entity tools of an `EntityController` that carries `[Tool]` take the same
+   rule from it, reading `set` as they read it to reach a partition, in any case and of any value. A terse `[McpEntity]` and an `EntityToolset<T>` are not controllers and keep accepting one.
 6. **A declared operation takes what it declares.** A query word it does not take, among them `filter`, `sort`, `page`, `with`, `shape`,
    `view`, `access` and `q`, is refused with that word named. What it takes is its declared input's members, and `set` where partitions
    are served. An input member named after one of the endpoint's own words reaches the endpoint as well, so declaring `Page` opens paging.
@@ -98,6 +100,10 @@ public sealed class NoticesController : EntityController<Notice>, IModelHook<Not
     `EntityController`; two controllers over one entity never run each other's. Its hook methods are not actions. A controller instance is
     per request, so an override hands its hooks what it prepared in a field. Each hook step does nothing unless a hook says otherwise, so a
     hook implements only the steps it needs.
+12. **Both doors run one definition.** An undeclared controller carrying `[Tool]` is answered on MCP by its entity's own tools, which run
+    the endpoint and never the controller (ARCH-0141), so its hooks (11) and its overrides' gates (7) would hold on REST alone. Such a
+    controller that is a hook or gates an override stops the host where its routes are composed, saying to mark it `[Declared]`, where its
+    overrides are its tools, or to put the rule on the entity.
 
 ## What this overturns
 
@@ -132,14 +138,18 @@ public, for a door that holds no request. Hook interfaces gain default steps and
 
 ## Evidence
 
-- `DeclaredControllerSpecsBase` (AdapterSurface, SQLite and in memory, 13 cases each): only overrides are routes (PUT, DELETE, `all`,
+- `DeclaredControllerSpecsBase` (AdapterSurface, SQLite and in memory, 14 cases each): only overrides are routes (PUT, DELETE, `all`,
   bulk, query and new 404, the collection's read 405); an override's own route replaces the inherited one; a slug addresses a row through
-  `KeyOf`; a singleton serves its row at `""`; a create only creates (`409 id-taken`); a create writes its declared members and its hook
+  `KeyOf`; a singleton serves its row at `""`; a create only creates (`409 id-taken`); a create sent again answers as the first did
+  where its hook knows the replay, and 409 where it does not; a create writes its declared members and its hook
   reads its input; a member outside the write set and an input that cannot be its type are refused with their fields; a change keeps
   what it leaves out and refuses a member it does not write; a gate on an override that is no tool is judged; a controller's hook runs
-  for it and not for another controller over the same row; `?set=` is refused on a declared and an undeclared controller; an undeclared
+  for it and not for another controller over the same row; `?set=` is refused on a declared and an undeclared controller, and a
+  query's body naming `set` is refused whatever its query names; an undeclared
   query word is refused on a declared controller and taken on an undeclared one.
 - `DeclaredOperationsSpec` (Koan.Mcp.Verbs.Tests, 6 cases, real HTTP and real `tools/call`): a declared controller's tools are its
   overrides and nothing else of it; each schema is its route values, write set and input, with the input's description; a create answers
   alike on both doors with the hook reading the input; a member outside the write set is refused on both doors; a change keeps what it
-  leaves out on both doors; `?set=` is refused on both doors, also for an undeclared controller's routes and the entity's own tools.
+  leaves out on both doors; `?set=` is refused on both doors, also for an undeclared controller's routes and the entity's own tools,
+  whose `set` is judged in any case and of any value. `ToolsThatCannotStartSpec`: an undeclared `[Tool]` controller that is a hook, or
+  that gates an override, stops the host until it is `[Declared]`.

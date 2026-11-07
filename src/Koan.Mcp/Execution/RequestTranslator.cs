@@ -86,7 +86,7 @@ public sealed class RequestTranslator
                 new EntityDeleteAllRequest
                 {
                     Context = context,
-                    Set = ReadString(args, "set"),
+                    Set = Partition(args),
                     DryRun = ReadBool(args, McpDryRun.ArgumentName) ?? false
                 }),
             EntityEndpointOperationKind.Patch => new RequestTranslation(
@@ -107,7 +107,7 @@ public sealed class RequestTranslator
         {
             Context = context,
             FilterJson = ReadString(args, "filter"),
-            Set = ReadString(args, "set"),
+            Set = Partition(args),
             IgnoreCase = ReadBool(args, "ignoreCase") ?? false,
             With = ReadString(args, "with"),
             Shape = ReadString(args, "shape"),
@@ -130,7 +130,7 @@ public sealed class RequestTranslator
         {
             Context = context,
             FilterJson = ReadString(args, "filter"),
-            Set = ReadString(args, "set"),
+            Set = Partition(args),
             IgnoreCase = ReadBool(args, "ignoreCase") ?? false,
             Accept = ReadString(args, "accept"),
             Policy = PaginationPolicy.Resolve(context.Services, null)
@@ -144,7 +144,7 @@ public sealed class RequestTranslator
         SetProperty(request, nameof(EntityGetByIdRequest<object>.Context), context);
         var idNode = TryGet(args, "id") ?? throw new JsonException("Missing required 'id' parameter.");
         SetProperty(request, nameof(EntityGetByIdRequest<object>.Id), ConvertValue(idNode, registration.KeyType));
-        SetProperty(request, nameof(EntityGetByIdRequest<object>.Set), ReadString(args, "set"));
+        SetProperty(request, nameof(EntityGetByIdRequest<object>.Set), Partition(args));
         SetProperty(request, nameof(EntityGetByIdRequest<object>.With), ReadString(args, "with"));
         SetProperty(request, nameof(EntityGetByIdRequest<object>.Accept), ReadString(args, "accept"));
         return request;
@@ -158,7 +158,7 @@ public sealed class RequestTranslator
         var modelNode = TryGet(args, "model") ?? throw new JsonException("Missing required 'model' payload.");
         fields.DemandReplacement();
         SetProperty(request, nameof(EntityUpsertRequest<object, object>.Model), ConvertEntity(modelNode, registration.EntityType, fields));
-        SetProperty(request, nameof(EntityUpsertRequest<object, object>.Set), ReadString(args, "set"));
+        SetProperty(request, nameof(EntityUpsertRequest<object, object>.Set), Partition(args));
         SetProperty(request, nameof(EntityUpsertRequest<object, object>.Accept), ReadString(args, "accept"));
         SetProperty(request, nameof(EntityUpsertRequest<object, object>.DryRun), ReadBool(args, McpDryRun.ArgumentName) ?? false);
         return request;
@@ -172,7 +172,7 @@ public sealed class RequestTranslator
         var modelsNode = TryGet(args, "models") ?? throw new JsonException("Missing required 'models' payload.");
         fields.DemandReplacement();
         SetProperty(request, nameof(EntityUpsertManyRequest<object>.Models), ConvertEntityCollection(modelsNode, registration.EntityType, fields));
-        SetProperty(request, nameof(EntityUpsertManyRequest<object>.Set), ReadString(args, "set"));
+        SetProperty(request, nameof(EntityUpsertManyRequest<object>.Set), Partition(args));
         SetProperty(request, nameof(EntityUpsertManyRequest<object>.DryRun), ReadBool(args, McpDryRun.ArgumentName) ?? false);
         return request;
     }
@@ -184,7 +184,7 @@ public sealed class RequestTranslator
         SetProperty(request, nameof(EntityDeleteRequest<object>.Context), context);
         var idNode = TryGet(args, "id") ?? throw new JsonException("Missing required 'id' parameter.");
         SetProperty(request, nameof(EntityDeleteRequest<object>.Id), ConvertValue(idNode, registration.KeyType));
-        SetProperty(request, nameof(EntityDeleteRequest<object>.Set), ReadString(args, "set"));
+        SetProperty(request, nameof(EntityDeleteRequest<object>.Set), Partition(args));
         SetProperty(request, nameof(EntityDeleteRequest<object>.Accept), ReadString(args, "accept"));
         SetProperty(request, nameof(EntityDeleteRequest<object>.DryRun), ReadBool(args, McpDryRun.ArgumentName) ?? false);
         return request;
@@ -197,7 +197,7 @@ public sealed class RequestTranslator
         SetProperty(request, nameof(EntityDeleteManyRequest<object>.Context), context);
         var idsNode = TryGet(args, "ids") ?? throw new JsonException("Missing required 'ids' collection.");
         SetProperty(request, nameof(EntityDeleteManyRequest<object>.Ids), ConvertKeyCollection(idsNode, registration.KeyType));
-        SetProperty(request, nameof(EntityDeleteManyRequest<object>.Set), ReadString(args, "set"));
+        SetProperty(request, nameof(EntityDeleteManyRequest<object>.Set), Partition(args));
         SetProperty(request, nameof(EntityDeleteManyRequest<object>.DryRun), ReadBool(args, McpDryRun.ArgumentName) ?? false);
         return request;
     }
@@ -214,7 +214,7 @@ public sealed class RequestTranslator
         {
             Context = context,
             Query = query!,
-            Set = ReadString(args, "set"),
+            Set = Partition(args),
             DryRun = ReadBool(args, McpDryRun.ArgumentName) ?? false
         };
     }
@@ -230,7 +230,7 @@ public sealed class RequestTranslator
         if (patchNode is not JArray) throw new JsonException("Expected a JSON Patch operations array.");
         fields.DemandPatch(patchNode.ToObject<PatchOp[]>() ?? throw new JsonException("Unable to read JSON Patch operations."));
         SetProperty(request, nameof(EntityPatchRequest<object, object>.Patch), ConvertPatchDocument(patchNode, registration.EntityType));
-        SetProperty(request, nameof(EntityPatchRequest<object, object>.Set), ReadString(args, "set"));
+        SetProperty(request, nameof(EntityPatchRequest<object, object>.Set), Partition(args));
         SetProperty(request, nameof(EntityPatchRequest<object, object>.Accept), ReadString(args, "accept"));
         SetProperty(request, nameof(EntityPatchRequest<object, object>.DryRun), ReadBool(args, McpDryRun.ArgumentName) ?? false);
         return request;
@@ -301,6 +301,9 @@ public sealed class RequestTranslator
     {
         return args.TryGetValue(property, StringComparison.OrdinalIgnoreCase, out var node) ? node : null;
     }
+
+    /// <summary>The partition a tool call names, read as every entity tool reads it, so the partition rule judges the one the call reaches.</summary>
+    internal static string? Partition(JObject? args) => args is null ? null : ReadString(args, KoanWebConstants.Query.Set);
 
     private static string? ReadString(JObject args, string property)
     {

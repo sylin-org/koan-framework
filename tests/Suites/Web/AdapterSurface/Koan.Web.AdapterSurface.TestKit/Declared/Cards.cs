@@ -8,7 +8,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace Koan.Web.AdapterSurface.TestKit.Declared;
 
-/// <summary>WEB-0087: a row three controllers serve, one declared, one a declared singleton, one the whole surface.</summary>
+/// <summary>WEB-0087: a row four controllers serve, two declared, one a declared singleton, one the whole surface.</summary>
 [StorageName("cards_surface")]
 public sealed class Card : Entity<Card>
 {
@@ -75,6 +75,21 @@ public sealed class FrontCardController : EntityController<Card>
     public override Task<IActionResult> GetById(string id, CancellationToken ct) => base.GetById(id, ct);
 
     protected override ValueTask<string?> KeyOf(string segment, CancellationToken ct) => ValueTask.FromResult<string?>(Front);
+}
+
+/// <summary>Creates a card, and answers a create sent again with the same title as the first one was answered, with the card it made.</summary>
+[Route("api/card-replays")]
+[Declared]
+public sealed class CardReplaysController : EntityController<Card>, IModelHook<Card>
+{
+    [Writes(nameof(Card.Id), nameof(Card.Title))]
+    public override Task<IActionResult> Upsert(Card model, CancellationToken ct) => base.Upsert(model, ct);
+
+    public Task OnBeforeSave(HookContext<Card> ctx, Card model)
+    {
+        if (ctx.Prior is { } prior && prior.Title == model.Title) ctx.ShortCircuit(prior);
+        return Task.CompletedTask;
+    }
 }
 
 /// <summary>The whole surface over the same row, with no hook of its own.</summary>

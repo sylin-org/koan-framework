@@ -17,8 +17,7 @@ internal sealed class EntityHooksAreNotActions : IApplicationModelConvention, IC
     {
         foreach (var controller in application.Controllers)
         {
-            var steps = controller.ControllerType.GetInterfaces()
-                .Where(contract => contract == typeof(IOrderedHook) || contract.IsGenericType && Hooks.Contains(contract.GetGenericTypeDefinition()))
+            var steps = Contracts(controller.ControllerType)
                 .SelectMany(contract => controller.ControllerType.GetInterfaceMap(contract).TargetMethods)
                 .ToHashSet();
             if (steps.Count == 0) continue;
@@ -26,4 +25,9 @@ internal sealed class EntityHooksAreNotActions : IApplicationModelConvention, IC
                 controller.Actions.Remove(action);
         }
     }
+
+    /// <summary>The hook contracts <paramref name="controller"/> implements, so it runs as those hooks for its own requests.</summary>
+    internal static IEnumerable<Type> Contracts(Type controller)
+        => controller.GetInterfaces()
+            .Where(contract => contract == typeof(IOrderedHook) || contract.IsGenericType && Hooks.Contains(contract.GetGenericTypeDefinition()));
 }

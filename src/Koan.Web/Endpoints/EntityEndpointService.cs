@@ -883,10 +883,9 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
                 ? await Data<TEntity, TKey>.Get(id, context.CancellationToken)
                 : null;
             Prior(context, before, before is null ? "create" : "update");
-            // WEB-0087: a write that only creates meets a row holding its id as an insert that lost a race does.
-            if (request.Insert && before is not null)
-                return Ended(new EntityModelResult<TEntity>(context, null, null, await InsertConflict(context, id!)));
-            if (mutation.Create is not null)
+            // WEB-0087: a write that only creates and finds a row holding its id changes nothing of it; its hooks see that row as Prior.
+            var taken = request.Insert && before is not null;
+            if (mutation.Create is not null && !taken)
             {
                 // create (no existing row) → STAMP the owner onto the payload — server-truth that overwrites a forged
                 // owner (a Where on create is a silent no-op that lets it through). update → the existing row must be
@@ -912,6 +911,9 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
 
             if (!await _hookPipeline.BeforeSave(hookContext, request.Model))
                 return await Stopped(context, hookContext);
+            // A hook that knows the row as this write's replay answers with it above; otherwise the create meets it as an insert that lost a race does.
+            if (taken)
+                return Ended(new EntityModelResult<TEntity>(context, null, null, await InsertConflict(context, id!)));
 
             if (request.DryRun)
             {

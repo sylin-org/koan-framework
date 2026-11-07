@@ -26,7 +26,8 @@ internal static class RouteAccess
         => IsEntityOperation(action) || Gates(action) || Gates(controller)
            || action.IsDefined(typeof(OpenAttribute), inherit: true) || controller.IsDefined(typeof(OpenAttribute), inherit: true);
 
-    private static bool Gates(MemberInfo member)
+    /// <summary>Whether <paramref name="member"/> itself declares a gate.</summary>
+    public static bool Gates(MemberInfo member)
         => member.IsDefined(typeof(AccessAttribute), inherit: true)
            || member.IsDefined(typeof(RequireScopeAttribute), inherit: true)
            || member.GetCustomAttributes(inherit: true).Any(attribute => Typed(attribute.GetType()));

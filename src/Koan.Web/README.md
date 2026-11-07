@@ -276,17 +276,20 @@ public sealed class NoticesController : EntityController<Notice>, IModelHook<Not
 
 - **What is served:** the overrides, each at its own HTTP attribute's route in place of the inherited one, and as a tool where `[Tool]`
   says so. Everything it inherits is neither, and the entity has no `{entity}_{op}` tools there. `POST ""` only creates: a row holding
-  the id answers `409 id-taken`.
+  the id answers `409 id-taken`, unless a hook that sees it as `ctx.Prior` answers the retry with it (`ctx.ShortCircuit(prior)`), as
+  the first write was answered.
 - **Addresses:** override `KeyOf(segment, ct)` to answer a slug, a handle or another key; a singleton routes `[HttpGet("")]` and
   `[HttpPatch("")]` and answers its one id from `KeyOf`. `KeyOf` works on any `EntityController`.
 - **What it takes:** `[Writes]` names the members a write writes; a body naming another is refused 400 with that field, an omitted
   member keeps its value on `PATCH` and its default or stamped value on `POST`, and record access admits the members named.
   `[Input<T>]` declares values that are not the entity's, from the query and the same body, read by hooks with `ctx.Input<T>()`. Any
   query word an operation does not take, `filter`, `page` or `with` among them, is refused with its name.
-- **Partitions:** every `EntityController` refuses `?set=` unless it declares `[Partitions("archive")]` or `[Partitions(Any = true)]`;
-  its entity tools follow the same rule.
+- **Partitions:** every `EntityController` refuses `set`, in the query or a query's body, unless it declares `[Partitions("archive")]`
+  or `[Partitions(Any = true)]`; its entity tools follow the same rule.
 - **Hooks:** a controller that implements `IModelHook<T>`, `IRequestOptionsHook<T>`, `ICollectionHook<T>` or `IEmitHook<T>` runs as
   that hook for its own requests only, after the registered hooks and before the access floor. Implement only the steps you need.
+  An undeclared controller carrying `[Tool]` is answered on MCP by its entity's own tools, which never run the controller, so one that
+  is a hook or gates an override stops the host at start until it is `[Declared]`.
 - **Gates:** a gate an override declares is judged before binding, tool or not. A declared collection answers in the format the caller
   accepts. See [WEB-0087](https://github.com/sylin-org/koan-framework/blob/main/docs/decisions/WEB-0087-a-declared-entity-controller-serves-what-it-declares.md).
 

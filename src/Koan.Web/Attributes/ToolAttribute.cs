@@ -1,4 +1,5 @@
 using System.Reflection;
+using Koan.Web.Authorization;
 using Koan.Web.Controllers;
 using Koan.Web.Filters;
 using Microsoft.AspNetCore.Mvc.ApplicationModels;
@@ -55,11 +56,32 @@ public sealed class ToolAttribute(string? particle = null) : Attribute, IControl
 
     void IControllerModelConvention.Apply(ControllerModel controller)
     {
+        OneDefinition(controller.ControllerType);
         foreach (var action in controller.Actions)
             if (Exposes(action.ActionMethod, controller.ControllerType)) Filter(action);
     }
 
     void IActionModelConvention.Apply(ActionModel action) => Filter(action);
+
+    /// <summary>
+    /// An undeclared <see cref="EntityController{TEntity,TKey}"/> carrying <c>[Tool]</c> is answered on MCP by its entity's own tools, which
+    /// run the endpoint and never the controller (ARCH-0141). A hook the controller is, or a gate one of its overrides declares, would therefore
+    /// hold on REST alone, so such a controller stops the host where its routes are composed (WEB-0087), and the two doors never differ.
+    /// </summary>
+    private static void OneDefinition(Type controller)
+    {
+        if (EntityOperation.IsDeclared(controller)) return;
+        var operations = controller.GetMethods(BindingFlags.Public | BindingFlags.Instance).Where(EntityOperation.IsEntityOperation).ToArray();
+        if (operations.Length == 0) return;
+        var skipped = EntityHooksAreNotActions.Contracts(controller).Any()
+            ? "never run it as a hook"
+            : operations.FirstOrDefault(operation => !EntityOperation.IsInherited(operation) && RouteAccess.Gates(operation)) is { } gated
+                ? $"never judge the gate on its override of {gated.Name}"
+                : null;
+        if (skipped is not null)
+            throw new InvalidOperationException($"{controller.Name} carries [Tool] without [Declared], so its entity's own tools answer for it on MCP, and they {skipped}. " +
+                "Mark it [Declared] so its overrides are its tools and both doors run the same, or put the rule on the entity.");
+    }
 
     private static void Filter(ActionModel action)
     {

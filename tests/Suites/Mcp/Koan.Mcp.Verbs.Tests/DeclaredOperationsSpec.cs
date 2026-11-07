@@ -92,6 +92,14 @@ public sealed class DeclaredOperationsSpec(ForumFixture forum) : IClassFixture<F
         articleTool.Status.Should().Be(400);
         articleTool.Failed.Should().BeTrue();
         articleTool.Text.Should().Contain("This address serves no partition 'audit'.");
+
+        // The partition is read as the tool reads it, whatever its case or its kind of value.
+        foreach (var (arguments, named) in new[] { (new JObject { ["Set"] = "audit" }, "audit"), (new JObject { ["set"] = 2024 }, "2024") })
+        {
+            var refused = await forum.Tool("article_collection", arguments, Mara);
+            refused.Status.Should().Be(400, arguments.ToString());
+            refused.Text.Should().Contain($"This address serves no partition '{named}'.");
+        }
     }
 
     private static IEnumerable<string> Fields(JObject tool) => ((JObject)tool["inputSchema"]!["properties"]!).Properties().Select(field => field.Name);

@@ -5,6 +5,9 @@ using Koan.Data.Core.Model;
 using Koan.Mcp.CustomTools;
 using Koan.Mcp.Options;
 using Koan.Web.Attributes;
+using Koan.Web.Authorization;
+using Koan.Web.Controllers;
+using Koan.Web.Hooks;
 using Microsoft.AspNetCore.Authorization;
 using Koan.Web.Extensions;
 using Microsoft.AspNetCore.Builder;
@@ -205,6 +208,44 @@ public sealed class ToolsThatCannotStartSpec
 
     [McpEntity]
     public sealed class LongNamedRecord : Entity<LongNamedRecord>;
+
+    public sealed class Memo : Entity<Memo>;
+
+    /// <summary>Its entity's own tools would answer for it on MCP and never run it as a hook.</summary>
+    [Route("/memos/hooked")]
+    [Tool]
+    public sealed class HookedMemos : EntityController<Memo>, IModelHook<Memo>;
+
+    /// <summary>Its entity's own tools would answer for it on MCP and never judge the gate on its override.</summary>
+    [Route("/memos/gated")]
+    [Tool]
+    public sealed class GatedMemos : EntityController<Memo>
+    {
+        [Access(remove: "authenticated")]
+        public override Task<IActionResult> Delete(string id, CancellationToken ct) => base.Delete(id, ct);
+    }
+
+    /// <summary>Declared, its overrides are its tools, so its hook and its gate hold on both doors.</summary>
+    [Route("/memos/declared")]
+    [Declared]
+    [Tool]
+    public sealed class DeclaredMemos : EntityController<Memo>, IModelHook<Memo>
+    {
+        [HttpDelete("{id}")]
+        [Access(remove: "authenticated")]
+        public override Task<IActionResult> Delete(string id, CancellationToken ct) => base.Delete(id, ct);
+    }
+
+    [Theory]
+    [InlineData(typeof(HookedMemos), "never run it as a hook")]
+    [InlineData(typeof(GatedMemos), "never judge the gate on its override of Delete")]
+    public async Task A_tool_controller_whose_entity_tools_would_skip_its_own_rules_stops_the_host_until_it_is_declared(Type controller, string says)
+    {
+        var stopped = await Assert.ThrowsAnyAsync<Exception>(() => Start(controller));
+        stopped.ToString().Should().Contain(says).And.Contain("[Declared]");
+
+        await Start(typeof(DeclaredMemos));
+    }
 
     [Fact]
     public void A_method_with_no_name_stated_is_named_in_words()

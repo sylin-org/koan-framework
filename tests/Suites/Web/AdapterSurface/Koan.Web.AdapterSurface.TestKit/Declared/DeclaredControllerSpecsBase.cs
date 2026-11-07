@@ -91,6 +91,25 @@ public abstract class DeclaredControllerSpecsBase<TFactory> : IClassFixture<TFac
     }
 
     [Fact]
+    public async Task A_create_sent_again_answers_as_the_first_did_where_its_hook_knows_the_replay()
+    {
+        var id = Guid.CreateVersion7().ToString("N");
+        var first = await Client.PostAsJsonAsync("/api/card-replays", new { id, title = "Once" }, Ct);
+        first.StatusCode.Should().Be(HttpStatusCode.OK, await first.Content.ReadAsStringAsync(Ct));
+
+        var again = await Client.PostAsJsonAsync("/api/card-replays", new { id, title = "Once" }, Ct);
+        again.StatusCode.Should().Be(HttpStatusCode.OK, await again.Content.ReadAsStringAsync(Ct));
+        var card = await again.Content.ReadFromJsonAsync<JsonElement>(Ct);
+        card.GetProperty("id").GetString().Should().Be(id);
+        card.GetProperty("title").GetString().Should().Be("Once");
+
+        var other = await Client.PostAsJsonAsync("/api/card-replays", new { id, title = "Twice" }, Ct);
+        other.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        (await Problem(other)).GetProperty("word").GetString().Should().Be("id-taken");
+        (await Read($"/api/cards/by/{id}")).GetProperty("title").GetString().Should().Be("Once");
+    }
+
+    [Fact]
     public async Task A_create_writes_what_it_declares_and_its_hook_reads_the_input_it_takes()
     {
         var answer = await Post(new { title = "Placed Card", place = "top" });
@@ -169,6 +188,14 @@ public abstract class DeclaredControllerSpecsBase<TFactory> : IClassFixture<TFac
         foreach (var path in new[] { $"/api/cards/by/{id}?set=audit", $"/api/plain-cards/{id}?set=audit", "/api/plain-cards?set=audit" })
         {
             var answer = await Client.GetAsync(path, Ct);
+            answer.StatusCode.Should().Be(HttpStatusCode.BadRequest, path);
+            (await Problem(answer)).GetProperty("errors").GetProperty("set")[0].GetString().Should().Be("This address serves no partition 'audit'.");
+        }
+
+        // A query reads the partition its body names over the one its address names, so each is judged.
+        foreach (var path in new[] { "/api/plain-cards/query", "/api/plain-cards/query?set=" })
+        {
+            var answer = await Client.PostAsJsonAsync(path, new { set = "audit" }, Ct);
             answer.StatusCode.Should().Be(HttpStatusCode.BadRequest, path);
             (await Problem(answer)).GetProperty("errors").GetProperty("set")[0].GetString().Should().Be("This address serves no partition 'audit'.");
         }

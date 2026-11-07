@@ -125,9 +125,12 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
     private IActionResult? Admit(JObject? body = null, bool bodyIsWords = false)
     {
         var query = HttpContext.Request.Query;
-        var partition = query.TryGetValue(KoanWebConstants.Query.Set, out var named) ? named.ToString()
-            : bodyIsWords && body?[KoanWebConstants.Query.Set] is JValue { Type: JTokenType.String } inBody ? inBody.ToString() : null;
-        if (PartitionsAttribute.Refusal(GetType(), partition) is { } unserved) return this.Refused(unserved);
+        // Each place a request can name a partition is judged, since a query reads the one its body names over the one its address names.
+        if (query.TryGetValue(KoanWebConstants.Query.Set, out var named) && PartitionsAttribute.Refusal(GetType(), named.ToString()) is { } unserved)
+            return this.Refused(unserved);
+        if (bodyIsWords && body?[KoanWebConstants.Query.Set] is JValue { Type: JTokenType.String } inBody
+            && PartitionsAttribute.Refusal(GetType(), inBody.ToString()) is { } unservedInBody)
+            return this.Refused(unservedInBody);
 
         var operation = Operation;
         if (operation.Declared)

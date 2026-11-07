@@ -45,8 +45,7 @@ public sealed class EndpointToolExecutor
         }
 
         // WEB-0087: a controller's tools serve the partitions its routes serve, and refuse any other as its routes do.
-        var partition = arguments?[Koan.Web.Infrastructure.KoanWebConstants.Query.Set] is JValue { Type: JTokenType.String } named ? named.ToString() : null;
-        if (Koan.Web.Attributes.PartitionsAttribute.Refusal(registration.Realization, partition) is { } unserved)
+        if (Koan.Web.Attributes.PartitionsAttribute.Refusal(registration.Realization, RequestTranslator.Partition(arguments)) is { } unserved)
             return _responseTranslator.Refused(tool, Koan.Web.Controllers.Answers.Refused(user, unserved));
 
         using var scope = _scopeFactory.CreateScope();
