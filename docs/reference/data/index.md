@@ -139,6 +139,9 @@ correction; a route whose DDL policy did not build it refuses the search, naming
 `write.heldTransaction` (SQLite) and refuses elsewhere: reads see the scope's writes, a write acts when it is issued, and
 any other writer waits, in another process too, for at most the store's busy timeout. See
 [DATA-0166](../../decisions/DATA-0166-a-scope-can-hold-a-native-transaction-from-its-start.md).
+`Data<T, TKey>.Hold("name", ct)` holds the route the entity is stored on, whatever the ambient context names, and answers null where
+that route cannot hold, so the caller runs without one; an entity write, a role change and an audit append hold this way
+([WEB-0086](../../decisions/WEB-0086-an-entity-write-commits-as-one-and-refuses-like-a-command.md)).
 
 ## Send a write as a value
 

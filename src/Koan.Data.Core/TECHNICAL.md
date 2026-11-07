@@ -354,7 +354,8 @@ validation:
   reports `Unknown` (DATA-0161). Only the scope's own refusal of `TransactionGuarantee.Atomic` escapes as
   `NotSupportedException`.
 - `EntityContext.Hold` (DATA-0166) is the same native boundary begun at the start of the scope. The coordinator resolves
-  the route from the ambient context, refuses one whose provider is not an `IHeldTransactionProvider`, counts the hold as
+  the route from the ambient context, or takes the entity's own from `Data<T, TKey>.Hold` (the repository's
+  `IRoutedRepository.RouteBinding`, a variant's being its root's), refuses one whose provider is not an `IHeldTransactionProvider`, counts the hold as
   an active mutation of the route (`DataOperationHorizon.AdmitHold`, so a maintenance window waits for it), and tracks
   nothing: `ContextState.Deferring` is null, so Data's verbs go to the repository, and the facade's guard admits each
   operation (`AdmitToHold`): a write must land on the held route, and once the hold has ended early a read refuses too. A

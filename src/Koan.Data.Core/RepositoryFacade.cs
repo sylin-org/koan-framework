@@ -51,6 +51,7 @@ internal sealed partial class RepositoryFacade<TEntity, TKey> :
     IAxisScopeDiagnostics,
     IDataOperationGate,
     IDataRouteBoundRepository,
+    IRoutedRepository,
     IDataMutationOutcomes<TEntity, TKey>,
     IInsertOnlyRepository<TEntity, TKey>,
     IDataQueryBoundary<TEntity, TKey>,
@@ -543,7 +544,7 @@ internal sealed partial class RepositoryFacade<TEntity, TKey> :
     string IDataRouteBoundRepository.RouteNamespace =>
         _routeBinding?.Namespace ?? $"data-route:{_sourcePlan.RouteIdentity}:0";
 
-    internal DataRouteBinding? RouteBinding => _routeBinding;
+    public DataRouteBinding? RouteBinding => _routeBinding;
 
     private GuardedOperationAwaitable Guard(
         DataOperationEffect effect,

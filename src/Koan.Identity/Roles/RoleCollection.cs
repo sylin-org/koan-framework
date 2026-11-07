@@ -562,8 +562,8 @@ public sealed class RoleCollection(RoleBagCache bags, IOptions<RoleOptions> opti
             return await change();
         }
 
-        if (!Data<Role, string>.Capabilities.Has(DataCaps.Write.HeldTransaction)) return await change();
-        using (await EntityContext.Hold(nameof(RoleCollection), ct))
+        if (Data<Role, string>.Hold(nameof(RoleCollection), ct) is not { } hold) return await change();
+        using (await hold)
         {
             var result = await change();
             await EntityContext.Commit(ct);

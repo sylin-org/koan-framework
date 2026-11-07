@@ -12,6 +12,7 @@ Use these only to find migration seams. Confirm the application's source version
 | `IPayloadTransformer` | Current public transformation extension | An internal type is a supported replacement |
 | `McpToolSchema` or `IMcpTool` | Current tool/resource contract | Generated and custom tools migrate identically |
 | `[VectorField]` | Current embedding/vector expression | Provider or stored vectors may change implicitly |
+| An exception filter or middleware mapping `EntityLifecycleCancelledException` or `Refusal` to an answer | WEB-0086: an entity write answers both as a Problem whose `word` is the cancellation's code or the refusal's word, so the filter no longer sees them there and a client reading `code` reads `word` | The filter can go: the application's own actions still throw to it |
 
 Do not flag a token merely because it is old in another application. Current Koan may still use `SaveAsync`, `Count.Exact()`, `Count.Fast()`, `AllStream()`, `QueryStream()`, `EntityLifecycleBuilder`, lifecycle context `Entity`, `CapabilitySet.Has(DataCaps...)`, and `Koan.*` namespaces.
 

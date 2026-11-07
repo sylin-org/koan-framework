@@ -306,7 +306,10 @@ public static class EntityContext
     /// <param name="name">Transaction name for correlation and telemetry</param>
     /// <param name="ct">Observed while the hold waits for its turn</param>
     /// <exception cref="InvalidOperationException">Thrown when already in a transaction (nested transactions not supported)</exception>
-    public static TransactionHold Hold(string name, CancellationToken ct = default)
+    public static TransactionHold Hold(string name, CancellationToken ct = default) => HoldOn(route: null, name, ct);
+
+    /// <summary>A hold on <paramref name="route"/>, an entity's own (<see cref="Data{TEntity,TKey}.Hold"/>), or on the ambient route where it is null.</summary>
+    internal static TransactionHold HoldOn(Routing.DataRouteBinding? route, string name, CancellationToken ct)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         if (Current?.Transaction is { } outer) throw NestedTransaction(name, outer);
@@ -314,7 +317,7 @@ public static class EntityContext
             .GetRequiredService<ITransactionCoordinatorFactory>(TransactionOperation)
             .CreateHeld(name);
         // Not async: the provider makes its transaction ambient for this flow, which an async frame would discard.
-        var begun = coordinator.BeginHold(ct);
+        var begun = coordinator.BeginHold(ct, route);
         return new TransactionHold(
             begun,
             () => Push(null, null, null, name, null, preserveTransaction: true, TransactionGuarantee.Atomic, coordinator));

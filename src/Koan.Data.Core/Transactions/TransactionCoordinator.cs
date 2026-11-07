@@ -101,17 +101,17 @@ internal sealed class TransactionCoordinator : ITransactionCoordinator
     private sealed record HeldRoute(string Adapter, string Source, string ConnectionIdentity);
 
     /// <summary>
-    /// Begins the native transaction on the route the ambient context names. Everything up to the provider's call runs in
-    /// the caller's frame, because the provider makes its transaction ambient for that flow; a route that cannot hold one
-    /// refuses here, before anything is held.
+    /// Begins the native transaction on <paramref name="route"/>, an entity's own, or else on the route the ambient context
+    /// names. Everything up to the provider's call runs in the caller's frame, because the provider makes its transaction
+    /// ambient for that flow; a route that cannot hold one refuses here, before anything is held.
     /// </summary>
-    internal Task BeginHold(CancellationToken ct)
+    internal Task BeginHold(CancellationToken ct, DataRouteBinding? route = null)
     {
         if (_options.HoldLimit <= TimeSpan.Zero && _options.HoldLimit != Timeout.InfiniteTimeSpan)
             throw new InvalidOperationException(
                 $"{TransactionOptions.SectionPath}:{nameof(TransactionOptions.HoldLimit)} must be positive, or infinite to " +
                 $"remove the bound, and it is {_options.HoldLimit}.");
-        var binding = AdapterResolver
+        var binding = route ?? AdapterResolver
             .ResolveDecisionForContext(_services, _services.GetRequiredService<DataSourceRegistry>())
             .Binding ?? throw new NotSupportedException(
                 $"Transaction '{Name}' requires a held transaction, but the ambient route is not bound to a physical store.");

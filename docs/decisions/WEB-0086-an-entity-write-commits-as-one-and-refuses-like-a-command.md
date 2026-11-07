@@ -32,8 +32,9 @@ of this through `Send`: one hold, and the one refusal mapping.
 1. **A write runs from its prior read to its last after-hook as one.** Every mutating path of the shared endpoint (`Upsert`,
    `UpsertMany`, `Patch`, `Delete`, `DeleteMany`, `DeleteByQuery`, `DeleteAll`), on REST and on the MCP entity tools alike:
    - inside a scope already open it joins, and the scope's owner commits it, rolls it back and hears whatever refuses;
-   - otherwise, where `Data<T>.Capabilities` declares `write.heldTransaction`, it is an `EntityContext.Hold` of its own, as
-     `RoleCollection`'s changes are (SEC-0036);
+   - otherwise, where the entity's provider declares `write.heldTransaction`, it is a hold of its own on the route the entity is
+     stored on, wherever the ambient context points: `Data<T>.Hold`, which `RoleCollection`'s changes (SEC-0036) and the audit
+     chain's appends take too;
    - elsewhere it runs as it does without one.
 2. **The hold opens at the prior read.** That is after the gate, field admission and `OnBeforePatch`, so an application judges costly
    input with nothing held. It commits after `OnAfterSave`, `OnAfterPatch` or `OnAfterDelete`, and before the emit hooks, which compose
@@ -61,9 +62,9 @@ of this through `Send`: one hold, and the one refusal mapping.
 - A write that holds keeps every other writer of its store waiting until it ends, so a hook inside it stays short, and work beyond the
   store (a fetch, a mail) belongs before the hold, in the override or `OnBeforePatch`, or after it, in an emit or the hold's
   `AfterCommit`.
-- A hook's write to another route refuses inside a hold, as every write there does (DATA-0166). The hold opens on the ambient route, as
-  `RoleCollection`'s and the audit chain's do; an entity routed elsewhere by attribute while its provider holds is the same limit they
-  have, and a scope named with `EntityContext.Source` before the request reaches it is the way round.
+- A hook's write to another route refuses inside a hold, as every write there does (DATA-0166): an entity stored on its own source
+  or adapter holds there, and a hook that writes an entity stored elsewhere answers 500 where it wrote before. Such a write belongs
+  in the hold's `AfterCommit` or an emit hook, or the hook's entity on the same route.
 - Every single upsert reads its prior row, including a plain one with no constraint.
 - A lifecycle `AfterUpsert` inside an entity write runs before the hold commits (the lifecycle reference says so).
 
@@ -76,5 +77,6 @@ of this through `Send`: one hold, and the one refusal mapping.
 
 ## Ergonomics
 
-New public concept: `HookContext<T>.Prior`. Removed: `EntityMutationProbe.WantsDeltaKey`. Nothing is declared to get a write's
-hold: the provider's capability decides, as it does for a role change.
+New public concepts: `HookContext<T>.Prior`, and `Data<T>.Hold`, a hold on the route an entity is stored on, or none where that
+route cannot hold. Removed: `EntityMutationProbe.WantsDeltaKey`. Nothing is declared to get a write's hold: the provider's capability
+decides, as it does for a role change.

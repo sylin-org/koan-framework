@@ -1,12 +1,20 @@
 using Microsoft.Data.Sqlite;
+using Microsoft.Extensions.DependencyInjection;
 using Koan.Web.AdapterSurface.TestKit;
+using Koan.Web.Extensions;
+using Koan.Web.Hooks;
 
 namespace Koan.Web.AdapterSurface.Sqlite.Tests;
 
 public sealed class SqliteAdapterFactory : AdapterTestFactoryBase, IAdapterCapabilities
 {
     private readonly string _dbPath = Path.Combine(Path.GetTempPath(), $"koan-surface-sqlite-{Guid.NewGuid():N}.db");
+    private readonly string _archivePath = Path.Combine(Path.GetTempPath(), $"koan-surface-sqlite-archive-{Guid.NewGuid():N}.db");
     private string ConnectionString => $"Data Source={_dbPath}";
+    private string ArchiveConnectionString => $"Data Source={_archivePath}";
+
+    /// <summary>A second SQLite source, which <see cref="ArchivedLedger"/> is stored on.</summary>
+    public const string Archive = "archive";
 
     public override bool IsAvailable => true;
     bool IAdapterCapabilities.SupportsRawQuery => true;
@@ -18,15 +26,24 @@ public sealed class SqliteAdapterFactory : AdapterTestFactoryBase, IAdapterCapab
         ["Koan:Data:Sources:Default:Adapter"] = "sqlite",
         ["Koan:Data:Sources:Default:ConnectionString"] = ConnectionString,
         ["Koan:Data:Sqlite:ConnectionString"] = ConnectionString,
+        [$"Koan:Data:Sources:{Archive}:Adapter"] = "sqlite",
+        [$"Koan:Data:Sources:{Archive}:ConnectionString"] = ArchiveConnectionString,
         ["Koan:Data:Sqlite:DdlPolicy"] = "AutoCreate",
         ["Koan:Data:Relational:Materialization:FailOnMismatch"] = "false",
         ["Koan:BackgroundServices:Enabled"] = "false",
         ["Logging:LogLevel:Default"] = "Warning",
     };
 
+    protected override void ConfigureAdditionalServices(IServiceCollection services)
+    {
+        services.AddKoanControllersFrom<ArchivedLedgerController>();
+        services.AddScoped<IModelHook<ArchivedLedger>, ArchivedLedgerHook>();
+    }
+
     protected override ValueTask StopBackingStoreAsync()
     {
         if (File.Exists(_dbPath)) File.Delete(_dbPath);
+        if (File.Exists(_archivePath)) File.Delete(_archivePath);
         return ValueTask.CompletedTask;
     }
 

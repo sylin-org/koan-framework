@@ -19,6 +19,7 @@ using Koan.Data.Core.Querying;
 using Koan.Data.Core.Routing;
 using Koan.Data.Core.Sorting;
 using Koan.Data.Core.Execution;
+using Koan.Data.Core.Transactions;
 using Koan.Data.Core.Transfers;
 
 namespace Koan.Data.Core;
@@ -72,6 +73,23 @@ public static partial class Data<TEntity, TKey>
             var repo = Repo;
             return DataCaps.Describe(repo, repo.GetType().Name);
         }
+    }
+
+    /// <summary>
+    /// A hold (<see cref="EntityContext.Hold"/>) on the route this entity is stored on, wherever the ambient context points,
+    /// so an entity routed by <c>[DataSource]</c> or <c>[DataAdapter]</c> holds where it is written; or null where that
+    /// route's provider does not declare <c>write.heldTransaction</c>, and the caller runs as it does without one.
+    /// <code>
+    /// if (Data&lt;Ledger, string&gt;.Hold("ledger", ct) is not { } hold) return await Write();
+    /// using (await hold) { var written = await Write(); await EntityContext.Commit(ct); return written; }
+    /// </code>
+    /// A write to another route still refuses inside it, as it does inside any hold.
+    /// </summary>
+    public static TransactionHold? Hold(string name, CancellationToken ct = default)
+    {
+        var repo = Repo;
+        if (!DataCaps.Describe(repo, repo.GetType().Name).Has(DataCaps.Write.HeldTransaction)) return null;
+        return EntityContext.HoldOn((repo as IRoutedRepository)?.RouteBinding, name, ct);
     }
 
     /// <summary>The resolved repository cast to an optional capability interface (e.g.

@@ -11,7 +11,8 @@ internal sealed class EntityVariantRepository<TRoot, TVariant, TKey> :
     IDataRepository<TVariant, TKey>,
     IInsertOnlyRepository<TVariant, TKey>,
     IQueryRepository<TVariant, TKey>,
-    IDescribesCapabilities
+    IDescribesCapabilities,
+    Routing.IRoutedRepository
     where TRoot : class, IEntity<TKey>
     where TVariant : class, TRoot, IEntity<TKey>
     where TKey : notnull
@@ -20,6 +21,9 @@ internal sealed class EntityVariantRepository<TRoot, TVariant, TKey> :
 
     public EntityVariantRepository(Func<IDataRepository<TRoot, TKey>> root)
         => _root = root ?? throw new ArgumentNullException(nameof(root));
+
+    /// <summary>A variant is held where its root is stored.</summary>
+    public Routing.DataRouteBinding? RouteBinding => (_root() as Routing.IRoutedRepository)?.RouteBinding;
 
     public Task EnsureReady(CancellationToken ct = default) => _root().EnsureReady(ct);
 

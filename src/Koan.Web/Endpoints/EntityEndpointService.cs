@@ -1464,16 +1464,17 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
 
     // WEB-0086: a write runs from its prior read to its last after-hook as one. Inside a scope already open it joins, and that scope's owner
     // commits it, rolls it back and hears whatever refuses. Otherwise, where the entity's provider declares write.heldTransaction, it is a
-    // hold of its own, which commits when what it did stands and rolls back on a stop of 400 or more, a refusal or any throw; elsewhere it
-    // runs as it does without one. A thrown Refusal, and a lifecycle handler's cancellation, answer as a command's refusal does.
+    // hold of its own on the route the entity is stored on, which commits when what it did stands and rolls back on a stop of 400 or more,
+    // a refusal or any throw; elsewhere it runs as it does without one. A thrown Refusal, and a lifecycle handler's cancellation, answer as a command's refusal does.
     private static async Task<TResult> Hold<TResult>(EntityRequestContext context, string operation, Func<Task<Step<TResult>>> write,
         Func<IActionResult, TResult> refused)
     {
         if (EntityContext.CurrentTransaction is not null) return (await write().ConfigureAwait(false)).Result;
         try
         {
-            if (!Data<TEntity, TKey>.Capabilities.Has(DataCaps.Write.HeldTransaction)) return (await write().ConfigureAwait(false)).Result;
-            using (await EntityContext.Hold($"{typeof(TEntity).Name}.{operation}", context.CancellationToken))
+            if (Data<TEntity, TKey>.Hold($"{typeof(TEntity).Name}.{operation}", context.CancellationToken) is not { } hold)
+                return (await write().ConfigureAwait(false)).Result;
+            using (await hold)
             {
                 var step = await write().ConfigureAwait(false);
                 if (step.Stands) await EntityContext.Commit(CancellationToken.None).ConfigureAwait(false);

@@ -67,9 +67,9 @@ public sealed class AuditChain
                 return await InATurn(work, ct).ConfigureAwait(false);
 
         if (EntityContext.UncommittedScope is { IsHeld: true }) return await work().ConfigureAwait(false);
-        if (EntityContext.CurrentTransaction is null && Data<AuditEvent, string>.Capabilities.Has(DataCaps.Write.HeldTransaction))
+        if (EntityContext.CurrentTransaction is null && Data<AuditEvent, string>.Hold("audit-chain", ct) is { } hold)
         {
-            using (await EntityContext.Hold("audit-chain", ct))
+            using (await hold)
             {
                 var result = await work().ConfigureAwait(false);
                 await EntityContext.Commit(ct).ConfigureAwait(false);
