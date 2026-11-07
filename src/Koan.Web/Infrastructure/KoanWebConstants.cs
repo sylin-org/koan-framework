@@ -10,6 +10,18 @@ public static class KoanWebConstants
         public const string ApplicationJson = "application/json";
         public const string ApplicationJsonPatch = "application/json-patch+json";
         public const string ApplicationMergePatch = "application/merge-patch+json";
+        public const string FormUrlEncoded = "application/x-www-form-urlencoded";
+        public const string MultipartForm = "multipart/form-data";
+    }
+
+    /// <summary>The fields a page's form carries for the framework rather than for what it writes (WEB-0088).</summary>
+    public static class Form
+    {
+        /// <summary>The method a form that can only <c>POST</c> asks for: <c>PATCH</c> or <c>DELETE</c>.</summary>
+        public const string Method = "_method";
+
+        /// <summary>The path under the application's base a form is sent on to once its write is done.</summary>
+        public const string Return = "return";
     }
 
     public static class Codes

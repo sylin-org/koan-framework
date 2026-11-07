@@ -58,6 +58,12 @@ unless it declares `[Partitions(...)]`
 sealed `after`, a page of `size` rows, in the order its `[Pagination]` declares, and counts nothing
 ([DATA-0170](../../decisions/DATA-0170-a-list-continues-from-one-sealed-keyset-cursor.md)).
 
+A declared controller's writes also take a page's form, which names `PATCH` or `DELETE` in a `_method` field, and answer through
+`Answers.Written`: a form is sent on (`303`) to its safe `return` path or the row's address (`AddressOf`), JSON reads the row with `201`
+or `200` and its `Location`, and a refused form answers its problem with what it `sent`. A verb beside the entity answers the same way
+with `this.Written(...)`
+([WEB-0088](../../decisions/WEB-0088-a-declared-entity-write-takes-a-form-and-answers-once.md)).
+
 Query-style verbs (`POST /query`, `GET /new`, bulk forms) exist beside these; see the surface
 reference. The `?filter=` payload speaks the closed query filter vocabulary —
 [the query filter vocabulary](../data/entities.md#the-query-filter-vocabulary) is the operator table. When an external contract needs an exotic verb, subclass and delegate to the same

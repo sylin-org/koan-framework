@@ -118,7 +118,8 @@ public sealed class EntityOperation
     private static bool IsEntityController(Type? type)
         => type is { IsGenericType: true } && type.GetGenericTypeDefinition() == typeof(EntityController<,>);
 
-    private static Type? EntityOf(Type controller)
+    /// <summary>The entity <paramref name="controller"/> serves, or null where it is no <see cref="EntityController{TEntity,TKey}"/>.</summary>
+    internal static Type? EntityOf(Type controller)
     {
         for (var type = controller; type is not null; type = type.BaseType)
             if (IsEntityController(type)) return type.GetGenericArguments()[0];

@@ -12,7 +12,9 @@ namespace Koan.Web.AdapterSurface.TestKit.Declared;
 /// WEB-0087: a declared <c>EntityController</c> serves what it declares. Only its overrides are routes, each at its own route; a create only
 /// creates and writes what it declares, taking its input from the same body; a change keeps what it leaves out; an address may name a row
 /// by another key, or be the one row of a singleton; a gate on an override is judged; the controller is a hook of its own requests and of no
-/// other controller's; and a partition no controller declares is refused on every controller.
+/// other controller's; and a partition no controller declares is refused on every controller. WEB-0088: its writes take a page's form,
+/// which names the method it cannot send, and answer through <c>Answers.Written</c>: a form is sent on, JSON reads the row created or
+/// changed, and a refused form keeps what it sent.
 /// </summary>
 public abstract class DeclaredControllerSpecsBase<TFactory> : IClassFixture<TFactory>
     where TFactory : class, IAdapterTestFactory
@@ -82,7 +84,7 @@ public abstract class DeclaredControllerSpecsBase<TFactory> : IClassFixture<TFac
     public async Task A_create_only_creates()
     {
         var id = Guid.CreateVersion7().ToString("N");
-        (await Post(new { id, title = "First" })).StatusCode.Should().Be(HttpStatusCode.OK);
+        (await Post(new { id, title = "First" })).StatusCode.Should().Be(HttpStatusCode.Created);
 
         var again = await Post(new { id, title = "Second" });
 
@@ -96,10 +98,11 @@ public abstract class DeclaredControllerSpecsBase<TFactory> : IClassFixture<TFac
     {
         var id = Guid.CreateVersion7().ToString("N");
         var first = await Client.PostAsJsonAsync("/api/card-replays", new { id, title = "Once" }, Ct);
-        first.StatusCode.Should().Be(HttpStatusCode.OK, await first.Content.ReadAsStringAsync(Ct));
+        first.StatusCode.Should().Be(HttpStatusCode.Created, await first.Content.ReadAsStringAsync(Ct));
 
         var again = await Client.PostAsJsonAsync("/api/card-replays", new { id, title = "Once" }, Ct);
-        again.StatusCode.Should().Be(HttpStatusCode.OK, await again.Content.ReadAsStringAsync(Ct));
+        again.StatusCode.Should().Be(HttpStatusCode.Created, await again.Content.ReadAsStringAsync(Ct));
+        again.Headers.Location!.OriginalString.Should().Be(first.Headers.Location!.OriginalString);
         var card = await again.Content.ReadFromJsonAsync<JsonElement>(Ct);
         card.GetProperty("id").GetString().Should().Be(id);
         card.GetProperty("title").GetString().Should().Be("Once");
@@ -115,7 +118,9 @@ public abstract class DeclaredControllerSpecsBase<TFactory> : IClassFixture<TFac
     {
         var answer = await Post(new { title = "Placed Card", place = "top" });
 
-        answer.StatusCode.Should().Be(HttpStatusCode.OK, await answer.Content.ReadAsStringAsync(Ct));
+        answer.StatusCode.Should().Be(HttpStatusCode.Created, await answer.Content.ReadAsStringAsync(Ct));
+        answer.Headers.Location!.OriginalString.Should().Be("/api/cards/by/placed-card");
+        answer.Headers.CacheControl!.NoStore.Should().BeTrue();
         var card = await answer.Content.ReadFromJsonAsync<JsonElement>(Ct);
         card.GetProperty("shelf").GetString().Should().Be("top");
         card.GetProperty("slug").GetString().Should().Be("placed-card");
@@ -148,6 +153,7 @@ public abstract class DeclaredControllerSpecsBase<TFactory> : IClassFixture<TFac
 
         var changed = await Patch($"/api/cards/by/{id}", new { title = "After change" });
         changed.StatusCode.Should().Be(HttpStatusCode.OK, await changed.Content.ReadAsStringAsync(Ct));
+        changed.Headers.Location!.OriginalString.Should().Be("/api/cards/by/before-change");
         var card = await Read($"/api/cards/by/{id}");
         card.GetProperty("title").GetString().Should().Be("After change");
         card.GetProperty("shelf").GetString().Should().Be("middle");
@@ -327,14 +333,138 @@ public abstract class DeclaredControllerSpecsBase<TFactory> : IClassFixture<TFac
 
     private static string? Next(JsonElement page) => page.GetProperty("next").GetString();
 
+    [Fact]
+    public async Task A_form_create_is_sent_on_to_the_rows_address()
+    {
+        var answer = await Form("/api/cards", ("title", "Formed Card"), ("place", "side"));
+
+        answer.StatusCode.Should().Be(HttpStatusCode.SeeOther, await answer.Content.ReadAsStringAsync(Ct));
+        answer.Headers.Location!.OriginalString.Should().Be("/api/cards/by/formed-card");
+        answer.Headers.CacheControl!.NoStore.Should().BeTrue();
+        (await Read("/api/cards/by/formed-card")).GetProperty("shelf").GetString().Should().Be("side");
+    }
+
+    [Fact]
+    public async Task A_form_is_sent_on_to_its_return_where_that_is_a_path_here()
+    {
+        var returned = await Form("/api/cards", ("title", "Returned Card"), ("return", "/boards/front?seen=1"));
+        returned.StatusCode.Should().Be(HttpStatusCode.SeeOther);
+        returned.Headers.Location!.OriginalString.Should().Be("/boards/front?seen=1");
+
+        foreach (var unsafeReturn in new[] { "//elsewhere.example/x", "https://elsewhere.example/x", "/\\elsewhere.example", "boards" })
+        {
+            var title = "Unsafe " + Guid.CreateVersion7().ToString("N");
+            var answer = await Form("/api/cards", ("title", title), ("return", unsafeReturn));
+            answer.StatusCode.Should().Be(HttpStatusCode.SeeOther, unsafeReturn);
+            answer.Headers.Location!.OriginalString.Should().Be("/api/cards/by/" + title.ToLowerInvariant().Replace(' ', '-'), unsafeReturn);
+        }
+    }
+
+    [Fact]
+    public async Task A_form_that_reads_json_reads_the_row_and_one_that_also_reads_pages_is_sent_on()
+    {
+        var json = await Form("/api/cards", [("title", "Json Form Card")], "application/json");
+        json.StatusCode.Should().Be(HttpStatusCode.Created, await json.Content.ReadAsStringAsync(Ct));
+        json.Headers.Location!.OriginalString.Should().Be("/api/cards/by/json-form-card");
+        (await json.Content.ReadFromJsonAsync<JsonElement>(Ct)).GetProperty("title").GetString().Should().Be("Json Form Card");
+
+        var both = await Form("/api/cards", [("title", "Paged Form Card")], "application/json, text/html");
+        both.StatusCode.Should().Be(HttpStatusCode.SeeOther);
+    }
+
+    [Fact]
+    public async Task A_form_asks_for_the_change_it_cannot_send()
+    {
+        var id = await Create("Formed change");
+
+        var answer = await Form($"/api/cards/by/{id}", ("_method", "PATCH"), ("title", "Changed by form"));
+
+        answer.StatusCode.Should().Be(HttpStatusCode.SeeOther, await answer.Content.ReadAsStringAsync(Ct));
+        answer.Headers.Location!.OriginalString.Should().Be("/api/cards/by/formed-change");
+        var card = await Read($"/api/cards/by/{id}");
+        card.GetProperty("title").GetString().Should().Be("Changed by form");
+        card.GetProperty("edits").GetInt32().Should().Be(1);
+    }
+
+    [Fact]
+    public async Task A_form_delete_takes_its_input_from_the_form_and_is_sent_on_to_the_list()
+    {
+        var made = await Client.PostAsJsonAsync("/api/loose-cards", new { title = "Leaving" }, Ct);
+        made.StatusCode.Should().Be(HttpStatusCode.Created, await made.Content.ReadAsStringAsync(Ct));
+        var id = (await made.Content.ReadFromJsonAsync<JsonElement>(Ct)).GetProperty("id").GetString()!;
+        made.Headers.Location!.OriginalString.Should().Be($"/api/loose-cards/{id}");
+
+        var changed = await Form($"/api/loose-cards/{id}", ("_method", "PATCH"), ("edits", "2"));
+        changed.StatusCode.Should().Be(HttpStatusCode.SeeOther, await changed.Content.ReadAsStringAsync(Ct));
+        changed.Headers.Location!.OriginalString.Should().Be($"/api/loose-cards/{id}");
+
+        var stale = await Form($"/api/loose-cards/{id}", ("_method", "DELETE"), ("seen", "0"));
+        stale.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        (await Problem(stale)).GetProperty("sent").GetProperty("seen")[0].GetString().Should().Be("0");
+
+        var gone = await Form($"/api/loose-cards/{id}", ("_method", "DELETE"), ("seen", "2"));
+        gone.StatusCode.Should().Be(HttpStatusCode.SeeOther, await gone.Content.ReadAsStringAsync(Ct));
+        gone.Headers.Location!.OriginalString.Should().Be("/api/loose-cards");
+        (await Client.GetAsync($"/api/cards/by/{id}", Ct)).StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task A_refused_form_keeps_what_it_sent()
+    {
+        var forged = await Form("/api/cards", ("title", "Forged Form"), ("slug", "elsewhere"), ("return", "/boards"));
+        forged.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        var problem = await Problem(forged);
+        problem.GetProperty("errors").GetProperty("slug")[0].GetString().Should().Be("This address does not write 'slug'.");
+        problem.GetProperty("sent").GetProperty("title")[0].GetString().Should().Be("Forged Form");
+        problem.GetProperty("sent").GetProperty("return")[0].GetString().Should().Be("/boards");
+
+        var unfit = await Form("/api/cards", ("title", "Many Copies"), ("copies", "many"));
+        unfit.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        var refused = await Problem(unfit);
+        refused.GetProperty("errors").TryGetProperty("copies", out _).Should().BeTrue();
+        refused.GetProperty("sent").GetProperty("copies")[0].GetString().Should().Be("many");
+
+        var json = await Post(new { title = "Forged Json", slug = "elsewhere" });
+        (await Problem(json)).TryGetProperty("sent", out _).Should().BeFalse("only a form is answered with what it sent");
+    }
+
+    [Fact]
+    public async Task A_verb_answers_as_an_entity_write_does()
+    {
+        var form = await Form("/api/card-verbs/kept/pin", ("return", "/boards"));
+        form.StatusCode.Should().Be(HttpStatusCode.SeeOther);
+        form.Headers.Location!.OriginalString.Should().Be("/boards");
+
+        var bare = await Form("/api/card-verbs/kept/pin");
+        bare.Headers.Location!.OriginalString.Should().Be("/api/cards/by/kept");
+
+        var json = await Client.PostAsync("/api/card-verbs/kept/pin", null, Ct);
+        json.StatusCode.Should().Be(HttpStatusCode.OK, "a sender that sends no form and asks for no page reads JSON");
+        json.Headers.Location!.OriginalString.Should().Be("/api/cards/by/kept");
+        (await json.Content.ReadFromJsonAsync<JsonElement>(Ct)).GetProperty("pinned").GetBoolean().Should().BeTrue();
+    }
+
     private async Task<string> Create(string title, string? place = null)
     {
         var answer = await Post(new { title, place });
-        answer.StatusCode.Should().Be(HttpStatusCode.OK, await answer.Content.ReadAsStringAsync(Ct));
+        answer.StatusCode.Should().Be(HttpStatusCode.Created, await answer.Content.ReadAsStringAsync(Ct));
         return (await answer.Content.ReadFromJsonAsync<JsonElement>(Ct)).GetProperty("id").GetString()!;
     }
 
     private Task<HttpResponseMessage> Post(object body) => Client.PostAsJsonAsync("/api/cards", body, Ct);
+
+    /// <summary>A page's form, as a browser posts it: urlencoded, asking for a page.</summary>
+    private Task<HttpResponseMessage> Form(string path, params (string Name, string Value)[] fields) => Form(path, fields, "text/html");
+
+    private Task<HttpResponseMessage> Form(string path, (string Name, string Value)[] fields, string accept)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Post, path)
+        {
+            Content = new FormUrlEncodedContent(fields.Select(field => new KeyValuePair<string, string>(field.Name, field.Value)))
+        };
+        request.Headers.TryAddWithoutValidation("Accept", accept);
+        return Client.SendAsync(request, Ct);
+    }
 
     private Task<HttpResponseMessage> Patch(string path, object body)
         => Client.SendAsync(new HttpRequestMessage(HttpMethod.Patch, path) { Content = Json(body) }, Ct);

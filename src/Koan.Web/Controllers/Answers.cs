@@ -4,6 +4,7 @@ using Koan.Data.Core.Commands;
 using Koan.Data.Core.Lifecycle;
 using Koan.Web.Authorization;
 using Koan.Web.Hooks;
+using Koan.Web.Infrastructure;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
@@ -35,6 +36,64 @@ public static class Answers
     /// <inheritdoc cref="Answer{TResult}(ControllerBase, Outcome{TResult}, Func{TResult, IActionResult})"/>
     public static async Task<IActionResult> Answer<TResult>(this ControllerBase controller, Outcome<TResult> outcome, Func<TResult, Task<IActionResult>> done)
         => outcome is Outcome<TResult>.Done committed ? await done(committed.Result) : NotDone(controller.HttpContext, outcome);
+
+    /// <summary>
+    /// The one answer to a write that committed (WEB-0088), at <paramref name="location"/>, the address of what it wrote. It is never
+    /// cached. A browser's form is sent on (<c>303</c>) to the safe path its <c>return</c> field names under the application's base, or
+    /// else to <paramref name="location"/>, so the page it came from posts, redirects and gets; a sender that reads JSON
+    /// (<see cref="WantsJson"/>) reads <paramref name="body"/>, <c>201</c> where the write <paramref name="created"/> it and <c>200</c>
+    /// otherwise, with <paramref name="location"/> as its <c>Location</c>.
+    /// </summary>
+    public static IActionResult Written(this ControllerBase controller, string location, object? body, bool created)
+    {
+        ArgumentNullException.ThrowIfNull(location);
+        var http = controller.HttpContext;
+        http.Response.Headers.CacheControl = "no-store";
+        if (!WantsJson(http.Request)) return new SentOn(location);
+
+        http.Response.Headers.Location = location;
+        return new ObjectResult(body)
+        {
+            StatusCode = created ? StatusCodes.Status201Created : StatusCodes.Status200OK,
+            ContentTypes = { KoanWebConstants.ContentTypes.ApplicationJson }
+        };
+    }
+
+    /// <summary>
+    /// Whether the sender reads JSON rather than pages: it sent JSON, or its <c>Accept</c> names JSON and not HTML, or it sent no form and
+    /// its <c>Accept</c> names no HTML. A browser's form, and a request that asks for HTML, read pages.
+    /// </summary>
+    public static bool WantsJson(HttpRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        if (request.HasJsonContentType()) return true;
+        var accept = request.GetTypedHeaders().Accept;
+        var json = accept.Any(type => type.MediaType.Equals(KoanWebConstants.ContentTypes.ApplicationJson, StringComparison.OrdinalIgnoreCase)
+                                      || type.Suffix.Equals("json", StringComparison.OrdinalIgnoreCase));
+        var html = accept.Any(type => type.MediaType.Equals(Html, StringComparison.OrdinalIgnoreCase));
+        if (json && !html) return true;
+        return !html && !request.HasFormContentType;
+    }
+
+    private const string Html = "text/html";
+
+    /// <summary>A form sent on: to the path its <c>return</c> field names under the application's base, where it is one — a single slash
+    /// and a path, never another host's (<c>//</c>), a backslash or a control character — and otherwise to the address written. The form
+    /// is read as the answer is written, so an action that bound none of it answers alike.</summary>
+    private sealed class SentOn(string location) : IActionResult
+    {
+        public async Task ExecuteResultAsync(ActionContext context)
+        {
+            var request = context.HttpContext.Request;
+            var onward = location;
+            if (request.HasFormContentType
+                && (await request.ReadFormAsync(context.HttpContext.RequestAborted))[KoanWebConstants.Form.Return].ToString() is { Length: > 0 } path
+                && path[0] == '/' && !path.StartsWith("//", StringComparison.Ordinal) && !path.Contains('\\') && !path.Any(char.IsControl))
+                onward = request.PathBase.ToUriComponent() + path;
+            context.HttpContext.Response.Headers.Location = onward;
+            context.HttpContext.Response.StatusCode = StatusCodes.Status303SeeOther;
+        }
+    }
 
     /// <summary>The one mapping of a reason.</summary>
     public static IActionResult Refused(this ControllerBase controller, Reason reason) => Refused(controller.HttpContext, reason);

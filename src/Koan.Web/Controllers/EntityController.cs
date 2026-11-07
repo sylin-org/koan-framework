@@ -191,6 +191,48 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
         return (null, writes);
     }
 
+    /// <summary>A declared write's members as it sent them (WEB-0088): a page's form as the object of its fields, each typed as the member
+    /// it names, or a value that cannot be its member refused with its field; otherwise the JSON body.</summary>
+    private async Task<(JObject? Words, IActionResult? Refused)> Sent(EntityOperation operation, CancellationToken ct)
+    {
+        if (!HttpContext.Request.HasFormContentType) return (await SentBody(ct), null);
+        var form = await HttpContext.Request.ReadFormAsync(ct);
+        var serializer = JsonSerializer.Create(HttpContext.RequestServices.GetRequiredService<IOptions<MvcNewtonsoftJsonOptions>>().Value.SerializerSettings);
+        var (words, unfit) = SentForm.Words(form, typeof(TEntity), operation.InputMembers, serializer);
+        return unfit is null ? (words, null) : (null, this.Refused(unfit));
+    }
+
+    /// <summary>
+    /// The address a row this controller wrote answers at, as a path under the application's base (WEB-0088): where a committed write's
+    /// <c>Location</c> points and a form is sent on to when it names no <c>return</c>. Left alone it is the address the write was sent to
+    /// where that address named the row, and otherwise that address followed by the row's id, as a create's is. Override it where the row
+    /// answers at another address, such as its slug's.
+    /// </summary>
+    protected virtual string AddressOf(TEntity row)
+    {
+        var sent = HttpContext.Request.Path.ToUriComponent();
+        var created = (ControllerContext?.ActionDescriptor as ControllerActionDescriptor)?.MethodInfo.GetBaseDefinition().Name == nameof(Upsert);
+        return created ? sent.TrimEnd('/') + "/" + Uri.EscapeDataString(Convert.ToString(row.Id, CultureInfo.InvariantCulture) ?? "") : sent;
+    }
+
+    /// <summary>What a single write answers once it committed: on a declared controller through <see cref="Answers.Written"/> (WEB-0088), at
+    /// the written row's address, or for a delete at the address the row was listed under.</summary>
+    private IActionResult Answered(EntityModelResult<TEntity> result, bool created, bool deleted = false)
+    {
+        var body = result.Payload ?? result.Model;
+        if (!Operation.Declared) return PrepareResponse(body);
+        var address = deleted || result.Model is null ? Listed() : AddressOf(result.Model);
+        return this.Written(HttpContext.Request.PathBase.ToUriComponent() + address, body, created);
+    }
+
+    /// <summary>The address the row a request names is listed under: the request's own, less its last segment.</summary>
+    private string Listed()
+    {
+        var sent = HttpContext.Request.Path.ToUriComponent().TrimEnd('/');
+        var last = sent.LastIndexOf('/');
+        return last <= 0 ? "/" : sent[..last];
+    }
+
     /// <summary>A declared create's body as it was sent, kept readable by its buffering (WEB-0087).</summary>
     private async Task<JObject?> SentBody(CancellationToken ct)
     {
@@ -639,9 +681,11 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
         var operation = Operation;
         JObject? body = null;
         IReadOnlyCollection<string>? writes = null;
-        if (operation.Declared && (operation.Writes is not null || operation.Input is not null))
+        if (operation.Declared && (operation.Writes is not null || operation.Input is not null || HttpContext.Request.HasFormContentType))
         {
-            body = await SentBody(ct);
+            var (sent, unfit) = await Sent(operation, ct);
+            if (unfit is not null) return unfit;
+            body = sent;
             var written = Written(operation, body?.Properties().Select(member => member.Name) ?? []);
             if (written.Refused is { } stranger) return stranger;
             writes = written.Writes;
@@ -731,7 +775,8 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
         var result = await EndpointService.Upsert(request);
         ApplyResponseMetadata(result);
         if (result.IsShortCircuited) return ResolveShortCircuit(result);
-        return PrepareResponse(result.Payload ?? result.Model);
+        // A declared create only creates, so a replay its hook answers is answered as the create was.
+        return Answered(result, insert || Equals(result.Context.Items.TryGetValue(EntityMutationProbe.OperationKey, out var done) ? done : null, "create"));
     }
 
     [HttpPost("bulk")]
@@ -758,7 +803,15 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
     [HttpDelete("{id}")]
     public virtual async Task<IActionResult> Delete([FromRoute] TKey id, CancellationToken ct)
     {
-        if (Admit() is { } refused) return refused;
+        // WEB-0088: a declared delete sent as a form takes its input from the form's fields, as one sent as a tool takes it from the query.
+        JObject? words = null;
+        if (Operation.Declared && HttpContext.Request.HasFormContentType)
+        {
+            var (sent, unfit) = await Sent(Operation, ct);
+            if (unfit is not null) return unfit;
+            words = sent;
+        }
+        if (Admit(words, bodyIsWords: words is not null) is { } refused) return refused;
         var (found, key) = await Keyed(id, ct);
         if (!found) return NotFound();
         var options = BuildOptions();
@@ -774,7 +827,7 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
         var result = await EndpointService.Delete(request);
         ApplyResponseMetadata(result);
         if (result.IsShortCircuited) return ResolveShortCircuit(result);
-        return PrepareResponse(result.Payload ?? result.Model);
+        return Answered(result, created: false, deleted: true);
     }
 
     [HttpDelete("bulk")]
@@ -847,18 +900,30 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
         Infrastructure.KoanWebConstants.ContentTypes.ApplicationJson)]
     public virtual async Task<IActionResult> Patch([FromRoute] TKey id, CancellationToken ct)
     {
-        // Buffer the body so we can parse it with the right shape per Content-Type.
-        Microsoft.AspNetCore.Http.HttpRequestRewindExtensions.EnableBuffering(HttpContext.Request);
         string raw;
-        using (var reader = new System.IO.StreamReader(HttpContext.Request.Body, System.Text.Encoding.UTF8, detectEncodingFromByteOrderMarks: true, leaveOpen: true))
+        string mediaType;
+        if (Operation.Declared && HttpContext.Request.HasFormContentType)
         {
-            raw = await reader.ReadToEndAsync(ct);
-            HttpContext.Request.Body.Position = 0;
+            // WEB-0088: a page's form is the partial JSON object of the members it names, admitted and written as that object would be.
+            var (sent, unfit) = await Sent(Operation, ct);
+            if (unfit is not null) return unfit;
+            raw = sent!.ToString(Formatting.None);
+            mediaType = Infrastructure.KoanWebConstants.ContentTypes.ApplicationJson;
         }
+        else
+        {
+            // Buffer the body so we can parse it with the right shape per Content-Type.
+            Microsoft.AspNetCore.Http.HttpRequestRewindExtensions.EnableBuffering(HttpContext.Request);
+            using (var reader = new System.IO.StreamReader(HttpContext.Request.Body, System.Text.Encoding.UTF8, detectEncodingFromByteOrderMarks: true, leaveOpen: true))
+            {
+                raw = await reader.ReadToEndAsync(ct);
+                HttpContext.Request.Body.Position = 0;
+            }
 
-        var contentType = HttpContext.Request.ContentType ?? Infrastructure.KoanWebConstants.ContentTypes.ApplicationJson;
-        // Take only the media type portion (strip ;charset=...).
-        var mediaType = contentType.Split(';', 2)[0].Trim();
+            var contentType = HttpContext.Request.ContentType ?? Infrastructure.KoanWebConstants.ContentTypes.ApplicationJson;
+            // Take only the media type portion (strip ;charset=...).
+            mediaType = contentType.Split(';', 2)[0].Trim();
+        }
 
         object patch;
         var kind = EntityPatchKind.PartialJson;
@@ -954,7 +1019,7 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
         var result = await EndpointService.Patch(request);
         ApplyResponseMetadata(result);
         if (result.IsShortCircuited) return ResolveShortCircuit(result);
-        return PrepareResponse(result.Payload ?? result.Model);
+        return Answered(result, created: false);
     }
 
     private Koan.Data.Abstractions.Instructions.PatchPayload<TKey> NormalizeFromJsonPatch(TKey id, JsonPatchDocument<TEntity> doc)

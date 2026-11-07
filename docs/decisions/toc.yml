@@ -536,6 +536,8 @@
       href: WEB-0086-an-entity-write-commits-as-one-and-refuses-like-a-command.md
     - name: WEB-0087 A declared entity controller serves what it declares
       href: WEB-0087-a-declared-entity-controller-serves-what-it-declares.md
+    - name: WEB-0088 A declared entity write takes a form, and every write answers once
+      href: WEB-0088-a-declared-entity-write-takes-a-form-and-answers-once.md
 - name: Flow (FLOW)
   items:
     - name: FLOW-0070 Flow commands bus

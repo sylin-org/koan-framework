@@ -6,7 +6,7 @@ namespace Koan.Web.Controllers;
 
 /// <summary>The one document a refusal answers with, at every Koan door (ARCH-0143, ARCH-0145): its status, a title, a sentence as
 /// <c>detail</c>, its <c>kind</c>, the stable <c>word</c> a client acts on, which is the kind where nothing names another, and what each
-/// field it concerns was refused for as <c>errors</c>. The kind follows from the status, so no problem says one its status contradicts; the
+/// field it concerns was refused for as <c>errors</c>, and for a refused form what it sent as <c>sent</c>. The kind follows from the status, so no problem says one its status contradicts; the
 /// title is the kind's name unless an application names its own. It answers <c>application/problem+json</c>, and offers <c>text/html</c> to
 /// negotiation: Koan writes no page, so an application that renders pages registers an ordinary <c>text/html</c> output formatter that writes
 /// this record, and sets <c>MvcOptions.RespectBrowserAcceptHeader</c> so a browser's <c>Accept</c> counts. The record is sealed and plain, so
@@ -28,6 +28,10 @@ public sealed record Problem(int Status, string? Detail = null, string? Word = n
     public string Word { get => field ?? Kind; init; } = Word;
 
     public string Title { get => field ?? CultureInfo.InvariantCulture.TextInfo.ToTitleCase(Kind); init; }
+
+    /// <summary>What a refused form sent, each field with its values, so the page that renders this record can show the form again as it
+    /// was filled (WEB-0088); null for anything else.</summary>
+    public IReadOnlyDictionary<string, string[]>? Sent { get; init; }
 
     public ObjectResult ToResult() => new(this) { StatusCode = Status, ContentTypes = { MediaType, "text/html" } };
 }

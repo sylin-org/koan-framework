@@ -325,6 +325,18 @@ no count or paging header. `RouteTools` adds `after` and `size` to its schema.
 after the registered hooks of each kind, before the access floor. `[Writes]` and `[Input]` refuse, when the routes are composed, anywhere but a declared
 controller's operation.
 
+## Form writes and the write answer
+
+`Answers.Written` is the one answer to a committed write: `Cache-Control: no-store`, then for a sender `Answers.WantsJson` says reads
+pages a result that reads the form as it executes and answers `303` to its safe `return` under `PathBase`, else to the location, and
+otherwise the body as JSON, `201` or `200`, with `Location`. `SentForm.Words` reads a form as the JSON object of its fields, typed by the
+entity's and the declared input's members, without `_method` and `return`; `EntityFormInputFormatter` binds a declared write's entity
+from it with field access's serializer, and the controller reads the same object as the body it checks against the write set and the
+input, so a form and JSON take one path. `[Declared]` adds the form media types to `Patch`'s `[Consumes]` and puts `KeptForm`, an
+always-run result filter, on its writes: a refused form's `Problem`, or the model-state refusal of a body that could not bind, answers
+with `Sent`. `FormMethod` runs before routing, after the cross-site check, only where the host maps a declared controller, reading a
+urlencoded `POST`'s `_method` alone.
+
 ## Property access admission
 
 `AccessGateCache` compiles property read/write/all using the existing parser. `remove` and row

@@ -84,8 +84,9 @@ public sealed class DeclaredOperationsSpec(ForumFixture forum) : IClassFixture<F
         var route = await forum.Route(HttpMethod.Post, "/boards/notices", new JObject { ["text"] = "by route", ["where"] = "lost" }, Mara);
         var tool = await forum.Tool("post_notice", new JObject { ["text"] = "by tool", ["where"] = "lost" }, Mara);
 
-        route.Status.Should().Be(200, route.ToString());
-        tool.Status.Should().Be(200, tool.ToString());
+        // WEB-0088: a create answers 201 at the row's address, on both doors.
+        route.Status.Should().Be(201, route.ToString());
+        tool.Status.Should().Be(201, tool.ToString());
         foreach (var written in new[] { JObject.Parse(route.Text), JObject.Parse(tool.Text) })
         {
             written["board"]!.Value<string>().Should().Be("lost");

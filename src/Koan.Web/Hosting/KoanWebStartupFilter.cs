@@ -133,6 +133,8 @@ internal sealed class KoanWebStartupFilter(IOptions<KoanWebOptions> options, IOp
                 }
                 if (opts.AutoMapControllers)
                 {
+                    // WEB-0088: a form asks for the method it cannot send, before routing picks the endpoint by it.
+                    if (FormMethod.Served(app.ApplicationServices)) app.Use(FormMethod.Override);
                     RunStage(app, KoanWebPipelineStage.BeforeRouting);
                     app.UseRouting();
                     // A default policy the application added answers before authorization, or a browser reads a 401 as a CORS failure.

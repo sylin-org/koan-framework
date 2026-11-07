@@ -51,6 +51,9 @@ public sealed class CardsController : EntityController<Card>, IModelHook<Card>
     protected override async ValueTask<string?> KeyOf(string segment, CancellationToken ct)
         => (await Card.Query(card => card.Slug == segment, ct)).FirstOrDefault()?.Id ?? segment;
 
+    /// <summary>WEB-0088: a card answers at its slug, so that is where a write of one is sent on to.</summary>
+    protected override string AddressOf(Card row) => "/api/cards/by/" + Uri.EscapeDataString(row.Slug);
+
     public Task OnBeforeSave(HookContext<Card> ctx, Card model)
     {
         if (ctx.Prior is { } prior) model.Edits = prior.Edits + 1;
@@ -90,6 +93,42 @@ public sealed class CardReplaysController : EntityController<Card>, IModelHook<C
         if (ctx.Prior is { } prior && prior.Title == model.Title) ctx.ShortCircuit(prior);
         return Task.CompletedTask;
     }
+}
+
+/// <summary>What a delete takes beside the card: how many edits its sender read.</summary>
+public sealed record CardLeaving(int? Seen = null);
+
+/// <summary>Creates, changes and deletes cards at the addresses it leaves alone, a delete only of a card as its sender read it.</summary>
+[Route("api/loose-cards")]
+[Declared]
+public sealed class LooseCardsController : EntityController<Card>, IModelHook<Card>
+{
+    [Writes(nameof(Card.Id), nameof(Card.Title))]
+    public override Task<IActionResult> Upsert(Card model, CancellationToken ct) => base.Upsert(model, ct);
+
+    [HttpPatch("{card}")]
+    [Writes(nameof(Card.Title), nameof(Card.Edits))]
+    public override Task<IActionResult> Patch(string card, CancellationToken ct) => base.Patch(card, ct);
+
+    [HttpDelete("{card}")]
+    [Input<CardLeaving>]
+    public override Task<IActionResult> Delete(string card, CancellationToken ct) => base.Delete(card, ct);
+
+    public Task OnBeforeDelete(HookContext<Card> ctx, Card model)
+    {
+        if (ctx.Input<CardLeaving>()?.Seen != model.Edits)
+            throw new Koan.Data.Core.Commands.Refusal(Koan.Data.Core.Commands.Reason.Conflict("edited", "This card was edited since it was read."));
+        return Task.CompletedTask;
+    }
+}
+
+/// <summary>A verb beside the cards, answered as an entity write is (WEB-0088).</summary>
+[ApiController]
+[Route("api/card-verbs")]
+public sealed class CardVerbsController : ControllerBase
+{
+    [HttpPost("{card}/pin")]
+    public IActionResult Pin(string card) => this.Written("/api/cards/by/" + Uri.EscapeDataString(card), new { card, pinned = true }, created: false);
 }
 
 /// <summary>The whole surface over the same row, with no hook of its own.</summary>

@@ -298,6 +298,35 @@ public sealed class NoticesController : EntityController<Notice>, IModelHook<Not
 - **Gates:** a gate an override declares is judged before binding, tool or not. A declared collection answers in the format the caller
   accepts. See [WEB-0087](https://github.com/sylin-org/koan-framework/blob/main/docs/decisions/WEB-0087-a-declared-entity-controller-serves-what-it-declares.md).
 
+## A form writes, and every write answers once
+
+A declared controller's writes take a page's form as well as JSON, and every committed write, an entity's or a verb's, answers through
+`Answers.Written`:
+
+```html
+<form method="post" action="/boards/notices/first-steps">
+  <input type="hidden" name="_method" value="PATCH">
+  <input type="hidden" name="return" value="/boards">
+  <textarea name="text"></textarea>
+</form>
+```
+
+```csharp
+protected override string AddressOf(Notice row) => "/boards/notices/" + Uri.EscapeDataString(row.Slug); // where a written notice answers
+
+[HttpPost("{notice}/pin")]                                                                              // a verb beside the entity
+public async Task<IActionResult> Pin(string notice, CancellationToken ct)
+    => this.Answer(await new PinNotice(notice).Send(ct), pinned => this.Written("/boards/notices/" + notice, pinned, created: false));
+```
+
+- **A form:** `Upsert`, `Patch` and `Delete` read a urlencoded or multipart form as the JSON object of its fields, typed as the members
+  they name, and judge it by the same write set, input and refusals. A urlencoded `POST` names `PATCH` or `DELETE` in `_method`.
+- **The answer:** never cached. A sender that reads pages (a form, or an `Accept` asking for HTML) is sent on with `303` to its form's
+  `return`, a path under the base, or else to the row's address, `AddressOf(row)`; a delete goes to the address its row was listed under.
+  A sender that reads JSON (`Answers.WantsJson`) reads the row, `201` for a create and `200` otherwise, with `Location`.
+- **A refusal:** a refused form answers its problem with `sent`, each field it sent, so your page formatter shows the form again as
+  filled. See [WEB-0088](https://github.com/sylin-org/koan-framework/blob/main/docs/decisions/WEB-0088-a-declared-entity-write-takes-a-form-and-answers-once.md).
+
 ## A request answered in process
 
 `KoanWebPipeline` answers a request of the application here, through its whole pipeline — routing, authentication,

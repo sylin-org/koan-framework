@@ -1,5 +1,6 @@
 using Koan.Web.Controllers;
 using Koan.Web.Filters;
+using Koan.Web.Infrastructure;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ApplicationModels;
 using Microsoft.AspNetCore.Mvc.Routing;
@@ -13,6 +14,8 @@ namespace Koan.Web.Attributes;
 /// (<see cref="InputAttribute{TInput}"/>) is refused with its field named; and a collection or query answers in the format the caller accepts,
 /// JSON by default, so an emit hook's record reaches the application's formatter. Its collection continues from a sealed <c>after</c>, a
 /// page of <c>size</c> rows, in the order its <see cref="PaginationAttribute"/>'s <c>DefaultSort</c> declares (DATA-0170), and counts nothing.
+/// Its writes take a page's form as well as JSON, a form
+/// naming the method it cannot send in <c>_method</c>, and answer through <see cref="Answers.Written"/> (WEB-0088).
 /// </summary>
 /// <example>
 /// <code>
@@ -55,8 +58,38 @@ public sealed class DeclaredAttribute : Attribute, IControllerModelConvention
                     break;
                 case nameof(EntityController<,>.Upsert):
                     if (!action.Filters.Contains(BufferedBody.Instance)) action.Filters.Add(BufferedBody.Instance);
+                    KeepsForm(action);
+                    break;
+                case nameof(EntityController<,>.Patch):
+                    TakesForms(action);
+                    KeepsForm(action);
+                    break;
+                case nameof(EntityController<,>.Delete):
+                    KeepsForm(action);
                     break;
             }
+        }
+    }
+
+    /// <summary>A refused write that came as a form answers with what it sent (WEB-0088).</summary>
+    private static void KeepsForm(ActionModel action)
+    {
+        if (!action.Filters.Contains(KeptForm.Instance)) action.Filters.Add(KeptForm.Instance);
+    }
+
+    /// <summary>A change takes a page's form as well as JSON (WEB-0088): the one it inherits consumes JSON alone.</summary>
+    private static void TakesForms(ActionModel action)
+    {
+        var consumes = new ConsumesAttribute(KoanWebConstants.ContentTypes.ApplicationJsonPatch, KoanWebConstants.ContentTypes.ApplicationMergePatch,
+            KoanWebConstants.ContentTypes.ApplicationJson, KoanWebConstants.ContentTypes.FormUrlEncoded, KoanWebConstants.ContentTypes.MultipartForm);
+        for (var i = 0; i < action.Filters.Count; i++)
+            if (action.Filters[i] is ConsumesAttribute) action.Filters[i] = consumes;
+        foreach (var selector in action.Selectors)
+        {
+            for (var i = 0; i < selector.ActionConstraints.Count; i++)
+                if (selector.ActionConstraints[i] is ConsumesAttribute) selector.ActionConstraints[i] = consumes;
+            for (var i = 0; i < selector.EndpointMetadata.Count; i++)
+                if (selector.EndpointMetadata[i] is ConsumesAttribute) selector.EndpointMetadata[i] = consumes;
         }
     }
 
