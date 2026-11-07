@@ -129,6 +129,10 @@ public sealed class CardVerbsController : ControllerBase
 {
     [HttpPost("{card}/pin")]
     public IActionResult Pin(string card) => this.Written("/api/cards/by/" + Uri.EscapeDataString(card), new { card, pinned = true }, created: false);
+
+    /// <summary>Names its address with the card as it was routed, unescaped, as a header cannot carry it.</summary>
+    [HttpPost("{card}/flag")]
+    public IActionResult Flag(string card) => this.Written("/api/cards/by/" + card, new { card, flagged = true }, created: false);
 }
 
 /// <summary>The whole surface over the same row, with no hook of its own.</summary>

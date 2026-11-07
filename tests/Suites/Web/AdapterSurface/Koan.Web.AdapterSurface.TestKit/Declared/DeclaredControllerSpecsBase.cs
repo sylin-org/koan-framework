@@ -351,13 +351,41 @@ public abstract class DeclaredControllerSpecsBase<TFactory> : IClassFixture<TFac
         returned.StatusCode.Should().Be(HttpStatusCode.SeeOther);
         returned.Headers.Location!.OriginalString.Should().Be("/boards/front?seen=1");
 
-        foreach (var unsafeReturn in new[] { "//elsewhere.example/x", "https://elsewhere.example/x", "/\\elsewhere.example", "boards" })
+        foreach (var unsafeReturn in new[] { "//elsewhere.example/x", "https://elsewhere.example/x", "/\\elsewhere.example", "boards", "/../x", "/a/%2e%2E/x", "/./x" })
         {
             var title = "Unsafe " + Guid.CreateVersion7().ToString("N");
             var answer = await Form("/api/cards", ("title", title), ("return", unsafeReturn));
             answer.StatusCode.Should().Be(HttpStatusCode.SeeOther, unsafeReturn);
             answer.Headers.Location!.OriginalString.Should().Be("/api/cards/by/" + title.ToLowerInvariant().Replace(' ', '-'), unsafeReturn);
         }
+    }
+
+    [Fact]
+    public async Task An_address_a_header_cannot_carry_is_sent_percent_encoded()
+    {
+        var returned = await Form("/api/cards", ("title", "Carried Card"), ("return", "/t/日本語/x y?seen=é"));
+        returned.StatusCode.Should().Be(HttpStatusCode.SeeOther);
+        returned.Headers.Location!.OriginalString.Should().Be("/t/%E6%97%A5%E6%9C%AC%E8%AA%9E/x%20y?seen=%C3%A9");
+
+        var escaped = await Form("/api/cards", ("title", "Escaped Card"), ("return", "/t/%E6%97%A5"));
+        escaped.Headers.Location!.OriginalString.Should().Be("/t/%E6%97%A5", "an escape already in the path stays as it was");
+
+        var form = await Form("/api/card-verbs/日本/flag");
+        form.Headers.Location!.OriginalString.Should().Be("/api/cards/by/%E6%97%A5%E6%9C%AC");
+        var json = await Client.PostAsync("/api/card-verbs/日本/flag", null, Ct);
+        json.StatusCode.Should().Be(HttpStatusCode.OK);
+        json.Headers.Location!.OriginalString.Should().Be("/api/cards/by/%E6%97%A5%E6%9C%AC");
+    }
+
+    [Fact]
+    public async Task A_form_does_not_reach_an_undeclared_controllers_delete()
+    {
+        var id = await Create("Undeclared keeps");
+
+        var answer = await Form($"/api/plain-cards/{id}", ("_method", "DELETE"));
+
+        answer.StatusCode.Should().Be(HttpStatusCode.MethodNotAllowed, "it stays the POST it arrived as, which that address does not take");
+        (await Client.GetAsync($"/api/cards/by/{id}", Ct)).StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
     [Fact]

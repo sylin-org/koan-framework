@@ -222,7 +222,7 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
         var body = result.Payload ?? result.Model;
         if (!Operation.Declared) return PrepareResponse(body);
         var address = deleted || result.Model is null ? Listed() : AddressOf(result.Model);
-        return this.Written(HttpContext.Request.PathBase.ToUriComponent() + address, body, created);
+        return this.Written(address, body, created);
     }
 
     /// <summary>The address the row a request names is listed under: the request's own, less its last segment.</summary>

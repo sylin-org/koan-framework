@@ -1,4 +1,6 @@
+using System.Globalization;
 using System.Security.Claims;
+using System.Text;
 using Koan.Data.Abstractions.Failures;
 using Koan.Data.Core.Commands;
 using Koan.Data.Core.Lifecycle;
@@ -38,20 +40,24 @@ public static class Answers
         => outcome is Outcome<TResult>.Done committed ? await done(committed.Result) : NotDone(controller.HttpContext, outcome);
 
     /// <summary>
-    /// The one answer to a write that committed (WEB-0088), at <paramref name="location"/>, the address of what it wrote. It is never
-    /// cached. A browser's form is sent on (<c>303</c>) to the safe path its <c>return</c> field names under the application's base, or
-    /// else to <paramref name="location"/>, so the page it came from posts, redirects and gets; a sender that reads JSON
-    /// (<see cref="WantsJson"/>) reads <paramref name="body"/>, <c>201</c> where the write <paramref name="created"/> it and <c>200</c>
-    /// otherwise, with <paramref name="location"/> as its <c>Location</c>.
+    /// The one answer to a write that committed (WEB-0088), at <paramref name="location"/>, the address of what it wrote as a path under
+    /// the application's base, as <c>AddressOf</c> names a row's: the base is put before it here. It is never cached. A browser's form is
+    /// sent on (<c>303</c>) to the safe path its <c>return</c> field names under the base, or else to <paramref name="location"/>, so the
+    /// page it came from posts, redirects and gets; a sender that reads JSON (<see cref="WantsJson"/>) reads <paramref name="body"/>,
+    /// <c>201</c> where the write <paramref name="created"/> it and <c>200</c> otherwise, with <paramref name="location"/> as its
+    /// <c>Location</c>. What a header cannot carry of either path, a letter of another script among it, is sent percent-encoded.
     /// </summary>
     public static IActionResult Written(this ControllerBase controller, string location, object? body, bool created)
     {
         ArgumentNullException.ThrowIfNull(location);
         var http = controller.HttpContext;
         http.Response.Headers.CacheControl = "no-store";
-        if (!WantsJson(http.Request)) return new SentOn(location);
+        var at = Carried(location.StartsWith('/') && !location.StartsWith("//", StringComparison.Ordinal)
+            ? http.Request.PathBase.ToUriComponent() + location
+            : location);
+        if (!WantsJson(http.Request)) return new SentOn(at);
 
-        http.Response.Headers.Location = location;
+        http.Response.Headers.Location = at;
         return new ObjectResult(body)
         {
             StatusCode = created ? StatusCodes.Status201Created : StatusCodes.Status200OK,
@@ -78,8 +84,9 @@ public static class Answers
     private const string Html = "text/html";
 
     /// <summary>A form sent on: to the path its <c>return</c> field names under the application's base, where it is one — a single slash
-    /// and a path, never another host's (<c>//</c>), a backslash or a control character — and otherwise to the address written. The form
-    /// is read as the answer is written, so an action that bound none of it answers alike.</summary>
+    /// and a path, never another host's (<c>//</c>), a backslash, a control character or a <c>.</c> or <c>..</c> segment, which would
+    /// climb out of the base — and otherwise to the address written. The form is read as the answer is written, so an action that bound
+    /// none of it answers alike.</summary>
     private sealed class SentOn(string location) : IActionResult
     {
         public async Task ExecuteResultAsync(ActionContext context)
@@ -88,11 +95,40 @@ public static class Answers
             var onward = location;
             if (request.HasFormContentType
                 && (await request.ReadFormAsync(context.HttpContext.RequestAborted))[KoanWebConstants.Form.Return].ToString() is { Length: > 0 } path
-                && path[0] == '/' && !path.StartsWith("//", StringComparison.Ordinal) && !path.Contains('\\') && !path.Any(char.IsControl))
-                onward = request.PathBase.ToUriComponent() + path;
+                && Safe(path))
+                onward = Carried(request.PathBase.ToUriComponent() + path);
             context.HttpContext.Response.Headers.Location = onward;
             context.HttpContext.Response.StatusCode = StatusCodes.Status303SeeOther;
         }
+
+        private static bool Safe(string path)
+        {
+            if (path[0] != '/' || path.StartsWith("//", StringComparison.Ordinal) || path.Contains('\\') || path.Any(char.IsControl)) return false;
+            var end = path.IndexOfAny(['?', '#']);
+            foreach (var segment in (end < 0 ? path : path[..end]).Split('/'))
+                if (segment.Replace("%2e", ".", StringComparison.OrdinalIgnoreCase) is "." or "..") return false;
+            return true;
+        }
+    }
+
+    /// <summary>A path as a header carries it: each character outside printable ASCII as the percent-escapes of its UTF-8 bytes, and every
+    /// escape already in it as it was.</summary>
+    private static string Carried(string path)
+    {
+        if (path.All(c => c is > ' ' and < '\x7f')) return path;
+        var carried = new StringBuilder(path.Length * 3);
+        Span<byte> bytes = stackalloc byte[4];
+        foreach (var rune in path.EnumerateRunes())
+        {
+            if (rune.Value is > ' ' and < 0x7f)
+            {
+                carried.Append((char)rune.Value);
+                continue;
+            }
+            var length = rune.EncodeToUtf8(bytes);
+            foreach (var octet in bytes[..length]) carried.Append('%').Append(octet.ToString("X2", CultureInfo.InvariantCulture));
+        }
+        return carried.ToString();
     }
 
     /// <summary>The one mapping of a reason.</summary>
