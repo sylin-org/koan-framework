@@ -14,9 +14,11 @@ public sealed class McpToolExecutionResult
         IReadOnlyList<string> warnings,
         JObject diagnostics,
         string? errorCode,
-        string? errorMessage)
+        string? errorMessage,
+        JObject? problem = null)
     {
         Success = success;
+        Problem = problem;
         Payload = payload;
         ShortCircuit = shortCircuit;
         Headers = headers;
@@ -41,6 +43,9 @@ public sealed class McpToolExecutionResult
     public string? ErrorCode { get; }
 
     public string? ErrorMessage { get; }
+
+    /// <summary>The refusal's own problem document, where the endpoint answered one, carried as the edge carries every refusal's.</summary>
+    public JObject? Problem { get; }
 
     public static McpToolExecutionResult SuccessResult(
         JToken? payload,
@@ -86,7 +91,8 @@ public sealed class McpToolExecutionResult
         JToken? shortCircuit,
         IReadOnlyDictionary<string, string> headers,
         IReadOnlyList<string> warnings,
-        JObject diagnostics)
+        JObject diagnostics,
+        JObject? problem = null)
     {
         return new McpToolExecutionResult(
             false,
@@ -96,6 +102,7 @@ public sealed class McpToolExecutionResult
             warnings,
             diagnostics,
             errorCode,
-            errorMessage);
+            errorMessage,
+            problem);
     }
 }

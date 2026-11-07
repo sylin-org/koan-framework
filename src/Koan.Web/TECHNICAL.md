@@ -278,7 +278,8 @@ still runs exactly once after user options even when an earlier options hook sho
 
 EntityEndpointService retains the visible before read for authorization and delta projection. A null
 does not prove physical absence: constrained creates call IInsertOnlyRepository on the Data facade
-resolved inside the requested set. Native collision returns 404 without success audit or AfterSave.
+resolved inside the requested set. Native collision answers without success audit or AfterSave: 409
+`id-taken` when the row it met is one the caller may now read and change, 404 otherwise (WEB-0086).
 Create-containing constrained bulk requests reject before any persistence; there is no atomic mixed
 bulk-create contract. The correction is shared by REST and MCP. Constrained creates never issue an
 unfiltered prior-row read.
@@ -287,6 +288,20 @@ Mutation qualification uses the existing Create/Update AccessFilter predicates a
 read-only access realization leaves writes unchanged. The insertion selector does not reevaluate gates
 or reinterpret the principal; existing coarse authorization, including server grants, remains authoritative.
 Owner-gate-only row enforcement is outside the insertion boundary. No opt-out or policy registry exists.
+
+## One write, one outcome
+
+Each mutating operation of EntityEndpointService passes its held part to one private step. Inside an
+ambient scope that step runs the part and lets the scope's owner end it and hear its exceptions.
+Otherwise, when `Data<TEntity, TKey>.Capabilities` declares `write.heldTransaction`, it opens
+`EntityContext.Hold("{Entity}.{operation}")` at the prior read, commits when the part reports that what
+it did stands, and rolls back on a stop of 400 or more, a rehearsal, or a throw; with no held
+transactions it runs the part as it is. `Refusal` and `EntityLifecycleCancelledException` are caught
+there and answered through `Answers`, so the mapping has one home. The prior row goes into
+`EntityRequestContext.Items` under `EntityMutationProbe.BeforeKey` before the before-hook of every
+single write, which `HookContext<T>.Prior` reads and the MCP delta projects. A row short circuit clears
+the stop and continues to the shared emit step, which runs after the hold has ended. `OnBeforePatch`
+runs before the hold and its refusals are mapped there.
 
 ## Property access admission
 

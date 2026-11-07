@@ -281,10 +281,6 @@ public sealed class RequestTranslator
         // so the data-layer gate / constrain / projection evaluate against the real caller instead of anonymous.
         var context = builder.Build(options, cancellationToken, httpContext: null, user: user);
 
-        // AN11 — every MCP mutation opts into the state delta (the pre-mutation read + the prospective/
-        // retrospective diff). REST stays cost-free until it opts in the same way.
-        context.Items[EntityMutationProbe.WantsDeltaKey] = true;
-
         // SEC-0004 (§C) — the MCP edge opts into the per-row capability projection BY DEFAULT: agents need the
         // `can:[]` manifest to plan, and MCP carries structured metadata natively. REST opts in per request
         // (?access=true). The endpoint computes the manifest once and stashes it for the ResponseTranslator.

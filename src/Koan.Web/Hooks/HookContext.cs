@@ -35,6 +35,10 @@ public sealed class HookContext<TEntity>
 
     public CancellationToken Ct => Request.CancellationToken;
 
+    /// <summary>The row as it stood before this write, read where the write's hold opens, or null for a row that did not exist; set before
+    /// <c>OnBeforeSave</c> or <c>OnBeforeDelete</c> of a single write, and null on a read or a batch.</summary>
+    public TEntity? Prior => Request.Items.TryGetValue(EntityMutationProbe.BeforeKey, out var prior) && prior is TEntity row ? row : default;
+
     public void Warn(string msg) => Request.Warn(msg);
 
     public IReadOnlyList<string> Warnings => Request.Warnings as IReadOnlyList<string> ?? Request.Warnings.ToArray();
@@ -48,6 +52,9 @@ public sealed class HookContext<TEntity>
         => _shortCircuit = payload ?? throw new ArgumentNullException(nameof(payload));
 
     public bool IsShortCircuited => _shortCircuit is not null;
+
+    /// <summary>A write a hook stopped with a row goes on as that row's write, so its emit runs.</summary>
+    internal void Resume() => _shortCircuit = null;
 
     public object? ShortCircuitPayload => _shortCircuit;
 

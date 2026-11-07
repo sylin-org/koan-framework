@@ -134,6 +134,7 @@ Do not hand-roll a deleted flag, a restore endpoint, or a copy script when the o
 | Outcome | Package | Also needs | Recipe |
 |---|---|---|---|
 | HTTP conventions and `EntityController<T>` | `Sylin.Koan.Web` | — | [Reference](https://github.com/sylin-org/koan-framework/blob/main/docs/reference/web/index.md) |
+| An entity write and what its hooks write commit as one, and a hook's refusal answers as a command's | `Sylin.Koan.Web` | a store that declares held transactions (SQLite) for the one commit | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Koan.Web/README.md#an-entity-write-commits-as-one) |
 | Run at one public URL, under a path, behind declared proxies | `Sylin.Koan.Web` | `Koan:Web:ApplicationUrl`, and `Koan:Web:TrustedProxies` behind a proxy | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Koan.Web/README.md#public-url-and-proxy) |
 | Answer a request of the application in process, as its reader or as nobody | `Sylin.Koan.Web` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Koan.Web/README.md#a-request-answered-in-process) |
 | Judge a route once before binding by your own declaration, and hand the action what the judgement found | `Sylin.Koan.Web` | an `IAuthorizationProvider` of yours | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Koan.Web/README.md#who-may-reach-a-route) |

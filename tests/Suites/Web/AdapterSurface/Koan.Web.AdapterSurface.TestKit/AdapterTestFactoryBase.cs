@@ -74,8 +74,12 @@ public abstract class AdapterTestFactoryBase : IAdapterTestFactory
                     web.ConfigureAppConfiguration((_, cfg) => cfg.AddInMemoryCollection(AdapterConfiguration()));
                     web.ConfigureServices(services =>
                     {
-                        services.AddKoan();
+                        services.AddKoan(EntityWrites.LedgerRules.Declare);
                         services.AddKoanControllersFrom<WidgetController>();
+                        // WEB-0086: the ledger's hook writes beside each write, so EntityWriteSpecsBase can see what stands.
+                        services.AddScoped<Koan.Web.Hooks.IModelHook<EntityWrites.Ledger>, EntityWrites.LedgerHook>();
+                        services.AddScoped<Koan.Web.Hooks.IEmitHook<EntityWrites.Ledger>, EntityWrites.LedgerHook>();
+                        services.AddScoped<Koan.Web.Authorization.EntityAccess<EntityWrites.Ledger>, EntityWrites.LedgerAccess>();
                         ConfigureAdditionalServices(services);
                     });
                     web.Configure(_ => { });

@@ -32,6 +32,8 @@ public static class KoanWebConstants
         {
             public const string InsertUnsupported = "web.mutation.insertUnsupported";
             public const string BulkCreateUnsupported = "web.mutation.bulkCreateUnsupported";
+            /// <summary>WEB-0086: the word of a create whose id another row took first.</summary>
+            public const string IdTaken = "id-taken";
         }
         public static class Patch
         {

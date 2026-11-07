@@ -11,13 +11,16 @@ amends:
   - DATA-0167
 related:
   - SEC-0039
-amended_by: ARCH-0145 (proposed)
+amended_by: ARCH-0145 (proposed), WEB-0086
 ---
 
 # ARCH-0143: A reason is a kind, a sentence and a word, a refusal is one problem document, and every page is the application's
 
 > **Amended by [ARCH-0145](ARCH-0145-a-reason-names-its-word-and-its-field.md), proposed (2026-11-04): every reason has a word, the kind's where it names none, an invalid one may name its field,**
 > and the problem carries the word as `word`, in place of §2's `Gate`, on every refusal.
+
+> **Amended by [WEB-0086](WEB-0086-an-entity-write-commits-as-one-and-refuses-like-a-command.md) (2026-11-06): an entity MCP tool's refusal carries the endpoint's problem,**
+> so §4's "an entity MCP tool's `errorCode`" is carried over; the code keeps its vocabulary beside it.
 
 ## Context
 

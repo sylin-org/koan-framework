@@ -41,6 +41,18 @@ public sealed class EntityFloorE2ESpec
     }
 
     [Fact]
+    public async Task A_denial_answers_the_problem_every_gate_answers()
+    {
+        // WEB-0086: a seam denial answers through Answers.Denied, a problem with a body, as a route's gate does. The collection's
+        // [Produces] still labels it application/json.
+        var challenged = await _fx.Client.SendAsync(Get("/api/vault"));
+        var forbidden = await _fx.Client.SendAsync(Get("/api/vault", scopes: "vault:write other:read"));
+
+        (await challenged.Content.ReadAsStringAsync()).Should().Contain("\"kind\":\"gated\"").And.Contain("Sign in to do this.");
+        (await forbidden.Content.ReadAsStringAsync()).Should().Contain("\"kind\":\"gated\"").And.Contain("This isn't open to you.");
+    }
+
+    [Fact]
     public async Task Authenticated_with_the_required_scope_is_allowed_200()
     {
         var res = await _fx.Client.SendAsync(Get("/api/vault", scopes: "vault:read"));

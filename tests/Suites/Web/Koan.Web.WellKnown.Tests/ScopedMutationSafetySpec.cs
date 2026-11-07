@@ -314,7 +314,6 @@ public sealed class ScopedMutationController : EntityController<ScopedMutationMe
     public async Task<IActionResult> Rehearse([FromBody] ScopedMutationMemo model, CancellationToken ct)
     {
         var context = new EntityRequestContext(HttpContext.RequestServices, new QueryOptions(), ct, HttpContext);
-        context.Items[EntityMutationProbe.WantsDeltaKey] = true;
         var endpoint = HttpContext.RequestServices.GetRequiredService<IEntityEndpointService<ScopedMutationMemo, string>>();
         var result = await endpoint.Upsert(new() { Context = context, Model = model, DryRun = true });
         return result.ShortCircuitResult ?? Ok(new

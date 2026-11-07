@@ -187,9 +187,10 @@ encryptor adds one through ASP.NET's `IDataProtectionBuilder`.
 
 ## Boundaries and failures
 
-- A constrained Create branch uses atomic insertion. An identity collision returns existence-hiding
-  404, including identities hidden by request predicates. Unsupported providers return 501 with
-  `web.mutation.insertUnsupported`. Ordinary unconstrained upsert keeps its existing semantics.
+- A constrained Create branch uses atomic insertion. An identity collision with a row the caller may see
+  and change answers 409 `id-taken`; any other stays existence-hiding 404, including identities hidden by
+  request predicates. Unsupported providers return 501 with `web.mutation.insertUnsupported`. Ordinary
+  unconstrained upsert keeps its existing semantics.
 - Mutation constraints mean declared Create/Update predicates or stamps. A read-only realization
   does not constrain writes. Existing coarse authorization, including server grants, remains authoritative.
 - Constrained bulk requests containing a new or unavailable identity return 501 with
@@ -215,6 +216,34 @@ encryptor adds one through ASP.NET's `IDataProtectionBuilder`.
   person again.
 - Contributed predicates are request-lifetime read visibility. They do not authorize writes, secure raw storage/SQL,
   or travel into durable jobs; those boundaries must establish or re-resolve their own application authority.
+
+## An entity write commits as one
+
+Every write `EntityController<T>` serves runs from its prior read to its last after-hook as one, so what its hooks write stands with
+the row or neither does, and what refuses answers as a command's refusal does:
+
+```csharp
+public sealed class PostHook : IModelHook<Post>
+{
+    public async Task OnBeforeSave(HookContext<Post> ctx, Post post)
+    {
+        if (ctx.Prior is { } stored && stored.Body == post.Body) { ctx.ShortCircuit(stored); return; } // a replay answers as written
+        if (post.Body.Length == 0) throw new Refusal(Reason.Invalid("body", "Say something."));       // 400, naming the field
+        await new Event { Kind = "post.written", PostId = post.Id }.Save(ctx.Ct);                     // commits with the post
+    }
+    // ...
+}
+```
+
+- **Where it holds:** inside a scope already open the write joins it, and its owner commits it. Otherwise, where the entity's provider
+  declares `write.heldTransaction` (SQLite), it is an `EntityContext.Hold` of its own; elsewhere it runs as it does without one.
+- **When:** the hold opens at the prior read, after the gate, field admission and `OnBeforePatch`, and commits after the last after-hook,
+  before the emit hooks compose the answer. A stop of 400 or more, a thrown `Refusal`, a lifecycle `Cancel`, any throw and a rehearsal
+  roll it back. Keep a hook inside it short: every other writer of the store waits.
+- **What it answers:** a `Refusal` through `Answers.Refused`, with its kind, word and field; a lifecycle `Cancel` as a 409 whose word is
+  its code; a seam denial through `Answers.Denied`. An MCP entity tool carries the same problem in `meta.problem`.
+- **The prior row** is `HookContext<T>.Prior`, read where the hold opens. A hook that stops a write with a row answers it through the
+  emit, as the first write was. See [WEB-0086](https://github.com/sylin-org/koan-framework/blob/main/docs/decisions/WEB-0086-an-entity-write-commits-as-one-and-refuses-like-a-command.md).
 
 ## A request answered in process
 

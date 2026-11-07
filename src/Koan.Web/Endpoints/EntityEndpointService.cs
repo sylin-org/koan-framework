@@ -14,12 +14,15 @@ using Koan.Core.Capabilities;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Capabilities;
 using Koan.Data.Core;
+using Koan.Data.Core.Commands;
+using Koan.Data.Core.Lifecycle;
 using Koan.Data.Core.Model;
 using Koan.Data.Core.Relationships;
 using Koan.Data.Abstractions.Filtering;
 using Koan.Data.Abstractions.Instructions;
 using Koan.Web.Attributes;
 using Koan.Web.Authorization;
+using Koan.Web.Controllers;
 using Koan.Web.Hooks;
 using Koan.Web.Infrastructure;
 
@@ -857,85 +860,69 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
             idProperty.SetValue(request.Model, request.RouteId);
         }
 
-        // AN11 delta + SEC-0004 Constrain both need the pre-mutation row. Read it ONCE when either asks (MCP and
-        // dry-run always want the delta; a constrained entity always needs the create-vs-update split). A plain,
-        // unconstrained REST upsert stays a single write with no extra read.
-        var mutation = MutationConstraints(context);
-        TEntity? before = null;
-        if (WantsDelta(context, request.DryRun) || mutation.Create is not null)
+        var (saved, answer) = await Write(context, "upsert", async () =>
         {
+            // The prior row, read where the hold opens: the hooks read it as Prior, the delta projects from it, and a
+            // constrained entity splits create from update on it.
+            var mutation = MutationConstraints(context);
             var id = request.Model.Id;
-            if (id is not null && !EqualityComparer<TKey>.Default.Equals(id, default!))
+            var before = id is not null && !EqualityComparer<TKey>.Default.Equals(id, default!)
+                ? await Data<TEntity, TKey>.Get(id, context.CancellationToken)
+                : null;
+            Prior(context, before, before is null ? "create" : "update");
+            if (mutation.Create is not null)
             {
-                before = await Data<TEntity, TKey>.Get(id, context.CancellationToken);
-            }
-        }
-        if (WantsDelta(context, request.DryRun))
-        {
-            context.Items[EntityMutationProbe.BeforeKey] = before;
-            context.Items[EntityMutationProbe.OperationKey] = before is null ? "create" : "update";
-        }
-        if (mutation.Create is not null)
-        {
-            // create (no existing row) → STAMP the owner onto the payload — server-truth that overwrites a forged
-            // owner (a Where on create is a silent no-op that lets it through). update → the existing row must be
-            // in scope (404 if not, existence-hiding, matching the read rail) then apply the update stamp
-            // (freeze ownership by default).
-            if (before is null)
-            {
-                mutation.Create.ApplyStamps(request.Model);
-            }
-            else
-            {
-                var constrain = mutation.Update!;
-                if (!PassesRequestPredicates(before, constrain.Filter))
+                // create (no existing row) → STAMP the owner onto the payload — server-truth that overwrites a forged
+                // owner (a Where on create is a silent no-op that lets it through). update → the existing row must be
+                // in scope (404 if not, existence-hiding, matching the read rail) then apply the update stamp
+                // (freeze ownership by default).
+                if (before is null)
                 {
-                    return new EntityModelResult<TEntity>(context, null, null, new NotFoundResult());
+                    mutation.Create.ApplyStamps(request.Model);
                 }
-                constrain.ApplyStamps(request.Model);
+                else
+                {
+                    var constrain = mutation.Update!;
+                    if (!PassesRequestPredicates(before, constrain.Filter))
+                        return Ended(new EntityModelResult<TEntity>(context, null, null, new NotFoundResult()));
+                    constrain.ApplyStamps(request.Model);
+                }
             }
-        }
 
-        var requiresInsert = mutation.Create is not null && before is null;
-        if (requiresInsert && (repo is not IInsertOnlyRepository<TEntity, TKey> ||
-            !DataCaps.Describe(repo, repo.GetType().Name).Has(DataCaps.Write.InsertOnly)))
-            return new EntityModelResult<TEntity>(context, null, null, InsertUnsupported());
+            var requiresInsert = mutation.Create is not null && before is null;
+            if (requiresInsert && (repo is not IInsertOnlyRepository<TEntity, TKey> ||
+                !DataCaps.Describe(repo, repo.GetType().Name).Has(DataCaps.Write.InsertOnly)))
+                return Ended(new EntityModelResult<TEntity>(context, null, null, InsertUnsupported()));
 
-        if (!await _hookPipeline.BeforeSave(hookContext, request.Model))
-            return await ModelShortCircuit(context, hookContext);
+            if (!await _hookPipeline.BeforeSave(hookContext, request.Model))
+                return await Stopped(context, hookContext);
 
-        if (request.DryRun)
-        {
-            // Rehearsal: the full hook/validation pipeline ran; the adapter write does NOT, and AfterSave is
-            // not raised (no save happened). The "after" face is the would-be model.
-            context.Items[EntityMutationProbe.DryRunKey] = true;
-            ApplyViewHeader(context, request.Accept);
-            CopyHookHeaders(context, hookContext);
-            return new EntityModelResult<TEntity>(context, request.Model, request.Model);
-        }
+            if (request.DryRun)
+            {
+                // Rehearsal: the full hook/validation pipeline ran; the adapter write does NOT, and AfterSave is
+                // not raised (no save happened). The "after" face is the would-be model.
+                context.Items[EntityMutationProbe.DryRunKey] = true;
+                ApplyViewHeader(context, request.Accept);
+                CopyHookHeaders(context, hookContext);
+                return Ended(new EntityModelResult<TEntity>(context, request.Model, request.Model));
+            }
 
-        TEntity saved;
-        if (requiresInsert)
-        {
-            var inserted = await ((IInsertOnlyRepository<TEntity, TKey>)repo).Insert(request.Model, context.CancellationToken);
-            if (inserted.Outcome == MutationOutcome.Conflict)
-                return new EntityModelResult<TEntity>(context, null, null, new NotFoundResult());
-            saved = inserted.Entity!;
-        }
-        else saved = await request.Model.Upsert<TEntity, TKey>(context.CancellationToken);
-        await AuditMutation(context, EntityAuthorizeActions.Write, saved.Id?.ToString() ?? "").ConfigureAwait(false);
+            TEntity written;
+            if (requiresInsert)
+            {
+                var inserted = await ((IInsertOnlyRepository<TEntity, TKey>)repo).Insert(request.Model, context.CancellationToken);
+                if (inserted.Outcome == MutationOutcome.Conflict)
+                    return Ended(new EntityModelResult<TEntity>(context, null, null, await InsertConflict(context, mutation.Update, request.Model.Id)));
+                written = inserted.Entity!;
+            }
+            else written = await request.Model.Upsert<TEntity, TKey>(context.CancellationToken);
+            await AuditMutation(context, EntityAuthorizeActions.Write, written.Id?.ToString() ?? "").ConfigureAwait(false);
 
-        if (!await _hookPipeline.AfterSave(hookContext, saved))
-            return await ModelShortCircuit(context, hookContext);
-
-        ApplyViewHeader(context, request.Accept);
-        var emit = await _hookPipeline.EmitModel(hookContext, saved);
-        if (hookContext.IsShortCircuited) return await ModelShortCircuit(context, hookContext);
-        var payload = emit.replaced ? emit.payload : saved;
-        if (await AdmitFieldOutput(context, payload) is { } fieldOutputDenied)
-            return new EntityModelResult<TEntity>(context, null, null, fieldOutputDenied);
-        CopyHookHeaders(context, hookContext);
-        return new EntityModelResult<TEntity>(context, saved, payload);
+            if (!await _hookPipeline.AfterSave(hookContext, written))
+                return await Stopped(context, hookContext);
+            return Saved(written);
+        });
+        return answer ?? await Emitted(context, hookContext, saved!, request.Accept);
     }
 
     public async Task<EntityEndpointResult> UpsertMany(EntityUpsertManyRequest<TEntity> request)
@@ -963,70 +950,71 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         // One partition scope spans the constraint probe, BeforeSave hooks, and the write (mirrors single-item Upsert).
         using var _ = EntityContext.With(partition: string.IsNullOrWhiteSpace(request.Set) ? null : request.Set);
 
-        var mutation = MutationConstraints(context);
-        if (mutation.Create is not null)
+        return await WriteBatch(context, "upsertMany", async () =>
         {
-            // Preflight the entire request. A null visible read does not prove absence; mixed
-            // atomic insertion/update is not yet a provider contract, so such batches fail closed.
-            var containsCreate = false;
+            var mutation = MutationConstraints(context);
+            if (mutation.Create is not null)
+            {
+                // Preflight the entire request. A null visible read does not prove absence; mixed
+                // atomic insertion/update is not yet a provider contract, so such batches fail closed.
+                var containsCreate = false;
+                foreach (var model in list)
+                {
+                    var id = model.Id;
+                    var before = id is not null && !EqualityComparer<TKey>.Default.Equals(id, default!)
+                        ? await Data<TEntity, TKey>.Get(id, context.CancellationToken)
+                        : null;
+                    if (before is null)
+                    {
+                        containsCreate = true;
+                        mutation.Create.ApplyStamps(model);
+                    }
+                    else
+                    {
+                        var constrain = mutation.Update!;
+                        if (!PassesRequestPredicates(before, constrain.Filter))
+                            return Ended(new EntityEndpointResult(context, null, new NotFoundResult()));
+                        constrain.ApplyStamps(model);
+                    }
+                }
+                if (containsCreate)
+                    return Ended(new EntityEndpointResult(context, null, new ObjectResult(new
+                    {
+                        code = KoanWebConstants.Codes.Mutation.BulkCreateUnsupported,
+                        message = "Constrained bulk requests containing new or unavailable identities require atomic mixed writes. Submit creates individually."
+                    }) { StatusCode = StatusCodes.Status501NotImplemented }));
+            }
+
             foreach (var model in list)
             {
-                var id = model.Id;
-                var before = id is not null && !EqualityComparer<TKey>.Default.Equals(id, default!)
-                    ? await Data<TEntity, TKey>.Get(id, context.CancellationToken)
-                    : null;
-                if (before is null)
-                {
-                    containsCreate = true;
-                    mutation.Create.ApplyStamps(model);
-                }
-                else
-                {
-                    var constrain = mutation.Update!;
-                    if (!PassesRequestPredicates(before, constrain.Filter))
-                    {
-                        return new EntityEndpointResult(context, null, new NotFoundResult());
-                    }
-                    constrain.ApplyStamps(model);
-                }
+                if (!await _hookPipeline.BeforeSave(hookContext, model))
+                    return await StoppedBatch(context, hookContext);
             }
-            if (containsCreate)
-                return new EntityEndpointResult(context, null, new ObjectResult(new
-                {
-                    code = KoanWebConstants.Codes.Mutation.BulkCreateUnsupported,
-                    message = "Constrained bulk requests containing new or unavailable identities require atomic mixed writes. Submit creates individually."
-                }) { StatusCode = StatusCodes.Status501NotImplemented });
-        }
 
-        foreach (var model in list)
-        {
-            if (!await _hookPipeline.BeforeSave(hookContext, model))
-                return await ModelShortCircuit(context, hookContext);
-        }
+            if (request.DryRun)
+            {
+                // AN11: batch rehearsal — validation ran, no write. Batch mutations carry a count-level delta
+                // (the affected count), not a per-field diff.
+                context.Items[EntityMutationProbe.DryRunKey] = true;
+                context.Items[EntityMutationProbe.OperationKey] = "upsertMany";
+                context.Items[EntityMutationProbe.AffectedCountKey] = list.Count;
+                CopyHookHeaders(context, hookContext);
+                return Ended(new EntityEndpointResult(context, new { wouldUpsert = list.Count }));
+            }
 
-        if (request.DryRun)
-        {
-            // AN11: batch rehearsal — validation ran, no write. Batch mutations carry a count-level delta
-            // (the affected count), not a per-field diff.
-            context.Items[EntityMutationProbe.DryRunKey] = true;
-            context.Items[EntityMutationProbe.OperationKey] = "upsertMany";
-            context.Items[EntityMutationProbe.AffectedCountKey] = list.Count;
+            var upserted = await Data<TEntity, TKey>.UpsertMany(list, context.CancellationToken);
+            await AuditMutation(context, EntityAuthorizeActions.Write, "").ConfigureAwait(false);
+
+            foreach (var model in list)
+            {
+                if (!await _hookPipeline.AfterSave(hookContext, model))
+                    return await StoppedBatch(context, hookContext);
+            }
+
+            context.Headers["Koan-Write-Capabilities"] = WriteCapabilitiesHeader(repo);
             CopyHookHeaders(context, hookContext);
-            return new EntityEndpointResult(context, new { wouldUpsert = list.Count });
-        }
-
-        var upserted = await Data<TEntity, TKey>.UpsertMany(list, context.CancellationToken);
-        await AuditMutation(context, EntityAuthorizeActions.Write, "").ConfigureAwait(false);
-
-        foreach (var model in list)
-        {
-            if (!await _hookPipeline.AfterSave(hookContext, model))
-                return await ModelShortCircuit(context, hookContext);
-        }
-
-        context.Headers["Koan-Write-Capabilities"] = WriteCapabilitiesHeader(repo);
-        CopyHookHeaders(context, hookContext);
-        return new EntityEndpointResult(context, new { upserted });
+            return Stands(new EntityEndpointResult(context, new { upserted }));
+        });
     }
 
     public async Task<EntityModelResult<TEntity>> Delete(EntityDeleteRequest<TKey> request)
@@ -1042,48 +1030,34 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         var bound = accessor is null ? null : DeleteBound(accessor);
 
         using var _ = EntityContext.With(partition: string.IsNullOrWhiteSpace(request.Set) ? null : request.Set);
-        // SEC-0004: a row outside the principal's scope is a 404, never deleted (existence-hiding, matches reads).
-        var model = (await RowsInDeleteBound([request.Id], bound, context.CancellationToken)).SingleOrDefault();
-        if (model is null)
+        var (deleted, answer) = await Write(context, "delete", async () =>
         {
-            return new EntityModelResult<TEntity>(context, null, null, new NotFoundResult());
-        }
+            // SEC-0004: a row outside the principal's scope is a 404, never deleted (existence-hiding, matches reads).
+            var model = (await RowsInDeleteBound([request.Id], bound, context.CancellationToken)).SingleOrDefault();
+            if (model is null)
+                return Ended(new EntityModelResult<TEntity>(context, null, null, new NotFoundResult()));
+            Prior(context, model, "delete");
 
-        if (!await _hookPipeline.BeforeDelete(hookContext, model))
-            return await ModelShortCircuit(context, hookContext);
+            if (!await _hookPipeline.BeforeDelete(hookContext, model))
+                return await Stopped(context, hookContext);
 
-        if (WantsDelta(context, request.DryRun))
-        {
-            context.Items[EntityMutationProbe.BeforeKey] = model;
-            context.Items[EntityMutationProbe.OperationKey] = "delete";
-        }
+            if (request.DryRun)
+            {
+                // Rehearsal: BeforeDelete ran; the row is NOT removed and AfterDelete is not raised.
+                context.Items[EntityMutationProbe.DryRunKey] = true;
+                ApplyViewHeader(context, request.Accept);
+                CopyHookHeaders(context, hookContext);
+                return Ended(new EntityModelResult<TEntity>(context, model, model));
+            }
 
-        if (request.DryRun)
-        {
-            // Rehearsal: BeforeDelete ran; the row is NOT removed and AfterDelete is not raised.
-            context.Items[EntityMutationProbe.DryRunKey] = true;
-            ApplyViewHeader(context, request.Accept);
-            CopyHookHeaders(context, hookContext);
-            return new EntityModelResult<TEntity>(context, model, model);
-        }
-
-        var ok = await DeleteWithin(request.Id, bound, context.CancellationToken);
-        if (!ok)
-        {
-            return new EntityModelResult<TEntity>(context, null, null, new NotFoundResult());
-        }
-        await AuditMutation(context, EntityAuthorizeActions.Remove, request.Id?.ToString() ?? "").ConfigureAwait(false);
-        if (!await _hookPipeline.AfterDelete(hookContext, model))
-            return await ModelShortCircuit(context, hookContext);
-
-        ApplyViewHeader(context, request.Accept);
-        var emit = await _hookPipeline.EmitModel(hookContext, model);
-        if (hookContext.IsShortCircuited) return await ModelShortCircuit(context, hookContext);
-        var payload = emit.replaced ? emit.payload : model;
-        if (await AdmitFieldOutput(context, payload) is { } fieldOutputDenied)
-            return new EntityModelResult<TEntity>(context, null, null, fieldOutputDenied);
-        CopyHookHeaders(context, hookContext);
-        return new EntityModelResult<TEntity>(context, model, payload);
+            if (!await DeleteWithin(request.Id, bound, context.CancellationToken))
+                return Ended(new EntityModelResult<TEntity>(context, null, null, new NotFoundResult()));
+            await AuditMutation(context, EntityAuthorizeActions.Remove, request.Id?.ToString() ?? "").ConfigureAwait(false);
+            if (!await _hookPipeline.AfterDelete(hookContext, model))
+                return await Stopped(context, hookContext);
+            return Saved(model);
+        });
+        return answer ?? await Emitted(context, hookContext, deleted!, request.Accept);
     }
 
     public async Task<EntityEndpointResult> DeleteMany(EntityDeleteManyRequest<TKey> request)
@@ -1095,38 +1069,41 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         context.Headers["Koan-Write-Capabilities"] = WriteCapabilitiesHeader(repo);
 
         using var _ = EntityContext.With(partition: string.IsNullOrWhiteSpace(request.Set) ? null : request.Set);
-        IReadOnlyCollection<TKey> targets = request.Ids ?? [];
         var accessor = ResolveAccessor(context);
         var bound = accessor is null ? null : DeleteBound(accessor);
         var hooked = RaisesDeleteHooks;
-        var rows = new List<TEntity>();
-        if ((accessor is not null || hooked) && targets.Count > 0)
-        {
-            // SEC-0004: trust no id — a row must be in scope to be deleted (out-of-scope ids are silently skipped,
-            // the same hidden-row semantics as a single delete). This bounding runs BEFORE the dry-run report so a
-            // rehearsal cannot leak the existence of out-of-scope ids. The loaded rows feed the delete hooks.
-            rows = await RowsInDeleteBound(targets, bound, context.CancellationToken);
-            targets = rows.Select(row => row.Id).ToList();
-        }
-
         var hookContext = _hookPipeline.CreateContext(context);
-        if (hooked && !await BeforeDeleteAll(hookContext, rows))
-            return await ModelShortCircuit(context, hookContext);
-
-        if (request.DryRun)
+        return await WriteBatch(context, "deleteMany", async () =>
         {
-            context.Items[EntityMutationProbe.DryRunKey] = true;
-            context.Items[EntityMutationProbe.OperationKey] = "deleteMany";
-            context.Items[EntityMutationProbe.AffectedCountKey] = targets.Count;
-            return new EntityEndpointResult(context, new { wouldDelete = targets.Count });
-        }
+            IReadOnlyCollection<TKey> targets = request.Ids ?? [];
+            var rows = new List<TEntity>();
+            if ((accessor is not null || hooked) && targets.Count > 0)
+            {
+                // SEC-0004: trust no id — a row must be in scope to be deleted (out-of-scope ids are silently skipped,
+                // the same hidden-row semantics as a single delete). This bounding runs BEFORE the dry-run report so a
+                // rehearsal cannot leak the existence of out-of-scope ids. The loaded rows feed the delete hooks.
+                rows = await RowsInDeleteBound(targets, bound, context.CancellationToken);
+                targets = rows.Select(row => row.Id).ToList();
+            }
 
-        var deleted = await DeleteManyWithin(targets, bound, context.CancellationToken);
-        await AuditMutation(context, EntityAuthorizeActions.Remove, "").ConfigureAwait(false);
-        if (hooked && !await AfterDeleteAll(hookContext, rows))
-            return await ModelShortCircuit(context, hookContext);
-        CopyHookHeaders(context, hookContext);
-        return new EntityEndpointResult(context, new { deleted });
+            if (hooked && !await BeforeDeleteAll(hookContext, rows))
+                return await StoppedBatch(context, hookContext);
+
+            if (request.DryRun)
+            {
+                context.Items[EntityMutationProbe.DryRunKey] = true;
+                context.Items[EntityMutationProbe.OperationKey] = "deleteMany";
+                context.Items[EntityMutationProbe.AffectedCountKey] = targets.Count;
+                return Ended(new EntityEndpointResult(context, new { wouldDelete = targets.Count }));
+            }
+
+            var deleted = await DeleteManyWithin(targets, bound, context.CancellationToken);
+            await AuditMutation(context, EntityAuthorizeActions.Remove, "").ConfigureAwait(false);
+            if (hooked && !await AfterDeleteAll(hookContext, rows))
+                return await StoppedBatch(context, hookContext);
+            CopyHookHeaders(context, hookContext);
+            return Stands(new EntityEndpointResult(context, new { deleted }));
+        });
     }
 
     public async Task<EntityEndpointResult> DeleteByQuery(EntityDeleteByQueryRequest request)
@@ -1164,30 +1141,32 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
             filter = Filter.And(filter, bound) ?? filter;
         }
 
-        var items = await Data<TEntity, TKey>.All(QueryDefinition.All.Where(filter), request.Context.CancellationToken);
-        var ids = items.Select(e => e.Id).ToList();
-
         var hooked = RaisesDeleteHooks;
         var hookContext = _hookPipeline.CreateContext(request.Context);
-        if (hooked && !await BeforeDeleteAll(hookContext, items))
-            return await ModelShortCircuit(request.Context, hookContext);
-
-        if (request.DryRun)
+        return await WriteBatch(request.Context, "deleteByQuery", async () =>
         {
-            // AN11: the query already ran, so the rehearsal reports an EXACT affected count for free.
-            request.Context.Items[EntityMutationProbe.DryRunKey] = true;
-            request.Context.Items[EntityMutationProbe.OperationKey] = "deleteByQuery";
-            request.Context.Items[EntityMutationProbe.AffectedCountKey] = ids.Count;
-            return new EntityEndpointResult(request.Context, new { wouldDelete = ids.Count });
-        }
+            var items = await Data<TEntity, TKey>.All(QueryDefinition.All.Where(filter), request.Context.CancellationToken);
+            var ids = items.Select(e => e.Id).ToList();
+            if (hooked && !await BeforeDeleteAll(hookContext, items))
+                return await StoppedBatch(request.Context, hookContext);
 
-        if (ids.Count == 0) return new EntityEndpointResult(request.Context, new { deleted = 0 });
-        var removedByPredicate = await DeleteManyWithin(ids, bound, request.Context.CancellationToken);
-        await AuditMutation(request.Context, EntityAuthorizeActions.Remove, "").ConfigureAwait(false);
-        if (hooked && !await AfterDeleteAll(hookContext, items))
-            return await ModelShortCircuit(request.Context, hookContext);
-        CopyHookHeaders(request.Context, hookContext);
-        return new EntityEndpointResult(request.Context, new { deleted = removedByPredicate });
+            if (request.DryRun)
+            {
+                // AN11: the query already ran, so the rehearsal reports an EXACT affected count for free.
+                request.Context.Items[EntityMutationProbe.DryRunKey] = true;
+                request.Context.Items[EntityMutationProbe.OperationKey] = "deleteByQuery";
+                request.Context.Items[EntityMutationProbe.AffectedCountKey] = ids.Count;
+                return Ended(new EntityEndpointResult(request.Context, new { wouldDelete = ids.Count }));
+            }
+
+            if (ids.Count == 0) return Ended(new EntityEndpointResult(request.Context, new { deleted = 0 }));
+            var removedByPredicate = await DeleteManyWithin(ids, bound, request.Context.CancellationToken);
+            await AuditMutation(request.Context, EntityAuthorizeActions.Remove, "").ConfigureAwait(false);
+            if (hooked && !await AfterDeleteAll(hookContext, items))
+                return await StoppedBatch(request.Context, hookContext);
+            CopyHookHeaders(request.Context, hookContext);
+            return Stands(new EntityEndpointResult(request.Context, new { deleted = removedByPredicate }));
+        });
     }
 
     public async Task<EntityEndpointResult> DeleteAll(EntityDeleteAllRequest request)
@@ -1202,29 +1181,7 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         // an entity with neither keeps RemoveAll.
         var bound = accessor is null ? null : DeleteBound(accessor);
         var hooked = RaisesDeleteHooks;
-        if (bound is not null || hooked)
-        {
-            var rows = await Data<TEntity, TKey>.All(QueryDefinition.All.Where(bound), request.Context.CancellationToken);
-            var ids = rows.Select(e => e.Id).ToList();
-            var hookContext = _hookPipeline.CreateContext(request.Context);
-            if (hooked && !await BeforeDeleteAll(hookContext, rows))
-                return await ModelShortCircuit(request.Context, hookContext);
-            if (request.DryRun)
-            {
-                request.Context.Items[EntityMutationProbe.DryRunKey] = true;
-                request.Context.Items[EntityMutationProbe.OperationKey] = "deleteAll";
-                request.Context.Items[EntityMutationProbe.AffectedCountKey] = ids.Count;
-                return new EntityEndpointResult(request.Context, new { wouldDelete = ids.Count });
-            }
-            var deletedBounded = ids.Count == 0 ? 0 : await DeleteManyWithin(ids, bound, request.Context.CancellationToken);
-            await AuditMutation(request.Context, EntityAuthorizeActions.Remove, "").ConfigureAwait(false);
-            if (hooked && !await AfterDeleteAll(hookContext, rows))
-                return await ModelShortCircuit(request.Context, hookContext);
-            CopyHookHeaders(request.Context, hookContext);
-            return new EntityEndpointResult(request.Context, new { deleted = deletedBounded });
-        }
-
-        if (request.DryRun)
+        if (bound is null && !hooked && request.DryRun)
         {
             // Unconstrained: name the effect rather than scan the whole set for a count — honest A10 posture.
             request.Context.Items[EntityMutationProbe.DryRunKey] = true;
@@ -1232,9 +1189,34 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
             return new EntityEndpointResult(request.Context, new { wouldDeleteAll = true });
         }
 
-        var deleted = await Entity<TEntity, TKey>.RemoveAll(request.Context.CancellationToken);
-        await AuditMutation(request.Context, EntityAuthorizeActions.Remove, "").ConfigureAwait(false);
-        return new EntityEndpointResult(request.Context, new { deleted });
+        var hookContext = _hookPipeline.CreateContext(request.Context);
+        return await WriteBatch(request.Context, "deleteAll", async () =>
+        {
+            if (bound is null && !hooked)
+            {
+                var deleted = await Entity<TEntity, TKey>.RemoveAll(request.Context.CancellationToken);
+                await AuditMutation(request.Context, EntityAuthorizeActions.Remove, "").ConfigureAwait(false);
+                return Stands(new EntityEndpointResult(request.Context, new { deleted }));
+            }
+
+            var rows = await Data<TEntity, TKey>.All(QueryDefinition.All.Where(bound), request.Context.CancellationToken);
+            var ids = rows.Select(e => e.Id).ToList();
+            if (hooked && !await BeforeDeleteAll(hookContext, rows))
+                return await StoppedBatch(request.Context, hookContext);
+            if (request.DryRun)
+            {
+                request.Context.Items[EntityMutationProbe.DryRunKey] = true;
+                request.Context.Items[EntityMutationProbe.OperationKey] = "deleteAll";
+                request.Context.Items[EntityMutationProbe.AffectedCountKey] = ids.Count;
+                return Ended(new EntityEndpointResult(request.Context, new { wouldDelete = ids.Count }));
+            }
+            var deletedBounded = ids.Count == 0 ? 0 : await DeleteManyWithin(ids, bound, request.Context.CancellationToken);
+            await AuditMutation(request.Context, EntityAuthorizeActions.Remove, "").ConfigureAwait(false);
+            if (hooked && !await AfterDeleteAll(hookContext, rows))
+                return await StoppedBatch(request.Context, hookContext);
+            CopyHookHeaders(request.Context, hookContext);
+            return Stands(new EntityEndpointResult(request.Context, new { deleted = deletedBounded }));
+        });
     }
 
     public async Task<EntityModelResult<TEntity>> Patch(EntityPatchRequest<TEntity, TKey> request)
@@ -1257,126 +1239,101 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         var accessor = ResolveAccessor(context);
         var constrain = accessor is null ? null : ConstrainFor(accessor, AccessAction.Update);
 
-        if (!await _hookPipeline.BeforePatch(hookContext, request.Id?.ToString() ?? "", request.Patch!))
-            return await ModelShortCircuit(context, hookContext);
+        // The patch is judged before the hold opens, so an application weighs costly input with nothing held.
+        try
+        {
+            if (!await _hookPipeline.BeforePatch(hookContext, request.Id?.ToString() ?? "", request.Patch!))
+                return await ModelShortCircuit(context, hookContext);
+        }
+        catch (Exception refusal) when (refusal is Refusal or EntityLifecycleCancelledException)
+        {
+            return new EntityModelResult<TEntity>(context, null, null, Refusing(context, refusal));
+        }
 
         using var _ = EntityContext.With(partition: string.IsNullOrWhiteSpace(request.Set) ? null : request.Set);
-        var original = await Data<TEntity, TKey>.Get(request.Id!, context.CancellationToken);
-        if (original is null)
+        var (saved, answer) = await Write(context, "patch", async () =>
         {
-            return new EntityModelResult<TEntity>(context, null, null, new NotFoundResult());
-        }
+            var original = await Data<TEntity, TKey>.Get(request.Id!, context.CancellationToken);
+            if (original is null)
+                return Ended(new EntityModelResult<TEntity>(context, null, null, new NotFoundResult()));
 
-        // SEC-0004: the existing row must be in scope (404 if not, existence-hiding); the same filter freezes
-        // ownership on the patched copy below.
-        if (constrain is not null && !PassesRequestPredicates(original, constrain.Filter))
-        {
-            return new EntityModelResult<TEntity>(context, null, null, new NotFoundResult());
-        }
+            // SEC-0004: the existing row must be in scope (404 if not, existence-hiding); the same filter freezes
+            // ownership on the patched copy below.
+            if (constrain is not null && !PassesRequestPredicates(original, constrain.Filter))
+                return Ended(new EntityModelResult<TEntity>(context, null, null, new NotFoundResult()));
 
-        var working = await Data<TEntity, TKey>.Get(request.Id!, context.CancellationToken);
-        if (working is null)
-        {
-            return new EntityModelResult<TEntity>(context, null, null, new NotFoundResult());
-        }
+            var working = await Data<TEntity, TKey>.Get(request.Id!, context.CancellationToken);
+            if (working is null)
+                return Ended(new EntityModelResult<TEntity>(context, null, null, new NotFoundResult()));
 
-        // Apply generalized patch
-        if (request.Patch is Microsoft.AspNetCore.JsonPatch.JsonPatchDocument<TEntity> jp)
-        {
-            jp.ApplyTo(working);
-        }
-        else if (request.Patch is Newtonsoft.Json.Linq.JToken jt)
-        {
-            var opts = context.HttpContext?.RequestServices.GetService(typeof(Microsoft.Extensions.Options.IOptions<Koan.Web.Options.KoanWebOptions>)) as Microsoft.Extensions.Options.IOptions<Koan.Web.Options.KoanWebOptions>;
-            var mergePolicy = request.Options?.MergeNulls
-                              ?? opts?.Value.MergePatchNullsForNonNullable
-                              ?? MergePatchNullPolicy.SetDefault;
-            var partialPolicy = request.Options?.PartialNulls
-                                ?? opts?.Value.PartialJsonNulls
-                                ?? PartialJsonNullPolicy.SetNull;
-            if (request.Kind == EntityPatchKind.MergePatch7386)
+            // Apply generalized patch
+            if (request.Patch is Microsoft.AspNetCore.JsonPatch.JsonPatchDocument<TEntity> jp)
             {
+                jp.ApplyTo(working);
+            }
+            else if (request.Patch is Newtonsoft.Json.Linq.JToken jt)
+            {
+                var opts = context.HttpContext?.RequestServices.GetService(typeof(Microsoft.Extensions.Options.IOptions<Koan.Web.Options.KoanWebOptions>)) as Microsoft.Extensions.Options.IOptions<Koan.Web.Options.KoanWebOptions>;
+                var mergePolicy = request.Options?.MergeNulls
+                                  ?? opts?.Value.MergePatchNullsForNonNullable
+                                  ?? MergePatchNullPolicy.SetDefault;
+                var partialPolicy = request.Options?.PartialNulls
+                                    ?? opts?.Value.PartialJsonNulls
+                                    ?? PartialJsonNullPolicy.SetNull;
                 // AE-16: the applicator restores a typed working copy (additive collections, private stored
                 // state, siblings and family shape survive); refusal, malformed intent, or a non-convertible
                 // value throws here, before stamps, BeforeSave and any save (BeforePatch has already run),
                 // and becomes a corrective 422.
                 try
                 {
-                    working = new Koan.Data.Core.Patch.MergePatchApplicator<TEntity>(jt, mergePolicy).ApplyToCopy(working);
+                    working = request.Kind == EntityPatchKind.MergePatch7386
+                        ? new Koan.Data.Core.Patch.MergePatchApplicator<TEntity>(jt, mergePolicy).ApplyToCopy(working)
+                        : new Koan.Data.Core.Patch.PartialJsonApplicator<TEntity>(jt, partialPolicy).ApplyToCopy(working);
                 }
                 catch (Exception ex) when (ex is Newtonsoft.Json.JsonException
                                                or System.IO.InvalidDataException
                                                or InvalidOperationException
                                                or ArgumentException)
                 {
-                    return new EntityModelResult<TEntity>(context, null, null,
-                        new UnprocessableEntityObjectResult(new { error = ex.Message }));
+                    return Ended(new EntityModelResult<TEntity>(context, null, null,
+                        new UnprocessableEntityObjectResult(new { error = ex.Message })));
                 }
             }
             else
             {
-                try
-                {
-                    working = new Koan.Data.Core.Patch.PartialJsonApplicator<TEntity>(jt, partialPolicy).ApplyToCopy(working);
-                }
-                catch (Exception ex) when (ex is Newtonsoft.Json.JsonException
-                                               or System.IO.InvalidDataException
-                                               or InvalidOperationException
-                                               or ArgumentException)
-                {
-                    return new EntityModelResult<TEntity>(context, null, null,
-                        new UnprocessableEntityObjectResult(new { error = ex.Message }));
-                }
+                return Ended(new EntityModelResult<TEntity>(context, null, null, new BadRequestObjectResult(new { error = "Unsupported patch payload" })));
             }
-        }
-        else
-        {
-            return new EntityModelResult<TEntity>(context, null, null, new BadRequestObjectResult(new { error = "Unsupported patch payload" }));
-        }
-        var idProp = typeof(TEntity).GetProperty("Id");
-        if (idProp is not null)
-        {
-            var newId = idProp.GetValue(working);
-            if (newId is not null && !Equals(newId, request.Id))
+            var idProp = typeof(TEntity).GetProperty("Id");
+            if (idProp is not null)
             {
-                return new EntityModelResult<TEntity>(context, null, null, new ConflictResult());
+                var newId = idProp.GetValue(working);
+                if (newId is not null && !Equals(newId, request.Id))
+                    return Ended(new EntityModelResult<TEntity>(context, null, null, new ConflictResult()));
             }
-        }
 
-        constrain?.ApplyStamps(working!); // freeze ownership (re-stamp owner to principal) before save
+            constrain?.ApplyStamps(working!); // freeze ownership (re-stamp owner to principal) before save
 
-        if (!await _hookPipeline.BeforeSave(hookContext, working!))
-            return await ModelShortCircuit(context, hookContext);
+            // The pre-patch row (`original`) is already loaded, so the hooks' Prior and the delta cost nothing extra.
+            Prior(context, original, "update");
+            if (!await _hookPipeline.BeforeSave(hookContext, working!))
+                return await Stopped(context, hookContext);
 
-        if (WantsDelta(context, request.DryRun))
-        {
-            // The pre-patch row (`original`) is already loaded — the delta costs nothing extra.
-            context.Items[EntityMutationProbe.BeforeKey] = original;
-            context.Items[EntityMutationProbe.OperationKey] = "update";
-        }
+            if (request.DryRun)
+            {
+                // Rehearsal: the patch is applied + validated against the working copy; nothing is saved.
+                context.Items[EntityMutationProbe.DryRunKey] = true;
+                ApplyViewHeader(context, request.Accept);
+                CopyHookHeaders(context, hookContext);
+                return Ended(new EntityModelResult<TEntity>(context, working, working));
+            }
 
-        if (request.DryRun)
-        {
-            // Rehearsal: the patch is applied + validated against the working copy; nothing is saved.
-            context.Items[EntityMutationProbe.DryRunKey] = true;
-            ApplyViewHeader(context, request.Accept);
-            CopyHookHeaders(context, hookContext);
-            return new EntityModelResult<TEntity>(context, working, working);
-        }
-
-        var saved = await working!.Upsert<TEntity, TKey>(context.CancellationToken);
-        await AuditMutation(context, EntityAuthorizeActions.Write, request.Id?.ToString() ?? "").ConfigureAwait(false);
-        if (!await _hookPipeline.AfterPatch(hookContext, saved))
-            return await ModelShortCircuit(context, hookContext);
-
-        ApplyViewHeader(context, request.Accept);
-        var emit = await _hookPipeline.EmitModel(hookContext, saved);
-        if (hookContext.IsShortCircuited) return await ModelShortCircuit(context, hookContext);
-        var payload = emit.replaced ? emit.payload : saved;
-        if (await AdmitFieldOutput(context, payload) is { } fieldOutputDenied)
-            return new EntityModelResult<TEntity>(context, null, null, fieldOutputDenied);
-        CopyHookHeaders(context, hookContext);
-        return new EntityModelResult<TEntity>(context, saved, payload);
+            var written = await working!.Upsert<TEntity, TKey>(context.CancellationToken);
+            await AuditMutation(context, EntityAuthorizeActions.Write, request.Id?.ToString() ?? "").ConfigureAwait(false);
+            if (!await _hookPipeline.AfterPatch(hookContext, written))
+                return await Stopped(context, hookContext);
+            return Saved(written);
+        });
+        return answer ?? await Emitted(context, hookContext, saved!, request.Accept);
     }
 
     private static bool PassesRequestPredicates(TEntity model, Filter? filter)
@@ -1448,10 +1405,107 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         message = "This connector or identity shape cannot guarantee atomic insertion. Select a connector and identity shape that support insert-only writes."
     }) { StatusCode = StatusCodes.Status501NotImplemented };
 
-    // AN11: a caller wants a state delta when it explicitly opts in (MCP sets WantsDeltaKey) or whenever the
-    // mutation is a dry-run (the rehearsal's whole point is the prospective delta).
-    private static bool WantsDelta(EntityRequestContext context, bool dryRun)
-        => dryRun || (context.Items.TryGetValue(EntityMutationProbe.WantsDeltaKey, out var v) && v is true);
+    // WEB-0086: an insert that met a row it could not see first. A row the caller may now see and change answers 409 id-taken, as a race
+    // with another create does; any other stays existence-hiding, as the update path is for a row outside the caller's scope.
+    private static async Task<IActionResult> InsertConflict(EntityRequestContext context, AccessFilter<TEntity>? update, TKey id)
+    {
+        var taken = await Data<TEntity, TKey>.Get(id, context.CancellationToken);
+        return taken is not null && PassesRequestPredicates(taken, update?.Filter)
+            ? Answers.Refused(context.User, Reason.Conflict(KoanWebConstants.Codes.Mutation.IdTaken, "Something already has this id, so nothing was written."))
+            : new NotFoundResult();
+    }
+
+    /// <summary>The row a single write found where its hold opens, for its hooks (<see cref="HookContext{TEntity}.Prior"/>) and its delta.</summary>
+    private static void Prior(EntityRequestContext context, TEntity? prior, string operation)
+    {
+        context.Items[EntityMutationProbe.BeforeKey] = prior;
+        context.Items[EntityMutationProbe.OperationKey] = operation;
+    }
+
+    /// <summary>What part of a write ends with, and whether what it did stands: committed where it holds, kept where it cannot.</summary>
+    private readonly record struct Step<TResult>(TResult Result, bool Stands);
+
+    /// <summary>A single write's end: the row it wrote, which the emit composes, or its whole answer.</summary>
+    private readonly record struct Written(TEntity? Row, EntityModelResult<TEntity>? Answer);
+
+    private static Step<TResult> Stands<TResult>(TResult result) => new(result, true);
+
+    private static Step<TResult> Ended<TResult>(TResult result) => new(result, false);
+
+    private static Step<Written> Saved(TEntity row) => Stands(new Written(row, null));
+
+    private static Step<Written> Ended(EntityModelResult<TEntity> answer) => Ended(new Written(default, answer));
+
+    // A hook that stops a single write with a row answers it as written: the emit composes that row as it would a saved one, so a replay
+    // answers as its first write did. Any other stop is its own answer, and one of 400 or more leaves nothing where the write holds.
+    private static async Task<Step<Written>> Stopped(EntityRequestContext context, HookContext<TEntity> hookContext)
+    {
+        if (hookContext.ShortCircuitPayload is TEntity row)
+        {
+            hookContext.Resume();
+            return Saved(row);
+        }
+
+        var answer = await ModelShortCircuit(context, hookContext);
+        return new(new Written(default, answer), !IsDenial(answer.ShortCircuitPayload));
+    }
+
+    private static async Task<Step<EntityEndpointResult>> StoppedBatch(EntityRequestContext context, HookContext<TEntity> hookContext)
+    {
+        var answer = await ModelShortCircuit(context, hookContext);
+        return new(answer, !IsDenial(answer.ShortCircuitPayload));
+    }
+
+    private static async Task<Written> Write(EntityRequestContext context, string operation, Func<Task<Step<Written>>> write)
+        => await Hold(context, operation, write, refused => new Written(default, new EntityModelResult<TEntity>(context, null, null, refused)));
+
+    private static Task<EntityEndpointResult> WriteBatch(EntityRequestContext context, string operation, Func<Task<Step<EntityEndpointResult>>> write)
+        => Hold(context, operation, write, refused => new EntityEndpointResult(context, null, refused));
+
+    // WEB-0086: a write runs from its prior read to its last after-hook as one. Inside a scope already open it joins, and that scope's owner
+    // commits it, rolls it back and hears whatever refuses. Otherwise, where the entity's provider declares write.heldTransaction, it is a
+    // hold of its own, which commits when what it did stands and rolls back on a stop of 400 or more, a refusal or any throw; elsewhere it
+    // runs as it does without one. A thrown Refusal, and a lifecycle handler's cancellation, answer as a command's refusal does.
+    private static async Task<TResult> Hold<TResult>(EntityRequestContext context, string operation, Func<Task<Step<TResult>>> write,
+        Func<IActionResult, TResult> refused)
+    {
+        if (EntityContext.CurrentTransaction is not null) return (await write().ConfigureAwait(false)).Result;
+        try
+        {
+            if (!Data<TEntity, TKey>.Capabilities.Has(DataCaps.Write.HeldTransaction)) return (await write().ConfigureAwait(false)).Result;
+            using (await EntityContext.Hold($"{typeof(TEntity).Name}.{operation}", context.CancellationToken))
+            {
+                var step = await write().ConfigureAwait(false);
+                if (step.Stands) await EntityContext.Commit(CancellationToken.None).ConfigureAwait(false);
+                else await EntityContext.Rollback(CancellationToken.None).ConfigureAwait(false);
+                return step.Result;
+            }
+        }
+        catch (Exception refusal) when (refusal is Refusal or EntityLifecycleCancelledException)
+        {
+            return refused(Refusing(context, refusal));
+        }
+    }
+
+    private static IActionResult Refusing(EntityRequestContext context, Exception refusal) => refusal switch
+    {
+        Refusal refused => Answers.Refused(context.User, refused.Reason),
+        EntityLifecycleCancelledException cancelled => Answers.Refused(context.User, cancelled),
+        _ => throw new ArgumentOutOfRangeException(nameof(refusal), refusal, "Only a refusal or a lifecycle cancellation is answered."),
+    };
+
+    // A written row's answer, composed after the write committed: the emit hooks read and take no lock.
+    private async Task<EntityModelResult<TEntity>> Emitted(EntityRequestContext context, HookContext<TEntity> hookContext, TEntity row, string? accept)
+    {
+        ApplyViewHeader(context, accept);
+        var emit = await _hookPipeline.EmitModel(hookContext, row);
+        if (hookContext.IsShortCircuited) return await ModelShortCircuit(context, hookContext);
+        var payload = emit.replaced ? emit.payload : row;
+        if (await AdmitFieldOutput(context, payload) is { } fieldOutputDenied)
+            return new EntityModelResult<TEntity>(context, null, null, fieldOutputDenied);
+        CopyHookHeaders(context, hookContext);
+        return new EntityModelResult<TEntity>(context, row, payload);
+    }
 
     // ARCH-0084: negotiate via the unified CapabilitySet (the adapter's IDescribesCapabilities declaration).
     private static CapabilitySet Capabilities(IDataRepository<TEntity, TKey> repo)

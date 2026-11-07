@@ -69,14 +69,9 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
 
     private IActionResult ResolveShortCircuit(EntityEndpointResult result)
     {
-        // ARCH-0092 (§D): a seam denial is carried as a transport-agnostic AuthorizeDecision — translate it to
-        // the REST status (Challenge → 401, Forbid → 403) here.
-        if (result.DeniedDecision is { } decision)
-        {
-            return decision is AuthorizeDecision.Challenge
-                ? Unauthorized()
-                : StatusCode(StatusCodes.Status403Forbidden);
-        }
+        // ARCH-0092 (§D): a seam denial is carried as a transport-agnostic AuthorizeDecision; it answers here as every gate's does
+        // (WEB-0086): a refusal with its reason, otherwise the one sentence for its kind.
+        if (result.DeniedDecision is { } decision) return Answers.Denied(HttpContext, decision);
 
         return result.ShortCircuitResult ?? PrepareResponse(result.ShortCircuitPayload ?? result.Payload);
     }

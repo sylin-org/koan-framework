@@ -298,13 +298,13 @@ public sealed class McpRpcHandler
     private static CallToolResult Refused(Koan.Mcp.CustomTools.McpCustomTool tool, int status, string text)
         => Koan.Mcp.CustomTools.ToolAnswers.Refused(tool.Name, new Koan.Web.Controllers.Problem(status, text), tool.IsMutation);
 
-    /// <summary>A failure that carries its own code keeps it, and carries the <see cref="Koan.Web.Controllers.Problem"/> of
-    /// <paramref name="status"/> too, so every failure at the edge has one shape (AI-0042).</summary>
-    private static CallToolResult WithProblem(CallToolResult result, int status)
+    /// <summary>A failure that carries its own code keeps it, and carries the <see cref="Koan.Web.Controllers.Problem"/> it
+    /// <paramref name="answered"/>, or else one of <paramref name="status"/>, so every failure at the edge has one shape (AI-0042).</summary>
+    private static CallToolResult WithProblem(CallToolResult result, int status, JObject? answered = null)
     {
-        var problem = Koan.Mcp.CustomTools.ToolAnswers.Json(new Koan.Web.Controllers.Problem(status, result.Content.FirstOrDefault()?.Text));
+        var problem = answered ?? Koan.Mcp.CustomTools.ToolAnswers.Json(new Koan.Web.Controllers.Problem(status, result.Content.FirstOrDefault()?.Text));
         result.Meta ??= new JObject();
-        result.Meta["status"] = status;
+        result.Meta["status"] = problem["status"]?.Value<int>() ?? status;
         result.Meta["problem"] = problem;
         result.StructuredContent = problem;
         return result;
@@ -1114,7 +1114,7 @@ public sealed class McpRpcHandler
                     ["warnings"] = ToJsonArray(execution.Warnings),
                     ["diagnostics"] = diagnostics
                 }
-            }, StatusOf(execution.ErrorCode ?? CodeMode.Execution.CodeModeErrorCodes.ExecutionError));
+            }, StatusOf(execution.ErrorCode ?? CodeMode.Execution.CodeModeErrorCodes.ExecutionError), execution.Problem);
         }
     }
 

@@ -45,6 +45,11 @@ Every verb is a face of the same governed write/read pipeline — none of them b
 | `PATCH /api/todos/{id}` | **Delta** — content type picks the dialect: `application/merge-patch+json` (RFC 7396, `null` clears), `application/json-patch+json` (RFC 6902 ops), or plain `application/json` (partial; `null` sets null) | one action dispatches by media type |
 | `DELETE /api/todos/{id}` | Remove | |
 
+Each write is one outcome: from its prior read to its last after-hook it is a hold where the store
+offers one (SQLite), so a hook's rows commit with the row or neither does, and a hook's thrown
+`Refusal` or a lifecycle `Cancel` answers a problem document with its word, not a 500
+([WEB-0086](../../decisions/WEB-0086-an-entity-write-commits-as-one-and-refuses-like-a-command.md)).
+
 Query-style verbs (`POST /query`, `GET /new`, bulk forms) exist beside these; see the surface
 reference. The `?filter=` payload speaks the closed query filter vocabulary —
 [the query filter vocabulary](../data/entities.md#the-query-filter-vocabulary) is the operator table. When an external contract needs an exotic verb, subclass and delegate to the same

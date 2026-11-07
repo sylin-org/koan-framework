@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Koan.Mcp.CodeMode.Execution;
+using Koan.Mcp.CustomTools;
+using Koan.Web.Controllers;
 using Koan.Web.Authorization;
 using Koan.Web.Endpoints;
 using Koan.Web.Hooks;
@@ -39,8 +41,8 @@ public sealed class ResponseTranslator
             diagnostics["correlationId"] = pin;
         }
 
-        // SEC-0010: a denial is a failed call, never an empty success. REST renders the same decision as a bare
-        // 401/403, so the decision record itself (whose Forbid reason describes the gate) is never serialized.
+        // SEC-0010: a denial is a failed call, never an empty success. The decision record itself (whose Forbid reason
+        // describes the gate) is never serialized.
         if (result.DeniedDecision is { } decision)
         {
             return Deny(registration, tool, result, decision, headers, warnings, diagnostics);
@@ -65,16 +67,19 @@ public sealed class ResponseTranslator
         }
 
         // SEC-0010: a short circuit carrying an error status (400, 404, 409, 413, ...) is the same refusal REST returns,
-        // so it is a failed call. Its rendered body stays in the short circuit for the caller to read.
+        // so it is a failed call. Its rendered body stays in the short circuit for the caller to read, and a refusal the
+        // endpoint answered as a Problem (WEB-0086) carries that document, its kind, word and field, as every tool's does.
         if (result.ShortCircuitResult is { } refusal && StatusOf(refusal) is >= 400 and var status)
         {
+            var problem = refusal is ObjectResult { Value: Problem said } ? ToolAnswers.Json(said) : null;
             return McpToolExecutionResult.Refused(
                 CodeFor(status),
-                RefusalMessage(tool, status, shortCircuit),
+                RefusalMessage(tool, status, shortCircuit, problem),
                 shortCircuit,
                 headers,
                 warnings,
-                diagnostics);
+                diagnostics,
+                problem);
         }
 
         var payload = await SerializePayload(result).ConfigureAwait(false);
@@ -215,9 +220,10 @@ public sealed class ResponseTranslator
         _ => CodeModeErrorCodes.Rejected
     };
 
-    // The refusal's own words when its body carries them ({ message } or { error }), else the status.
-    private static string RefusalMessage(McpToolDefinition tool, int status, JToken? shortCircuit)
+    // The refusal's own words: its problem's, or its body's ({ message } or { error }), else the status.
+    private static string RefusalMessage(McpToolDefinition tool, int status, JToken? shortCircuit, JObject? problem)
     {
+        if (problem is not null) return $"'{tool.Name}' was refused ({status}): {ToolAnswers.Say(status, problem)}";
         var body = (shortCircuit as JObject)?["payload"] as JObject;
         var said = body?["message"] ?? body?["error"];
         return said is { Type: JTokenType.String } && !string.IsNullOrWhiteSpace(said.Value<string>())

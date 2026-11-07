@@ -40,7 +40,8 @@ builder.Services.AddKoan(() =>
         })
         .AfterUpsert(context =>
         {
-            // The write has succeeded (and a Koan transaction has committed).
+            // The write has succeeded. Inside a deferred transaction it has also committed; inside a
+            // hold it has not yet, and rolls back with the hold.
             AuditTrail.Record(context.Current.Id);
         }));
 ```
@@ -85,8 +86,12 @@ Lifecycle does not claim cross-provider batch atomicity. `BatchOptions.RequireAt
 adapter contract. In particular, an atomic batch containing soft deletes rejects because soft delete
 is lowered to multiple canonical updates rather than falsely reported as one atomic native delete.
 
-`AfterUpsert` is deferred until a surrounding Koan transaction commits. A rolled-back write does not
-emit the after phase.
+Inside a deferred `EntityContext.Transaction`, `AfterUpsert` waits until the scope commits, and a
+rolled-back write does not emit the after phase. Inside a hold (`EntityContext.Hold`, DATA-0166) a write
+acts when it is issued, so `AfterUpsert` runs then, before the hold commits: what it writes on the hold's
+route commits or rolls back with the hold, and anything it tells beyond the store must wait for
+`EntityContext.UncommittedScope` to clear or use the hold's `AfterCommit`. An `EntityController<T>` write
+is such a hold where its provider offers one (WEB-0086).
 
 ## Load meaning
 

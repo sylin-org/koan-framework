@@ -9,15 +9,11 @@ namespace Koan.Web.Endpoints;
 /// </summary>
 public static class EntityMutationProbe
 {
-    /// <summary>Caller opt-in (bool): compute the pre-mutation "before" state so a state delta can be projected.
-    /// MCP sets it on every call; REST stays cost-free (no extra read) until it opts in.</summary>
-    public const string WantsDeltaKey = "koan.web.wantsMutationDelta";
-
     /// <summary>Echoed by the service (bool) when a mutation ran as a rehearsal (nothing was written).</summary>
     public const string DryRunKey = "koan.web.dryRun";
 
-    /// <summary>The pre-mutation entity state (object, or absent when the row did not exist — a create). The
-    /// post-mutation "after" state is the result model itself.</summary>
+    /// <summary>The pre-mutation entity state (object, or null when the row did not exist — a create), set on every single write before
+    /// its before-hook runs, which reads it as <c>HookContext.Prior</c>. The post-mutation "after" state is the result model itself.</summary>
     public const string BeforeKey = "koan.web.mutationBefore";
 
     /// <summary>The mutation kind for the delta: <c>create</c> | <c>update</c> | <c>delete</c>.</summary>

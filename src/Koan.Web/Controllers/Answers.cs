@@ -1,5 +1,7 @@
+using System.Security.Claims;
 using Koan.Data.Abstractions.Failures;
 using Koan.Data.Core.Commands;
+using Koan.Data.Core.Lifecycle;
 using Koan.Web.Authorization;
 using Koan.Web.Hooks;
 using Microsoft.AspNetCore.Http;
@@ -38,19 +40,30 @@ public static class Answers
     public static IActionResult Refused(this ControllerBase controller, Reason reason) => Refused(controller.HttpContext, reason);
 
     /// <inheritdoc cref="Refused(ControllerBase, Reason)"/>
-    public static IActionResult Refused(HttpContext http, Reason reason)
+    public static IActionResult Refused(HttpContext http, Reason reason) => Refused(http.User, reason);
+
+    /// <summary>The one mapping of a reason, for a door that knows its reader and holds no request, as an entity write's endpoint does.</summary>
+    internal static IActionResult Refused(ClaimsPrincipal? reader, Reason reason)
     {
         ArgumentNullException.ThrowIfNull(reason);
         var detail = reason.Kind == ReasonKind.Absent ? Nothing : reason.Text;
-        return new Problem(Status(http, reason), detail, reason.Word,
+        return new Problem(Status(reader, reason), detail, reason.Word,
             reason.Field is { } field ? new Dictionary<string, string[]> { [field] = [detail] } : null).ToResult();
     }
 
+    /// <summary>A lifecycle handler's cancellation, which refuses the row as it stands: a conflict, with the handler's code as its word.</summary>
+    internal static IActionResult Refused(ClaimsPrincipal? reader, EntityLifecycleCancelledException cancelled)
+        => Refused(reader, string.IsNullOrWhiteSpace(cancelled.ReasonCode)
+            ? Reason.Conflict(cancelled.Message)
+            : Reason.Conflict(cancelled.ReasonCode, cancelled.Message));
+
     /// <summary>The status a reason answers with, for a page that shows it in place.</summary>
-    public static int Status(HttpContext http, Reason reason) => reason.Kind switch
+    public static int Status(HttpContext http, Reason reason) => Status(http.User, reason);
+
+    private static int Status(ClaimsPrincipal? reader, Reason reason) => reason.Kind switch
     {
         ReasonKind.Absent => StatusCodes.Status404NotFound,
-        ReasonKind.Gated => http.User.Identity?.IsAuthenticated == true ? StatusCodes.Status403Forbidden : StatusCodes.Status401Unauthorized,
+        ReasonKind.Gated => reader?.Identity?.IsAuthenticated == true ? StatusCodes.Status403Forbidden : StatusCodes.Status401Unauthorized,
         ReasonKind.Conflict => StatusCodes.Status409Conflict,
         _ => StatusCodes.Status400BadRequest,
     };

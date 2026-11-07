@@ -91,7 +91,7 @@ internal static class ToolAnswers
     }
 
     /// <summary>What a refusal says: one sentence for anything absent, each field a value could not bind to, or its detail or title.</summary>
-    private static string? Say(int status, JObject problem)
+    internal static string? Say(int status, JObject problem)
     {
         if (status == StatusCodes.Status404NotFound) return Answers.Nothing;
         if (problem["errors"] is JObject errors && errors.Count > 0)
