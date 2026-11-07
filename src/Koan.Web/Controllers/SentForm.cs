@@ -1,5 +1,4 @@
 using System.Collections;
-using System.Reflection;
 using Koan.Data.Core.Commands;
 using Koan.Web.Infrastructure;
 using Microsoft.AspNetCore.Http;
@@ -15,20 +14,18 @@ namespace Koan.Web.Controllers;
 /// </summary>
 internal static class SentForm
 {
-    /// <summary>The members <paramref name="form"/> names as one object: a field naming a member of <paramref name="entity"/> or of the
-    /// operation's <paramref name="inputs"/> takes that member's type, an empty one being no value where the member is not text, a
-    /// collection takes every value sent, and any other field stays the text it was so the operation refuses it by name. A value that cannot be
-    /// its member's type is the refusal, naming its field.</summary>
-    public static (JObject Words, Reason? Unfit) Words(IFormCollection form, Type entity, IReadOnlyList<PropertyInfo> inputs, JsonSerializer serializer)
+    /// <summary>The members <paramref name="form"/> names as one object: a field naming a member of the entity or of the input of
+    /// <paramref name="operation"/> takes that member's type, an empty one being no value where the member is not text, a collection takes
+    /// every value sent, and any other field stays the text it was so the operation refuses it by name. A value that cannot be its member's
+    /// type is the refusal, naming its field, as it is where it was sent as JSON.</summary>
+    public static (JObject Words, Reason? Unfit) Words(IFormCollection form, EntityOperation operation, JsonSerializer serializer)
     {
         var words = new JObject();
         foreach (var (name, values) in form)
         {
             if (string.Equals(name, KoanWebConstants.Form.Method, StringComparison.OrdinalIgnoreCase)
                 || string.Equals(name, KoanWebConstants.Form.Return, StringComparison.OrdinalIgnoreCase)) continue;
-            var member = inputs.FirstOrDefault(input => EntityOperation.Named(input, name))
-                         ?? entity.GetProperties(BindingFlags.Public | BindingFlags.Instance).FirstOrDefault(property => EntityOperation.Named(property, name));
-            var type = member?.PropertyType;
+            var type = operation.Member(name)?.PropertyType;
             if (type is not null && type != typeof(string) && typeof(IEnumerable).IsAssignableFrom(type))
             {
                 words[name] = new JArray(values.Select(value => (JToken)new JValue(value)));
@@ -54,7 +51,7 @@ internal static class SentForm
             }
             catch (Exception error) when (error is JsonException or FormatException or InvalidCastException or ArgumentException or OverflowException)
             {
-                return (words, Reason.Invalid(name, $"'{name}' cannot take this value."));
+                return (words, EntityOperation.CannotTake(name));
             }
         }
         return (words, null);

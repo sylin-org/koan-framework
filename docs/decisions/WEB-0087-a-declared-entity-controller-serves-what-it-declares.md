@@ -95,7 +95,8 @@ public sealed class NoticesController : EntityController<Notice>, IModelHook<Not
    access admits each member the body names, where it otherwise admitted a replacement of the whole entity, so an `[Access(write)]`
    member a write leaves alone refuses nothing. The route tool's schema lists those members and no others.
 10. **`[Input<TInput>]` declares what an operation takes beside the entity's members,** read from the query and, on a write, from the
-    same body. A value that cannot be its member's type is refused with its field named; the tool's schema lists the members with their
+    same body. A value that cannot be its member's type, an enum word that names nothing among them, is refused with its field named
+    as a value of the entity's members is (WEB-0088 §7); the tool's schema lists the members with their
     descriptions; a hook reads them typed with `HookContext<T>.Input<TInput>()`. An input member named like an entity member is refused
     where the application's routes are composed, because it would write the entity past its write set, and so are `[Writes]` and
     `[Input]` anywhere but a declared controller's operation, so neither is ever silently ignored.

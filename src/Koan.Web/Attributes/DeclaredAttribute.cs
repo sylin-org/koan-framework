@@ -58,23 +58,23 @@ public sealed class DeclaredAttribute : Attribute, IControllerModelConvention
                     break;
                 case nameof(EntityController<,>.Upsert):
                     if (!action.Filters.Contains(BufferedBody.Instance)) action.Filters.Add(BufferedBody.Instance);
-                    KeepsForm(action);
+                    Refuses(action);
                     break;
                 case nameof(EntityController<,>.Patch):
                     TakesForms(action);
-                    KeepsForm(action);
+                    Refuses(action);
                     break;
                 case nameof(EntityController<,>.Delete):
-                    KeepsForm(action);
+                    Refuses(action);
                     break;
             }
         }
     }
 
-    /// <summary>A refused write that came as a form answers with what it sent (WEB-0088).</summary>
-    private static void KeepsForm(ActionModel action)
+    /// <summary>A body that cannot bind is refused as Koan refuses, and a refused write that came as a form answers with what it sent (WEB-0088).</summary>
+    private static void Refuses(ActionModel action)
     {
-        if (!action.Filters.Contains(KeptForm.Instance)) action.Filters.Add(KeptForm.Instance);
+        if (!action.Filters.Contains(RefusedWrite.Instance)) action.Filters.Add(RefusedWrite.Instance);
     }
 
     /// <summary>A change takes a page's form as well as JSON (WEB-0088): the one it inherits consumes JSON alone.</summary>

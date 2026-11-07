@@ -57,7 +57,7 @@ internal sealed class TestAuth(IOptionsMonitor<AuthenticationSchemeOptions> opti
 }
 
 /// <summary>One answer of one door, for comparing.</summary>
-public sealed record Answer(int Status, string? Kind, string Text, bool Failed, string? Location = null, string? Word = null);
+public sealed record Answer(int Status, string? Kind, string Text, bool Failed, string? Location = null, string? Word = null, string? RetryAfter = null);
 
 /// <summary>Middleware an application composed outside everything else: a tenant from a header, into a scoped service and <c>Items</c>, and what the
 /// accessor holds when it gets the request back.</summary>
@@ -208,14 +208,14 @@ public class ForumFixture : IAsyncLifetime
     public Dictionary<string, string> Sent { get; } = new();
 
     /// <summary>A real request to the route.</summary>
-    public async Task<Answer> Route(HttpMethod method, string path, JObject? json, string? user)
+    public async Task<Answer> Route(HttpMethod method, string path, JToken? json, string? user)
     {
         using var client = Client(user);
         using var request = new HttpRequestMessage(method, path);
         if (json is not null) request.Content = new StringContent(json.ToString(Formatting.None), Encoding.UTF8, "application/json");
         using var response = await client.SendAsync(request, TestContext.Current.CancellationToken);
         var text = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
-        return Read((int)response.StatusCode, text) with { Location = response.Headers.Location?.ToString() };
+        return Read((int)response.StatusCode, text) with { Location = response.Headers.Location?.ToString(), RetryAfter = response.Headers.RetryAfter?.ToString() };
     }
 
     /// <summary>A real form post to the route.</summary>
@@ -244,7 +244,7 @@ public class ForumFixture : IAsyncLifetime
         var text = result["content"]![0]!["text"]!.Value<string>()!;
         var meta = result["_meta"] as JObject ?? new JObject();
         return new Answer(meta["status"]?.Value<int>() ?? 0, meta["errorCode"]?.Value<string>(), text, result["isError"]?.Value<bool>() == true, meta["location"]?.Value<string>(),
-            result["structuredContent"]?["word"]?.Value<string>());
+            result["structuredContent"]?["word"]?.Value<string>(), meta["retryAfter"]?.Value<string>());
     }
 
     /// <summary>The whole result of a real <c>tools/call</c>.</summary>

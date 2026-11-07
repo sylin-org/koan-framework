@@ -241,7 +241,8 @@ public sealed class PostHook : IModelHook<Post>
   before the emit hooks compose the answer. A stop of 400 or more, a thrown `Refusal`, a lifecycle `Cancel`, any throw and a rehearsal
   roll it back. Keep a hook inside it short: every other writer of the store waits.
 - **What it answers:** a `Refusal` through `Answers.Refused`, with its kind, word and field; a lifecycle `Cancel` as a 409 whose word is
-  its code; a seam denial through `Answers.Denied`. An MCP entity tool carries the same problem in `meta.problem`.
+  its code; a seam denial through `Answers.Denied`. A hold that cannot begin behind a busy store never ran: `503` with `Retry-After`,
+  nothing written, safe to send again. An MCP entity tool carries the same problem in `meta.problem`.
 - **The prior row** is `HookContext<T>.Prior`, read where the hold opens. A hook that stops a write with a row answers it through the
   emit, as the first write was. See [WEB-0086](https://github.com/sylin-org/koan-framework/blob/main/docs/decisions/WEB-0086-an-entity-write-commits-as-one-and-refuses-like-a-command.md).
 
@@ -321,6 +322,10 @@ public async Task<IActionResult> Pin(string notice, CancellationToken ct)
 
 - **A form:** `Upsert`, `Patch` and `Delete` read a urlencoded or multipart form as the JSON object of its fields, typed as the members
   they name, and judge it by the same write set, input and refusals. A urlencoded `POST` names `PATCH` or `DELETE` in `_method`, which a declared controller's change or delete answers.
+  Such a form is read within the strictest `[RequestSizeLimit]` and `[RequestFormLimits]` of the routes at its address, and answers
+  `413` past them; every other form route keeps its own limits.
+- **A body that cannot bind:** JSON that is not one object, or a value its member cannot be (an enum word that names nothing), is
+  refused `400` naming the field, word `invalid`, on both doors, as every other refusal of the write is.
 - **The answer:** never cached. A sender that reads pages (a form, or an `Accept` asking for HTML) is sent on with `303` to its form's
   `return`, a path under the base, or else to the row's address, `AddressOf(row)`; a delete goes to the address its row was listed under.
   A sender that reads JSON (`Answers.WantsJson`) reads the row, `201` for a create and `200` otherwise, with `Location`. An address

@@ -47,7 +47,10 @@ of this through `Send`: one hold, and the one refusal mapping.
 4. **A refusal answers as a command's does.** A thrown `Refusal` answers through `Answers.Refused`, keeping its kind, word and field.
    A lifecycle cancellation is mapped once, in `Answers`: a 409 conflict whose word is the handler's code, or `conflict` where it names
    none, and whose detail is its reason. A seam denial answers through `Answers.Denied`: a refusal with its reason, otherwise the one
-   sentence of its kind.
+   sentence of its kind. A hold that cannot begin, because another writer kept the store for the whole of its busy timeout, never ran,
+   so the write answers as a command that never ran does, through `Answers.NeverRan`: `503` with `Retry-After`, nothing written and
+   safe to send again, on REST and through a route tool, whose `meta` carries `retryAfter` and `landed: false`; an entity tool carries
+   the same problem, and the header among the endpoint's headers.
 5. **A create whose id another write took first answers 409 `id-taken`** wherever the caller may read that row, as a create that lost a
    race to a visible row does, whether or not they may change it. Only a row their record access hides, through its Read constraint,
    stays the existence-hiding 404, as a read of it answers. The constraint is judged as a read judges it: a row predicate on the row,
@@ -76,6 +79,12 @@ of this through `Send`: one hold, and the one refusal mapping.
   reach its filter there; an action of its own still does.
 - A denied entity write or read answers a `Problem` body where it answered none.
 - A rehearsal on a holding provider rolls back what its hooks wrote.
+
+## Evidence
+
+- `BusyStoreSpec` (Koan.Mcp.Verbs.Tests, real Kestrel and SQLite with a one-second busy timeout): behind a command holding the store, a
+  declared create and change answer `503` with `Retry-After: 1` on REST and on `tools/call`, the tool's `meta` saying `landed: false`;
+  nothing of them is written, and the create sent again once the store is free answers `201`.
 
 ## Ergonomics
 

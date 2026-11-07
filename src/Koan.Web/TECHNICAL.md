@@ -334,11 +334,19 @@ body as JSON, `201` or `200`, with `Location`. Either path is percent-encoded wh
 non-ASCII header value after the write committed. `SentForm.Words` reads a form as the JSON object of its fields, typed by the
 entity's and the declared input's members, without `_method` and `return`; `EntityFormInputFormatter` binds a declared write's entity
 from it with field access's serializer, and the controller reads the same object as the body it checks against the write set and the
-input, so a form and JSON take one path. `[Declared]` adds the form media types to `Patch`'s `[Consumes]` and puts `KeptForm`, an
-always-run result filter, on its writes: a refused form's `Problem`, or the model-state refusal of a body that could not bind, answers
-with `Sent`. `FormMethod` runs before routing, after the cross-site check, only where the host maps a declared controller, reading a
-urlencoded `POST`'s `_method` alone, and changes the method only where a declared controller's own change or delete endpoint takes it
-and its route template matches the path.
+input, so a form and JSON take one path. `EntityOperation.Unfit` is the one judgement of a value that cannot be the entity's or the
+input's member it names, and of a body that is not one JSON object: `SentForm`, a declared `Patch`'s body, the declared input and
+`RefusedWrite` all ask it. `[Declared]` adds the form media types to `Patch`'s `[Consumes]` and puts `RefusedWrite`, an always-run
+result filter, on its writes: the model-state refusal of a body that could not bind becomes `Answers.Refused` of what `Unfit` says
+of the buffered JSON body, or `Answers.Unbound` for a form, and a refused form's `Problem` answers with `Sent`. `FormMethod` runs
+before routing, after the cross-site check, only where the host maps a declared controller. It compiles, once per set of endpoints,
+the route templates of every declared change or delete and every endpoint taking a `POST`; a urlencoded `POST` whose path matches no
+declared change or delete is left unread. One that matches is read within the least `IRequestSizeLimitMetadata` and the least
+`IFormOptionsMetadata` value limits of every endpoint its path matches, set on `IHttpMaxRequestBodySizeFeature` and a `FormFeature`
+before the read, a form past them answering `Answers.TooLarge()`, and its method changes only where a matched declared change or
+delete takes the method its `_method` names. `EntityEndpointService.Hold` answers a `TransactionException` from beginning its hold
+with `Answers.NeverRan`, the `Retry-After` set on the request context's headers, which REST copies to the response and the MCP edge
+carries.
 
 ## Property access admission
 

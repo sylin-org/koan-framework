@@ -161,14 +161,7 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
                             ? many ? new JArray(given.Select(value => (JToken)new JValue(value))) : new JValue(given.ToString())
                             : null);
             if (token is null || token.Type == JTokenType.Null) continue;
-            try
-            {
-                token.ToObject(member.PropertyType, serializer);
-            }
-            catch (Exception error) when (error is JsonException or FormatException or InvalidCastException or ArgumentException or OverflowException)
-            {
-                return this.Refused(Reason.Invalid(name, $"'{name}' cannot take this value."));
-            }
+            if (EntityOperation.Unfit(name, token, member.PropertyType, serializer) is { } unfit) return this.Refused(unfit);
             values[member.Name] = token;
         }
 
@@ -198,7 +191,7 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
         if (!HttpContext.Request.HasFormContentType) return (await SentBody(ct), null);
         var form = await HttpContext.Request.ReadFormAsync(ct);
         var serializer = JsonSerializer.Create(HttpContext.RequestServices.GetRequiredService<IOptions<MvcNewtonsoftJsonOptions>>().Value.SerializerSettings);
-        var (words, unfit) = SentForm.Words(form, typeof(TEntity), operation.InputMembers, serializer);
+        var (words, unfit) = SentForm.Words(form, operation, serializer);
         return unfit is null ? (words, null) : (null, this.Refused(unfit));
     }
 
@@ -950,11 +943,15 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
             else
             {
                 var token = string.IsNullOrWhiteSpace(raw) ? JValue.CreateNull() : JToken.Parse(raw);
+                // WEB-0088: a declared change refuses a body that cannot bind as its create does, naming the field it could not take.
+                if (operation.Declared && operation.Unfit(token, JsonSerializer.Create(HttpContext.RequestServices
+                        .GetRequiredService<IOptions<MvcNewtonsoftJsonOptions>>().Value.SerializerSettings)) is { } unfit)
+                    return this.Refused(unfit);
                 payloadId = token["id"];
                 if (operation.Writes is not null || operation.Input is not null)
                 {
                     // WEB-0087: the body names what it writes, and the declared input travels in it beside those members.
-                    if (token is not JObject members) return this.Refused(Reason.Invalid("A change is one JSON object of the members it writes."));
+                    if (token is not JObject members) return this.Refused(EntityOperation.NotOneObject);
                     var written = Written(operation, members.Properties().Select(member => member.Name));
                     if (written.Refused is { } stranger) return stranger;
                     writes = written.Writes;
@@ -972,6 +969,10 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
         }
         catch (Exception ex)
         {
+            // A declared change's body that is not JSON at all is refused as one that is not an object.
+            if (operation.Declared && ex is JsonException
+                && !string.Equals(mediaType, Infrastructure.KoanWebConstants.ContentTypes.ApplicationJsonPatch, StringComparison.OrdinalIgnoreCase))
+                return this.Refused(EntityOperation.NotOneObject);
             return BadRequest(new { error = $"Invalid PATCH body for content type '{mediaType}': {ex.Message}" });
         }
 

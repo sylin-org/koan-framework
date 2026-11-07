@@ -60,7 +60,8 @@ sealed `after`, a page of `size` rows, in the order its `[Pagination]` declares,
 
 A declared controller's writes also take a page's form, which names `PATCH` or `DELETE` in a `_method` field, and answer through
 `Answers.Written`: a form is sent on (`303`) to its safe `return` path or the row's address (`AddressOf`), JSON reads the row with `201`
-or `200` and its `Location`, and a refused form answers its problem with what it `sent`. A verb beside the entity answers the same way
+or `200` and its `Location`, and a refused form answers its problem with what it `sent`. A form is read within the limits of the
+routes at its address, and a body that cannot bind is refused naming its field. A verb beside the entity answers the same way
 with `this.Written(...)`
 ([WEB-0088](../../decisions/WEB-0088-a-declared-entity-write-takes-a-form-and-answers-once.md)).
 

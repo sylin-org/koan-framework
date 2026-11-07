@@ -173,8 +173,7 @@ public static class Answers
                 return Refused(http, refused.Reason);
             case Outcome<TResult>.Failed { Landed: DataCommitOutcome.NotDispatched } failed:
                 Log(http, failed.Cause);
-                http.Response.Headers.RetryAfter = "1";
-                return new Problem(StatusCodes.Status503ServiceUnavailable, "It never ran, so nothing was done and it is safe to send again.").ToResult();
+                return NeverRan(after => http.Response.Headers.RetryAfter = after);
             case Outcome<TResult>.Failed failed:
                 Log(http, failed.Cause);
                 return new Problem(StatusCodes.Status500InternalServerError,
@@ -182,6 +181,14 @@ public static class Answers
             default:
                 throw new InvalidOperationException($"A command answered {outcome}.");
         }
+    }
+
+    /// <summary>What a write that never ran answers, a command's or an entity's (WEB-0086): 503, safe to send again, and when, through
+    /// <paramref name="retryAfter"/>, which puts the <c>Retry-After</c> where the door that answers carries its headers.</summary>
+    internal static IActionResult NeverRan(Action<string> retryAfter)
+    {
+        retryAfter("1");
+        return new Problem(StatusCodes.Status503ServiceUnavailable, "It never ran, so nothing was done and it is safe to send again.").ToResult();
     }
 
     internal static IActionResult TooLarge()

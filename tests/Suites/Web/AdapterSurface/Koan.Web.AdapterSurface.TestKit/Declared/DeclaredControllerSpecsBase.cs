@@ -146,6 +146,38 @@ public abstract class DeclaredControllerSpecsBase<TFactory> : IClassFixture<TFac
         (await Problem(answer)).GetProperty("errors").TryGetProperty("copies", out _).Should().BeTrue();
     }
 
+    /// <summary>K57: a create or a change whose body cannot bind, one that is not an object or a value that names nothing its member can be,
+    /// is refused as every other refusal of the write is, naming the field, and writes nothing.</summary>
+    [Fact]
+    public async Task A_body_that_cannot_bind_is_refused_naming_its_field()
+    {
+        var id = await Create("Unbound card");
+
+        foreach (var (answer, field) in new (HttpResponseMessage, string?)[]
+                 {
+                     (await Send(HttpMethod.Post, "/api/cards", "[]"), null),
+                     (await Send(HttpMethod.Patch, $"/api/cards/by/{id}", "[]"), null),
+                     (await Post(new { title = "Wild Card", suit = "clubs" }), "suit"),
+                     (await Post(new { title = "Led Card", lead = "clubs" }), "lead"),
+                     (await Patch($"/api/cards/by/{id}", new { suit = "clubs" }), "suit"),
+                 })
+        {
+            answer.StatusCode.Should().Be(HttpStatusCode.BadRequest, field);
+            answer.Content.Headers.ContentType?.MediaType.Should().Be("application/problem+json");
+            var problem = await Problem(answer);
+            problem.GetProperty("kind").GetString().Should().Be("invalid");
+            problem.GetProperty("word").GetString().Should().Be("invalid");
+            if (field is null) problem.GetProperty("detail").GetString().Should().Be("A write is one JSON object of the members it writes.");
+            else problem.GetProperty("errors").GetProperty(field)[0].GetString().Should().Be($"'{field}' cannot take this value.");
+        }
+
+        (await Client.GetAsync("/api/cards/by/wild-card", Ct)).StatusCode.Should().Be(HttpStatusCode.NotFound);
+        (await Client.GetAsync("/api/cards/by/led-card", Ct)).StatusCode.Should().Be(HttpStatusCode.NotFound);
+        var kept = await Read($"/api/cards/by/{id}");
+        kept.GetProperty("edits").GetInt32().Should().Be(0);
+        (await Patch($"/api/cards/by/{id}", new { suit = "spades" })).StatusCode.Should().Be(HttpStatusCode.OK, "a word its member names is taken");
+    }
+
     [Fact]
     public async Task A_change_keeps_what_it_leaves_out_and_refuses_what_it_does_not_write()
     {
@@ -496,6 +528,9 @@ public abstract class DeclaredControllerSpecsBase<TFactory> : IClassFixture<TFac
 
     private Task<HttpResponseMessage> Patch(string path, object body)
         => Client.SendAsync(new HttpRequestMessage(HttpMethod.Patch, path) { Content = Json(body) }, Ct);
+
+    private Task<HttpResponseMessage> Send(HttpMethod method, string path, string json)
+        => Client.SendAsync(new HttpRequestMessage(method, path) { Content = new StringContent(json, Encoding.UTF8, "application/json") }, Ct);
 
     private async Task<JsonElement> Read(string path)
     {

@@ -39,7 +39,7 @@ internal sealed class EntityFormInputFormatter : IInputFormatter
         var serializer = JsonSerializer.Create(access.RequiresGuardedSerialization ? access.CreateSerializerSettings(settings) : settings);
 
         var form = await http.Request.ReadFormAsync(http.RequestAborted).ConfigureAwait(false);
-        var (words, unfit) = SentForm.Words(form, context.ModelType, operation.InputMembers, serializer);
+        var (words, unfit) = SentForm.Words(form, operation, serializer);
         if (unfit is not null)
         {
             context.ModelState.TryAddModelError(unfit.Field ?? context.ModelName, unfit.Text);

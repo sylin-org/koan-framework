@@ -4,6 +4,7 @@ using System.Reflection;
 using Koan.Data.Core.Commands;
 using Koan.Web.Attributes;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace Koan.Web.Controllers;
 
@@ -25,6 +26,7 @@ public sealed class EntityOperation
         Pagination = action?.GetCustomAttribute<PaginationAttribute>(inherit: true) ?? controller.GetCustomAttribute<PaginationAttribute>(inherit: true);
         var entity = EntityOf(controller);
         if (action is null || entity is null) return;
+        _members = entity.GetProperties(BindingFlags.Public | BindingFlags.Instance).Where(member => member.GetIndexParameters().Length == 0).ToArray();
         if (action.GetCustomAttribute<WritesAttribute>(inherit: true) is { } writes)
             Writes = writes.Members.Select(name => entity.GetProperty(name, BindingFlags.Public | BindingFlags.Instance) is { CanWrite: true } member
                 ? member
@@ -108,6 +110,45 @@ public sealed class EntityOperation
 
     /// <summary>The member of the entity this operation writes under <paramref name="name"/>, or null.</summary>
     internal PropertyInfo? Written(string name) => Writes?.FirstOrDefault(member => Named(member, name));
+
+    /// <summary>The members of the entity, which a body may name.</summary>
+    private readonly PropertyInfo[] _members = [];
+
+    /// <summary>The member a body names under <paramref name="name"/>: its input's, then the entity's; null where it names neither.</summary>
+    internal PropertyInfo? Member(string name)
+        => InputMembers.FirstOrDefault(member => Named(member, name)) ?? _members.FirstOrDefault(member => Named(member, name));
+
+    /// <summary>What a body sent to this operation is refused for where it cannot bind (WEB-0087, WEB-0088): one that is not a JSON object, or
+    /// the first value that cannot be the member of the entity or of the input it names, refused naming its field; null where it binds.</summary>
+    internal Reason? Unfit(JToken? body, JsonSerializer serializer)
+    {
+        if (body is not JObject members) return NotOneObject;
+        foreach (var member in members.Properties())
+            if (Member(member.Name) is { } named && Unfit(member.Name, member.Value, named.PropertyType, serializer) is { } unfit) return unfit;
+        return null;
+    }
+
+    /// <summary>What <paramref name="value"/>, sent as <paramref name="name"/>, is refused for where it cannot be <paramref name="type"/>; null where
+    /// it can, or where it is no value.</summary>
+    internal static Reason? Unfit(string name, JToken value, Type type, JsonSerializer serializer)
+    {
+        if (value.Type == JTokenType.Null) return null;
+        try
+        {
+            value.ToObject(type, serializer);
+            return null;
+        }
+        catch (Exception error) when (error is JsonException or FormatException or InvalidCastException or ArgumentException or OverflowException)
+        {
+            return CannotTake(name);
+        }
+    }
+
+    /// <summary>What a value sent as <paramref name="name"/> that cannot be its member is refused with.</summary>
+    internal static Reason CannotTake(string name) => Reason.Invalid(name, $"'{name}' cannot take this value.");
+
+    /// <summary>What a write's body that is not one JSON object is refused with.</summary>
+    internal static Reason NotOneObject => Reason.Invalid("A write is one JSON object of the members it writes.");
 
     internal static bool Named(PropertyInfo member, string name)
         => string.Equals(WireName(member), name, StringComparison.OrdinalIgnoreCase) || string.Equals(member.Name, name, StringComparison.OrdinalIgnoreCase);

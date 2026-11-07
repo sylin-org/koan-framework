@@ -1491,7 +1491,8 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
     // WEB-0086: a write runs from its prior read to its last after-hook as one. Inside a scope already open it joins, and that scope's owner
     // commits it, rolls it back and hears whatever refuses. Otherwise, where the entity's provider declares write.heldTransaction, it is a
     // hold of its own on the route the entity is stored on, which commits when what it did stands and rolls back on a stop of 400 or more,
-    // a refusal or any throw; elsewhere it runs as it does without one. A thrown Refusal, and a lifecycle handler's cancellation, answer as a command's refusal does.
+    // a refusal or any throw; elsewhere it runs as it does without one. A thrown Refusal, and a lifecycle handler's cancellation, answer as a command's refusal does,
+    // and a hold that could not begin behind a busy store answers as a command that never ran does: nothing was written, and it is safe to send again.
     private static async Task<TResult> Hold<TResult>(EntityRequestContext context, string operation, Func<Task<Step<TResult>>> write,
         Func<IActionResult, TResult> refused)
     {
@@ -1500,7 +1501,19 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         {
             if (Data<TEntity, TKey>.Hold($"{typeof(TEntity).Name}.{operation}", context.CancellationToken) is not { } hold)
                 return (await write().ConfigureAwait(false)).Result;
-            using (await hold)
+            IDisposable held;
+            try
+            {
+                // Awaited in this frame: the hold enters the ambient context of this flow as the await completes.
+                held = await hold;
+            }
+            catch (Koan.Data.Core.Transactions.TransactionException)
+            {
+                // The coordinator has said why; the caller is told it never ran, on whichever door carries the headers.
+                return refused(Answers.NeverRan(after => context.Headers[Microsoft.Net.Http.Headers.HeaderNames.RetryAfter] = after));
+            }
+
+            using (held)
             {
                 var step = await write().ConfigureAwait(false);
                 if (step.Stands) await EntityContext.Commit(CancellationToken.None).ConfigureAwait(false);

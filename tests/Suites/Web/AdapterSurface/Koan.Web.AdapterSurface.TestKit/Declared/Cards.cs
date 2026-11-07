@@ -22,10 +22,20 @@ public sealed class Card : Entity<Card>
 
     /// <summary>Counted by <see cref="CardsController"/> on every change.</summary>
     public int Edits { get; set; }
+
+    /// <summary>Written by <see cref="CardsController"/>: a value a body may name that names nothing.</summary>
+    public CardSuit Suit { get; set; }
+}
+
+/// <summary>What a card is of.</summary>
+public enum CardSuit
+{
+    Hearts,
+    Spades,
 }
 
 /// <summary>What a create takes beside the card.</summary>
-public sealed record CardPlacing(string? Place = null, int? Copies = null);
+public sealed record CardPlacing(string? Place = null, int? Copies = null, CardSuit? Lead = null);
 
 /// <summary>Serves a card by its id or its slug, creates one with the title it declares and the place it takes, changes only its title, and
 /// lets only someone signed in remove one.</summary>
@@ -36,12 +46,12 @@ public sealed class CardsController : EntityController<Card>, IModelHook<Card>
     [HttpGet("by/{card}")]
     public override Task<IActionResult> GetById(string card, CancellationToken ct) => base.GetById(card, ct);
 
-    [Writes(nameof(Card.Id), nameof(Card.Title))]
+    [Writes(nameof(Card.Id), nameof(Card.Title), nameof(Card.Suit))]
     [Input<CardPlacing>]
     public override Task<IActionResult> Upsert(Card model, CancellationToken ct) => base.Upsert(model, ct);
 
     [HttpPatch("by/{card}")]
-    [Writes(nameof(Card.Title))]
+    [Writes(nameof(Card.Title), nameof(Card.Suit))]
     public override Task<IActionResult> Patch(string card, CancellationToken ct) => base.Patch(card, ct);
 
     [HttpDelete("by/{card}")]
