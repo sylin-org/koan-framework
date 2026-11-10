@@ -291,8 +291,9 @@ public sealed class NoticesController : EntityController<Notice>, IModelHook<Not
   or `[Partitions(Any = true)]`; its entity tools follow the same rule.
 - **Hooks:** a controller that implements `IModelHook<T>`, `IRequestOptionsHook<T>`, `ICollectionHook<T>` or `IEmitHook<T>` runs as
   that hook for its own requests only, after the registered hooks and before the access floor. Implement only the steps you need.
-  Every hook reads which operation it serves as `ctx.Operation` (`Collection`, `New`, `Read`, `Create`, `Change` or `Delete`), so a
-  controller with two writes keeps no field to tell them apart; whether a row stood is `ctx.Prior`.
+  Every hook reads which operation it serves as `ctx.Operation`, the endpoint's own `EntityEndpointOperationKind` (`Collection`,
+  `GetById`, `Upsert`, `Patch`, `Delete` and the rest), so a controller with two writes keeps no field to tell them apart; whether a row
+  stood is `ctx.Prior`.
   An undeclared controller carrying `[Tool]` is answered on MCP by its entity's own tools, which never run the controller, so one that
   is a hook or gates an override stops the host at start until it is `[Declared]`.
 - **Lists:** a declared collection is keyset-only. `[Pagination(DefaultSize = 20, MaxSize = 50, DefaultSort = "-LastActivityAt")]`

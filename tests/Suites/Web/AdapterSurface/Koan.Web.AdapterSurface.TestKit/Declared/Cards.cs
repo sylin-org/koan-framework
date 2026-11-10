@@ -3,6 +3,7 @@ using Koan.Data.Core.Model;
 using Koan.Web.Attributes;
 using Koan.Web.Authorization;
 using Koan.Web.Controllers;
+using Koan.Web.Endpoints;
 using Koan.Web.Hooks;
 using Microsoft.AspNetCore.Mvc;
 
@@ -198,8 +199,8 @@ public sealed class ToldCardsController : EntityController<Card>, IRequestOption
     }
 }
 
-/// <summary>WEB-0089: hands the page a refused form reads again for a create and a change, whose gate lets only someone signed in send
-/// one, and hands none for a delete, which it always refuses.</summary>
+/// <summary>WEB-0089: hands the page a refused form reads again for its <c>Upsert</c> and its <c>Patch</c>, whose gate lets only someone
+/// signed in send one, and hands none for its <c>Delete</c>, which it always refuses.</summary>
 [Route("api/paged-cards")]
 [Declared]
 public sealed class PagedCardsController : EntityController<Card>, IModelHook<Card>
@@ -226,8 +227,8 @@ public sealed class PagedCardsController : EntityController<Card>, IModelHook<Ca
     public Task OnBeforeDelete(HookContext<Card> ctx, Card model)
         => throw new Koan.Data.Core.Commands.Refusal(Koan.Data.Core.Commands.Reason.Conflict("kept", "This card is kept."));
 
-    protected override ValueTask<object?> RefusedPage(EntityOperationKind operation, Problem refused, CancellationToken ct)
-        => ValueTask.FromResult<object?>(operation == EntityOperationKind.Delete ? null : new CardFormPage(operation.ToString(), refused.Word, refused.Sent));
+    protected override ValueTask<object?> RefusedPage(EntityEndpointOperationKind operation, Problem refused, CancellationToken ct)
+        => ValueTask.FromResult<object?>(operation == EntityEndpointOperationKind.Delete ? null : new CardFormPage(operation.ToString(), refused.Word, refused.Sent));
 }
 
 /// <summary>The page <see cref="PagedCardsController"/> hands a refused form: which operation it was sent to, why it was refused, and what

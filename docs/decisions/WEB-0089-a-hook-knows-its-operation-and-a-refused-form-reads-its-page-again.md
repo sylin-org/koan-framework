@@ -45,26 +45,28 @@ public sealed class NoticesController : EntityController<Notice>, IModelHook<Not
 
     public Task OnBeforeSave(HookContext<Notice> ctx, Notice notice)
     {
-        if (ctx.Operation == EntityOperationKind.Change) notice.EditedAt = DateTimeOffset.UtcNow;
+        if (ctx.Operation == EntityEndpointOperationKind.Patch) notice.EditedAt = DateTimeOffset.UtcNow;
         return Task.CompletedTask;
     }
 
-    protected override async ValueTask<object?> RefusedPage(EntityOperationKind operation, Problem refused, CancellationToken ct)
+    protected override async ValueTask<object?> RefusedPage(EntityEndpointOperationKind operation, Problem refused, CancellationToken ct)
         => new NoticeForm(await Board.Get("general", ct), operation, refused); // the application's page; its formatter draws it
 }
 ```
 
 ## Decision
 
-1. **A hook is told the operation it serves.** `HookContext<T>.Operation` is one of `EntityOperationKind`'s six: `Collection` (the
-   collection, or a query of it), `New`, `Read`, `Create` (a create, a bulk create, and a `PUT`, which writes through it), `Change`,
-   and `Delete` (of one row or many). Each entry point of the entity endpoint sets it before its first hook and nothing changes it after,
-   so every hook of one request, its options, fetch, save, delete and emit steps, registered or the controller's own, reads the same
-   answer, on REST and on MCP. Whether a row stood is `Prior`'s to say: a create that finds one is still a create. `EntityOperation`
-   compiles the kind once per action, and what Koan asked of an action's name, a created row's address and whether a body that cannot
-   bind is a create's or a change's, reads it.
+1. **A hook is told the operation it serves.** `HookContext<T>.Operation` is the endpoint's own `EntityEndpointOperationKind`, the word
+   its descriptor and its entity tools already name it by: `Collection`, `Query`, `GetNew`, `GetById`, `Upsert`, `UpsertMany`, `Patch`,
+   `Delete`, `DeleteMany`, `DeleteByQuery` or `DeleteAll`, each the name of the operation a controller's author overrides and of the
+   entry point that runs it; a `PUT` writes through `Upsert`. Each entry point of the entity endpoint sets its own before its first hook
+   and nothing changes it after, so every hook of one request, its options, fetch, save, delete and emit steps, registered or the
+   controller's own, reads the same answer, on REST and on MCP; it is `None` only where no entity operation runs. `Upsert` says what the
+   route is, on a declared controller where it only creates and on an undeclared one where it creates or changes; whether a row stood is
+   `Prior`'s to say. `EntityOperation` compiles the kind once per action, and what Koan asked of an action's name, a created row's address
+   and whether a body that cannot bind is an upsert's or a patch's, reads it.
 2. **A refused form reads the page its controller hands.** `EntityController.RefusedPage(operation, refused, ct)` is asked when a
-   declared create, change or delete that came as a form is refused and its sender reads pages (`!Answers.WantsJson`), once
+   declared `Upsert`, `Patch` or `Delete` that came as a form is refused and its sender reads pages (`!Answers.WantsJson`), once
    `refused.Sent` holds what the form sent. What it answers is answered with the refusal's status and `Cache-Control: no-store`, for the
    application's formatter to draw; null, its default, answers the refusal as it was. `RefusedWrite` runs whether or not the action ran,
    so a refusal by the gate or by binding reads the page too, for the operation the form was sent to; where the gate refused before the
@@ -90,34 +92,36 @@ public sealed class NoticesController : EntityController<Notice>, IModelHook<Not
 
 ## Ergonomics
 
-New public concepts: `EntityOperationKind`, `HookContext<T>.Operation` and `EntityController.RefusedPage`. A controller with a create and a
+New public concepts: `HookContext<T>.Operation` and `EntityController.RefusedPage`; the operation's type is the endpoint's own
+`EntityEndpointOperationKind`, whose values are the names of the operations a controller overrides. A controller with a create and a
 change keeps no field to tell its hooks which ran, and matches no `Problem` after `base.Upsert` or `base.Patch` to rebuild a page; a
-registered hook branches on the same word. `RefusedPage` sits beside `AddressOf` and `KeyOf`, the controller's other answers about its
+registered hook branches on the same word, and so does an MCP tool. `RefusedPage` sits beside `AddressOf` and `KeyOf`, the controller's other answers about its
 own pages and addresses.
 
 ## Coalescence
 
-- **Owner:** each entry point of `EntityEndpointService` names the operation it serves, since an entity tool reaches it with no
-  controller; `EntityOperation.Kind` names, per action, the entry point that action calls, for what is answered before or without the
-  endpoint: a row's address, and a refusal by the gate or by binding. `RefusedWrite` stays the one place a refused declared write is
-  answered.
-- **Beside it:** `EntityEndpointOperationKind` lists the endpoint's eleven entry points, one per entity tool, which name an MCP tool and
-  its gate action. `EntityOperationKind` is what a request does to a row, which a hook and a page branch on; telling `UpsertMany` from
-  `Upsert` or `DeleteAll` from `Delete` is not a hook's question.
+- **One list:** the operation a hook is told is the endpoint's own kind, the one `DefaultEntityEndpointDescriptorProvider` gives each of
+  its operations and Koan.Mcp names its tools and gate actions from; no second list of operations exists. Each entry point of
+  `EntityEndpointService` sets its own value, one for one, with no mapping, since an entity tool reaches it with no controller.
+- **Per action:** `EntityOperation.Kind` names, per action, the entry point that action calls, for what is answered before or without the
+  endpoint: a row's address, and a refusal by the gate or by binding. Nothing in Koan held that table: the descriptor provider lists the
+  operations and their traits, keyed by nothing an action carries, and Koan.Mcp maps a kind to the endpoint call, the other way.
+  `RefusedWrite` stays the one place a refused declared write is answered.
 - **Deleted:** Koan's two readings of an action's name to tell a create; the in-process redraw ARCH-0144 §7 reserved, with its
   `InProcessSpec` case, whose primitive behavior, the reader carried and a value handed to the formatter, the spec's other cases keep
   proving.
 - **Not built:** a flag for a replayed write (on a create's emit `Prior` already says it, and at a change's stop it would call a change
   that changed nothing a replay); an onward address a hook says (a form's `return` comes first); what a write answers in place of its row
   (`ShortCircuit` in an emit hook serves it); a typed slot for what a hook worked out; a permission bit per field of one change; a change
-  that creates its row; kinds for the batch writes beyond these six.
+  that creates its row; a value folding the batch writes into the single ones, or an operation of its own for a create that only
+  creates.
 
 ## Evidence
 
-- `DeclaredControllerSpecsBase` (AdapterSurface, SQLite and in memory, 32 cases each): each hook is told the operation it serves, for all
-  six, from the options, save, delete and emit steps; a refused form reads the page its controller gives, with the refusal's status and
+- `DeclaredControllerSpecsBase` (AdapterSurface, SQLite and in memory): each hook of a declared controller is told `Collection`,
+  `GetNew`, `GetById`, `Upsert`, `Patch` and `Delete`, from the options, save, delete and emit steps; a refused form reads the page its controller gives, with the refusal's status and
   `no-store`, for a refusal in the write's hold (`409`) and one by the gate before anything bound (`401`, the row unchanged); a form
   whose binding failed reads its page with the operation it was sent to; a refused JSON write reads the problem though its controller
   hands pages, and so does a form whose page its controller declines.
-- `DeclaredOperationsSpec` (Koan.Mcp.Verbs.Tests, real HTTP and real `tools/call`): a tool call tells its hooks `Create` and `Change` as
+- `DeclaredOperationsSpec` (Koan.Mcp.Verbs.Tests, real HTTP and real `tools/call`): a tool call tells its hooks `Upsert` and `Patch` as
   its route does, and a refused one reads the problem, while the same refusal sent as a page's form reads the controller's page.

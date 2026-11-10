@@ -116,10 +116,10 @@ public sealed class DeclaredOperationsSpec(ForumFixture forum) : IClassFixture<F
         var posted = await forum.Tool("post_notice", new JObject { ["text"] = "told by a tool" }, Mara);
         posted.Status.Should().Be(201, posted.ToString());
         var made = JObject.Parse(posted.Text);
-        made["told"]!.Value<string>().Should().Be("Create");
+        made["told"]!.Value<string>().Should().Be("Upsert");
         var edited = await forum.Tool("edit_notice", new JObject { ["notice"] = made["id"]!.Value<string>(), ["text"] = "told again" }, Mara);
         edited.Status.Should().Be(200, edited.ToString());
-        JObject.Parse(edited.Text)["told"]!.Value<string>().Should().Be("Change");
+        JObject.Parse(edited.Text)["told"]!.Value<string>().Should().Be("Patch");
 
         var tool = await forum.Tool("post_notice", new JObject { ["text"] = "forged", ["author"] = "sam" }, Mara);
         tool.Status.Should().Be(400);
@@ -134,7 +134,7 @@ public sealed class DeclaredOperationsSpec(ForumFixture forum) : IClassFixture<F
             new FormUrlEncodedContent(new Dictionary<string, string> { ["text"] = "forged", ["author"] = "sam" }), TestContext.Current.CancellationToken);
         form.StatusCode.Should().Be(System.Net.HttpStatusCode.BadRequest);
         var page = JObject.Parse(await form.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
-        page["operation"]!.Value<string>().Should().Be("Create");
+        page["operation"]!.Value<string>().Should().Be("Upsert");
         page["word"]!.Value<string>().Should().Be("invalid");
     }
 

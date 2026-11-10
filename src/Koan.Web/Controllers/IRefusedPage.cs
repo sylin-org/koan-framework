@@ -1,4 +1,4 @@
-using Koan.Web.Hooks;
+using Koan.Web.Endpoints;
 
 namespace Koan.Web.Controllers;
 
@@ -6,5 +6,5 @@ namespace Koan.Web.Controllers;
 /// <see cref="EntityController{TEntity,TKey}"/>, whose <c>RefusedPage</c> answers.</summary>
 internal interface IRefusedPage
 {
-    ValueTask<object?> RefusedPage(EntityOperationKind operation, Problem refused, CancellationToken ct);
+    ValueTask<object?> RefusedPage(EntityEndpointOperationKind operation, Problem refused, CancellationToken ct);
 }

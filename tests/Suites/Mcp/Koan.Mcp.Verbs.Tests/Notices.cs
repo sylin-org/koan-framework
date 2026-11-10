@@ -3,6 +3,7 @@ using Koan.Data.Abstractions.Filtering;
 using Koan.Data.Core.Model;
 using Koan.Web.Attributes;
 using Koan.Web.Controllers;
+using Koan.Web.Endpoints;
 using Koan.Web.Hooks;
 using Microsoft.AspNetCore.Mvc;
 
@@ -79,6 +80,6 @@ public sealed class NoticesController : EntityController<Notice>, IModelHook<Not
         return Task.CompletedTask;
     }
 
-    protected override ValueTask<object?> RefusedPage(EntityOperationKind operation, Problem refused, CancellationToken ct)
+    protected override ValueTask<object?> RefusedPage(EntityEndpointOperationKind operation, Problem refused, CancellationToken ct)
         => ValueTask.FromResult<object?>(new NoticeFormPage(operation.ToString(), refused.Word));
 }

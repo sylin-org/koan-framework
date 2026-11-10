@@ -3,7 +3,7 @@ using System.ComponentModel;
 using System.Reflection;
 using Koan.Data.Core.Commands;
 using Koan.Web.Attributes;
-using Koan.Web.Hooks;
+using Koan.Web.Endpoints;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
@@ -26,9 +26,9 @@ public sealed class EntityOperation
         Declared = IsDeclared(controller);
         Partitions = controller.GetCustomAttribute<PartitionsAttribute>(inherit: true);
         Pagination = action?.GetCustomAttribute<PaginationAttribute>(inherit: true) ?? controller.GetCustomAttribute<PaginationAttribute>(inherit: true);
-        Kind = action is not null && IsEntityOperation(action) ? KindOf(action.GetBaseDefinition().Name) : null;
+        Kind = action is not null && IsEntityOperation(action) ? KindOf(action.GetBaseDefinition().Name) : EntityEndpointOperationKind.None;
         HandsRefusedPage = controller.GetMethod(nameof(IRefusedPage.RefusedPage), BindingFlags.Instance | BindingFlags.NonPublic,
-            [typeof(EntityOperationKind), typeof(Problem), typeof(CancellationToken)]) is { } page && !IsEntityController(page.DeclaringType);
+            [typeof(EntityEndpointOperationKind), typeof(Problem), typeof(CancellationToken)]) is { } page && !IsEntityController(page.DeclaringType);
         var entity = EntityOf(controller);
         if (action is null || entity is null) return;
         _members = entity.GetProperties(BindingFlags.Public | BindingFlags.Instance).Where(member => member.GetIndexParameters().Length == 0).ToArray();
@@ -61,18 +61,22 @@ public sealed class EntityOperation
         }
     }
 
-    /// <summary>The operation an action of <see cref="EntityController{TEntity,TKey}"/> serves, by the endpoint entry it calls: a <c>PUT</c>
-    /// writes through the create's, as a bulk create does.</summary>
-    private static EntityOperationKind? KindOf(string action) => action switch
+    /// <summary>The endpoint operation an action of <see cref="EntityController{TEntity,TKey}"/> runs, the entry point it calls: each action
+    /// its own, and a <c>PUT</c> the upsert it writes through.</summary>
+    private static EntityEndpointOperationKind KindOf(string action) => action switch
     {
-        nameof(EntityController<,>.GetCollection) or nameof(EntityController<,>.Query) => EntityOperationKind.Collection,
-        nameof(EntityController<,>.GetNew) => EntityOperationKind.New,
-        nameof(EntityController<,>.GetById) => EntityOperationKind.Read,
-        nameof(EntityController<,>.Upsert) or nameof(EntityController<,>.UpsertMany) or nameof(EntityController<,>.Put) => EntityOperationKind.Create,
-        nameof(EntityController<,>.Patch) => EntityOperationKind.Change,
-        nameof(EntityController<,>.Delete) or nameof(EntityController<,>.DeleteMany) or nameof(EntityController<,>.DeleteByQuery)
-            or nameof(EntityController<,>.DeleteAll) => EntityOperationKind.Delete,
-        _ => null,
+        nameof(EntityController<,>.GetCollection) => EntityEndpointOperationKind.Collection,
+        nameof(EntityController<,>.Query) => EntityEndpointOperationKind.Query,
+        nameof(EntityController<,>.GetNew) => EntityEndpointOperationKind.GetNew,
+        nameof(EntityController<,>.GetById) => EntityEndpointOperationKind.GetById,
+        nameof(EntityController<,>.Upsert) or nameof(EntityController<,>.Put) => EntityEndpointOperationKind.Upsert,
+        nameof(EntityController<,>.UpsertMany) => EntityEndpointOperationKind.UpsertMany,
+        nameof(EntityController<,>.Patch) => EntityEndpointOperationKind.Patch,
+        nameof(EntityController<,>.Delete) => EntityEndpointOperationKind.Delete,
+        nameof(EntityController<,>.DeleteMany) => EntityEndpointOperationKind.DeleteMany,
+        nameof(EntityController<,>.DeleteByQuery) => EntityEndpointOperationKind.DeleteByQuery,
+        nameof(EntityController<,>.DeleteAll) => EntityEndpointOperationKind.DeleteAll,
+        _ => EntityEndpointOperationKind.None,
     };
 
     /// <summary>The words a declared collection pages by (DATA-0170), which an input of it cannot take.</summary>
@@ -81,9 +85,9 @@ public sealed class EntityOperation
     /// <summary>Whether the controller serves only what it overrides (<see cref="DeclaredAttribute"/>).</summary>
     public bool Declared { get; }
 
-    /// <summary>Which operation this action serves (WEB-0089), as the endpoint it calls tells its hooks; null for an action that is no entity
-    /// operation.</summary>
-    internal EntityOperationKind? Kind { get; }
+    /// <summary>The endpoint operation this action runs (WEB-0089), as that endpoint tells its hooks;
+    /// <see cref="EntityEndpointOperationKind.None"/> for an action that is no entity operation.</summary>
+    internal EntityEndpointOperationKind Kind { get; }
 
     /// <summary>Whether the controller hands the page a refused form reads again (WEB-0089), by overriding <c>RefusedPage</c>.</summary>
     internal bool HandsRefusedPage { get; }

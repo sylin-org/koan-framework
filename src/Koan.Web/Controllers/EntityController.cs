@@ -212,23 +212,24 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase, IRefused
     protected virtual string AddressOf(TEntity row)
     {
         var sent = HttpContext.Request.Path.ToUriComponent();
-        // A PUT writes through the create, but its own address names the row it writes.
-        var created = Operation.Kind == EntityOperationKind.Create && !HttpMethods.IsPut(HttpContext.Request.Method);
+        // A PUT writes through the upsert, but its own address names the row it writes.
+        var created = Operation.Kind == EntityEndpointOperationKind.Upsert && !HttpMethods.IsPut(HttpContext.Request.Method);
         return created ? sent.TrimEnd('/') + "/" + Uri.EscapeDataString(Convert.ToString(row.Id, CultureInfo.InvariantCulture) ?? "") : sent;
     }
 
     /// <summary>
-    /// The page a refused form reads again (WEB-0089): asked when a declared create, change or delete that came as a page's form is refused, by
-    /// its gate, by binding or by the write, and its sender reads pages, with the <paramref name="operation"/> the form was sent to and the
+    /// The page a refused form reads again (WEB-0089): asked when a declared <c>Upsert</c>, <c>Patch</c> or <c>Delete</c> that came as a page's
+    /// form is refused, by its gate, by binding or by the write, and its sender reads pages, with the <paramref name="operation"/> the form was
+    /// sent to and the
     /// <paramref name="refused"/> problem, which carries what the form sent as <see cref="Problem.Sent"/>. What it answers is answered with
     /// the refusal's status, never cached, for the application's formatter to draw, so a form is shown again as it was filled with its
     /// reason beside it; left alone it answers null, and the refusal answers as it is. Koan draws no page: it hands this one on. A sender that
     /// reads JSON, a tool call among them, is answered the refusal.
     /// </summary>
-    protected virtual ValueTask<object?> RefusedPage(EntityOperationKind operation, Problem refused, CancellationToken ct)
+    protected virtual ValueTask<object?> RefusedPage(EntityEndpointOperationKind operation, Problem refused, CancellationToken ct)
         => ValueTask.FromResult<object?>(null);
 
-    ValueTask<object?> IRefusedPage.RefusedPage(EntityOperationKind operation, Problem refused, CancellationToken ct) => RefusedPage(operation, refused, ct);
+    ValueTask<object?> IRefusedPage.RefusedPage(EntityEndpointOperationKind operation, Problem refused, CancellationToken ct) => RefusedPage(operation, refused, ct);
 
     /// <summary>What a single write answers once it committed: on a declared controller through <see cref="Answers.Written"/> (WEB-0088), at
     /// the written row's address, or for a delete at the address the row was listed under.</summary>

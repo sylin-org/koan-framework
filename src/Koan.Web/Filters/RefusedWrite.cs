@@ -1,5 +1,5 @@
 using Koan.Web.Controllers;
-using Koan.Web.Hooks;
+using Koan.Web.Endpoints;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Controllers;
@@ -58,7 +58,7 @@ internal sealed class RefusedWrite : IAsyncAlwaysRunResultFilter
         if (!http.Request.HasFormContentType || Answers.WantsJson(http.Request) || context.ActionDescriptor is not ControllerActionDescriptor action)
             return null;
         var operation = EntityOperation.Of(action.MethodInfo, action.ControllerTypeInfo);
-        if (!operation.HandsRefusedPage || operation.Kind is not { } kind) return null;
+        if (!operation.HandsRefusedPage || operation.Kind is EntityEndpointOperationKind.None) return null;
 
         // A gate refuses before the action's controller is made, so one is made here to hand the page, and released after it.
         var factory = context.Controller is null ? http.RequestServices.GetRequiredService<IControllerFactory>() : null;
@@ -67,7 +67,7 @@ internal sealed class RefusedWrite : IAsyncAlwaysRunResultFilter
         try
         {
             if (controller is not IRefusedPage pages
-                || await pages.RefusedPage(kind, refused, http.RequestAborted).ConfigureAwait(false) is not { } page)
+                || await pages.RefusedPage(operation.Kind, refused, http.RequestAborted).ConfigureAwait(false) is not { } page)
                 return null;
             http.Response.Headers.CacheControl = "no-store";
             return new ObjectResult(page) { StatusCode = refused.Status };
@@ -86,7 +86,7 @@ internal sealed class RefusedWrite : IAsyncAlwaysRunResultFilter
         var request = http.Request;
         // A create and a change take their members as one JSON object; a JSON Patch is a list of operations, and a delete takes no body.
         if (context.ActionDescriptor is ControllerActionDescriptor action && request.HasJsonContentType() && request.Body.CanSeek
-            && EntityOperation.Of(action.MethodInfo, action.ControllerTypeInfo) is { Kind: EntityOperationKind.Create or EntityOperationKind.Change } operation
+            && EntityOperation.Of(action.MethodInfo, action.ControllerTypeInfo) is { Kind: EntityEndpointOperationKind.Upsert or EntityEndpointOperationKind.Patch } operation
             && !string.Equals(request.ContentType?.Split(';', 2)[0].Trim(), Infrastructure.KoanWebConstants.ContentTypes.ApplicationJsonPatch, StringComparison.OrdinalIgnoreCase))
         {
             request.Body.Position = 0;

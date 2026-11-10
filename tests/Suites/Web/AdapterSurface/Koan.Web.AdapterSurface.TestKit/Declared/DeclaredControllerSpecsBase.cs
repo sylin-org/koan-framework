@@ -516,19 +516,19 @@ public abstract class DeclaredControllerSpecsBase<TFactory> : IClassFixture<TFac
         (await Problem(json)).TryGetProperty("sent", out _).Should().BeFalse("only a form is answered with what it sent");
     }
 
-    /// <summary>WEB-0089: every hook of a request is told the operation it serves, its options, save, delete and emit hooks alike, for each
-    /// of the six a declared controller serves.</summary>
+    /// <summary>WEB-0089: every hook of a request is told the endpoint operation it runs, its options, save, delete and emit hooks alike, for
+    /// each of the six a declared controller here serves.</summary>
     [Fact]
     public async Task Each_hook_is_told_the_operation_it_serves()
     {
         var made = await Client.PostAsJsonAsync("/api/told-cards", new { title = "Told card" }, Ct);
-        Told(made).Should().Be("save:Create emit:Create");
+        Told(made).Should().Be("save:Upsert emit:Upsert");
         var id = (await made.Content.ReadFromJsonAsync<JsonElement>(Ct)).GetProperty("id").GetString()!;
 
         Told(await Client.GetAsync("/api/told-cards", Ct)).Should().Be("options:Collection emit:Collection");
-        Told(await Client.GetAsync("/api/told-cards/new", Ct)).Should().Be("options:New emit:New");
-        Told(await Client.GetAsync($"/api/told-cards/{id}", Ct)).Should().Be("options:Read emit:Read");
-        Told(await Patch($"/api/told-cards/{id}", new { title = "Told again" })).Should().Be("save:Change emit:Change");
+        Told(await Client.GetAsync("/api/told-cards/new", Ct)).Should().Be("options:GetNew emit:GetNew");
+        Told(await Client.GetAsync($"/api/told-cards/{id}", Ct)).Should().Be("options:GetById emit:GetById");
+        Told(await Patch($"/api/told-cards/{id}", new { title = "Told again" })).Should().Be("save:Patch emit:Patch");
         Told(await Client.DeleteAsync($"/api/told-cards/{id}", Ct)).Should().Be("delete:Delete emit:Delete");
     }
 
@@ -541,7 +541,7 @@ public abstract class DeclaredControllerSpecsBase<TFactory> : IClassFixture<TFac
         held.StatusCode.Should().Be(HttpStatusCode.Conflict, await held.Content.ReadAsStringAsync(Ct));
         held.Headers.CacheControl!.NoStore.Should().BeTrue();
         var page = await held.Content.ReadFromJsonAsync<JsonElement>(Ct);
-        page.GetProperty("operation").GetString().Should().Be("Create");
+        page.GetProperty("operation").GetString().Should().Be("Upsert");
         page.GetProperty("word").GetString().Should().Be("held");
         page.GetProperty("sent").GetProperty("title")[0].GetString().Should().Be(PagedCardsController.Held);
 
@@ -550,7 +550,7 @@ public abstract class DeclaredControllerSpecsBase<TFactory> : IClassFixture<TFac
         gated.StatusCode.Should().Be(HttpStatusCode.Unauthorized, await gated.Content.ReadAsStringAsync(Ct));
         gated.Headers.CacheControl!.NoStore.Should().BeTrue();
         var refused = await gated.Content.ReadFromJsonAsync<JsonElement>(Ct);
-        refused.GetProperty("operation").GetString().Should().Be("Change");
+        refused.GetProperty("operation").GetString().Should().Be("Patch");
         refused.GetProperty("word").GetString().Should().Be("gated");
         refused.GetProperty("sent").GetProperty("title")[0].GetString().Should().Be("Changed by nobody");
         (await Read($"/api/cards/by/{id}")).GetProperty("title").GetString().Should().Be("Gated page");
@@ -564,7 +564,7 @@ public abstract class DeclaredControllerSpecsBase<TFactory> : IClassFixture<TFac
 
         unbound.StatusCode.Should().Be(HttpStatusCode.BadRequest, await unbound.Content.ReadAsStringAsync(Ct));
         var page = await unbound.Content.ReadFromJsonAsync<JsonElement>(Ct);
-        page.GetProperty("operation").GetString().Should().Be("Create");
+        page.GetProperty("operation").GetString().Should().Be("Upsert");
         page.GetProperty("word").GetString().Should().Be("invalid");
         page.GetProperty("sent").GetProperty("suit")[0].GetString().Should().Be("clubs");
         (await Client.GetAsync("/api/cards/by/wild-page", Ct)).StatusCode.Should().Be(HttpStatusCode.NotFound);
