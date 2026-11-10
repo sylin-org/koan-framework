@@ -11,8 +11,8 @@ namespace Koan.Web.Attributes;
 /// An <see cref="EntityController{TEntity,TKey}"/> that serves what it declares (WEB-0087): only the operations it overrides are routes, and
 /// tools where <c>[Tool]</c> says so; an override's own HTTP attribute is its route, in place of the one it inherits; <c>POST ""</c> only
 /// creates, so a row already holding the id answers <c>409 id-taken</c>; a query or body word an operation does not take
-/// (<see cref="InputAttribute{TInput}"/>) is refused with its field named, where a read from a sender that names no JSON is sent on to its
-/// address without it (WEB-0090); and a collection or query answers in the format the caller accepts,
+/// (<see cref="InputAttribute{TInput}"/>) is refused with its field named, while a read ignores the words it does not take (WEB-0090); and
+/// a collection or query answers in the format the caller accepts,
 /// JSON by default, so an emit hook's record reaches the application's formatter. Its collection continues from a sealed <c>after</c>, a
 /// page of <c>size</c> rows, in the order its <see cref="PaginationAttribute"/>'s <c>DefaultSort</c> declares (DATA-0170), and counts nothing.
 /// Its writes take a page's form as well as JSON, a form

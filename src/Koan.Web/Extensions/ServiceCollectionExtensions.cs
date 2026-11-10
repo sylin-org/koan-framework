@@ -66,6 +66,8 @@ public static class ServiceCollectionExtensions
         services.TryAddEnumerable(ServiceDescriptor.Transient<IConfigureOptions<MvcOptions>, Filters.GateFilter.Convention>());
         // WEB-0087: a controller that is a hook of its own requests answers none through its hook methods.
         services.TryAddEnumerable(ServiceDescriptor.Transient<IConfigureOptions<MvcOptions>, Controllers.EntityHooksAreNotActions>());
+        // WEB-0091: wherever an action answers GET it answers HEAD.
+        services.TryAddEnumerable(ServiceDescriptor.Transient<IConfigureOptions<MvcOptions>, Controllers.GetAnswersHead>());
         services.TryAddEnumerable(ServiceDescriptor.Singleton<Microsoft.Extensions.Hosting.IHostedService, Authorization.RouteAccessStartCheck>());
         services.TryAddEnumerable(ServiceDescriptor.Transient<IPostConfigureOptions<MvcOptions>, Serialization.FieldAccessMvcOptions>());
         services.AddKoanOptions<WebPipelineOptions>(ConfigurationConstants.Web.Section + ":Pipeline");

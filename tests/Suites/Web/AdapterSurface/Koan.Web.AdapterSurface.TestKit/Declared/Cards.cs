@@ -3,7 +3,6 @@ using Koan.Data.Core.Model;
 using Koan.Web.Attributes;
 using Koan.Web.Authorization;
 using Koan.Web.Controllers;
-using Koan.Web.Endpoints;
 using Koan.Web.Hooks;
 using Microsoft.AspNetCore.Mvc;
 
@@ -199,41 +198,32 @@ public sealed class ToldCardsController : EntityController<Card>, IRequestOption
     }
 }
 
-/// <summary>WEB-0089: hands the page a refused form reads again for its <c>Upsert</c> and its <c>Patch</c>, whose gate lets only someone
-/// signed in send one, and hands none for its <c>Delete</c>, which it always refuses.</summary>
+/// <summary>WEB-0089: a create whose refused form reads the page its action hands through <c>Kept</c>, and reads the refusal where the
+/// action composes none.</summary>
 [Route("api/paged-cards")]
 [Declared]
 public sealed class PagedCardsController : EntityController<Card>, IModelHook<Card>
 {
-    /// <summary>A title a create refuses in its hold.</summary>
+    /// <summary>A title a create refuses in its hold, whose form reads its page again.</summary>
     public const string Held = "Held card";
 
-    [Writes(nameof(Card.Id), nameof(Card.Title), nameof(Card.Suit))]
-    public override Task<IActionResult> Upsert(Card model, CancellationToken ct) => base.Upsert(model, ct);
+    /// <summary>A title a create refuses in its hold, for which the action composes no page.</summary>
+    public const string Unpaged = "Unpaged card";
 
-    [HttpPatch("{card}")]
-    [Writes(nameof(Card.Title))]
-    [Access(write: "authenticated")]
-    public override Task<IActionResult> Patch(string card, CancellationToken ct) => base.Patch(card, ct);
-
-    [HttpDelete("{card}")]
-    public override Task<IActionResult> Delete(string card, CancellationToken ct) => base.Delete(card, ct);
+    [Writes(nameof(Card.Id), nameof(Card.Title))]
+    public override async Task<IActionResult> Upsert(Card model, CancellationToken ct)
+        => await this.Kept(await base.Upsert(model, ct),
+            refused => Task.FromResult<object?>(model.Title == Unpaged ? null : new CardFormPage(refused.Word, refused.Sent)));
 
     public Task OnBeforeSave(HookContext<Card> ctx, Card model)
-        => model.Title == Held
+        => model.Title is Held or Unpaged
             ? throw new Koan.Data.Core.Commands.Refusal(Koan.Data.Core.Commands.Reason.Conflict("held", "This title is held."))
             : Task.CompletedTask;
-
-    public Task OnBeforeDelete(HookContext<Card> ctx, Card model)
-        => throw new Koan.Data.Core.Commands.Refusal(Koan.Data.Core.Commands.Reason.Conflict("kept", "This card is kept."));
-
-    protected override ValueTask<object?> RefusedPage(EntityEndpointOperationKind operation, Problem refused, CancellationToken ct)
-        => ValueTask.FromResult<object?>(operation == EntityEndpointOperationKind.Delete ? null : new CardFormPage(operation.ToString(), refused.Word, refused.Sent));
 }
 
-/// <summary>The page <see cref="PagedCardsController"/> hands a refused form: which operation it was sent to, why it was refused, and what
-/// it sent, for the form to be shown again as it was filled.</summary>
-public sealed record CardFormPage(string Operation, string Word, IReadOnlyDictionary<string, string[]>? Sent);
+/// <summary>The page <see cref="PagedCardsController"/> hands a refused form: why it was refused, and what it sent, for the form to be
+/// shown again as it was filled.</summary>
+public sealed record CardFormPage(string Word, IReadOnlyDictionary<string, string[]>? Sent);
 
 /// <summary>The whole surface over the same row, with no hook of its own.</summary>
 [Route("api/plain-cards")]

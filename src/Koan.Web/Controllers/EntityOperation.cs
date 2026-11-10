@@ -27,8 +27,6 @@ public sealed class EntityOperation
         Partitions = controller.GetCustomAttribute<PartitionsAttribute>(inherit: true);
         Pagination = action?.GetCustomAttribute<PaginationAttribute>(inherit: true) ?? controller.GetCustomAttribute<PaginationAttribute>(inherit: true);
         Kind = action is not null && IsEntityOperation(action) ? KindOf(action.GetBaseDefinition().Name) : EntityEndpointOperationKind.None;
-        HandsRefusedPage = controller.GetMethod(nameof(IRefusedPage.RefusedPage), BindingFlags.Instance | BindingFlags.NonPublic,
-            [typeof(EntityEndpointOperationKind), typeof(Problem), typeof(CancellationToken)]) is { } page && !IsEntityController(page.DeclaringType);
         var entity = EntityOf(controller);
         if (action is null || entity is null) return;
         _members = entity.GetProperties(BindingFlags.Public | BindingFlags.Instance).Where(member => member.GetIndexParameters().Length == 0).ToArray();
@@ -88,9 +86,6 @@ public sealed class EntityOperation
     /// <summary>The endpoint operation this action runs (WEB-0089), as that endpoint tells its hooks;
     /// <see cref="EntityEndpointOperationKind.None"/> for an action that is no entity operation.</summary>
     internal EntityEndpointOperationKind Kind { get; }
-
-    /// <summary>Whether the controller hands the page a refused form reads again (WEB-0089), by overriding <c>RefusedPage</c>.</summary>
-    internal bool HandsRefusedPage { get; }
 
     /// <summary>The members this operation writes, or null where it writes the whole entity.</summary>
     public IReadOnlyList<PropertyInfo>? Writes { get; }

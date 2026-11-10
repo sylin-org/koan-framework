@@ -15,7 +15,7 @@ namespace Koan.Web.AdapterSurface.TestKit.Declared;
 /// other controller's; and a partition no controller declares is refused on every controller. WEB-0088: its writes take a page's form,
 /// which names the method it cannot send, and answer through <c>Answers.Written</c>: a form is sent on, JSON reads the row created or
 /// changed, and a refused form keeps what it sent. WEB-0089: each hook is told the operation it serves, and a refused form reads the page its
-/// controller hands. WEB-0090: a page reached with words it does not take is sent on without them.
+/// action hands through <c>Kept</c>. WEB-0090: a declared read ignores the words it does not take, and a write refuses them.
 /// </summary>
 public abstract class DeclaredControllerSpecsBase<TFactory> : IClassFixture<TFactory>
     where TFactory : class, IAdapterTestFactory
@@ -241,40 +241,49 @@ public abstract class DeclaredControllerSpecsBase<TFactory> : IClassFixture<TFac
         }
     }
 
+    /// <summary>WEB-0090: a write refuses a query word it does not take, naming it; an undeclared controller takes what it always took.</summary>
     [Fact]
-    public async Task A_query_word_the_operation_does_not_take_is_refused_with_its_field()
+    public async Task A_write_refuses_a_query_word_it_does_not_take()
     {
         var id = await Create("Unasked words");
 
-        var answer = await Ask(HttpMethod.Get, $"/api/cards/by/{id}?with=all", "application/json");
-
-        answer.StatusCode.Should().Be(HttpStatusCode.BadRequest);
-        (await Problem(answer)).GetProperty("errors").GetProperty("with")[0].GetString().Should().Be("This address takes no 'with'.");
+        var patched = await Patch($"/api/cards/by/{id}?with=all", new { title = "Changed with words" });
+        patched.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await Problem(patched)).GetProperty("errors").GetProperty("with")[0].GetString().Should().Be("This address takes no 'with'.");
+        var posted = await Client.PostAsJsonAsync("/api/cards?fbclid=IwAR0x", new { title = "Tagged create" }, Ct);
+        posted.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await Problem(posted)).GetProperty("errors").GetProperty("fbclid")[0].GetString().Should().Be("This address takes no 'fbclid'.");
+        (await Read($"/api/cards/by/{id}")).GetProperty("title").GetString().Should().Be("Unasked words");
         (await Client.GetAsync($"/api/plain-cards/{id}?with=all", Ct)).StatusCode.Should().Be(HttpStatusCode.OK, "an undeclared controller takes what it always took");
     }
 
-    /// <summary>WEB-0090: a page reached with words its operation does not take, a link another site tagged, is sent on to its own address
-    /// without them, keeping each word it takes as it was sent, a repeated one and an escaped one among them; a partition it does not serve
-    /// is refused still.</summary>
+    /// <summary>WEB-0090: a declared read ignores the words it does not take, a link another site tagged among them, for every sender, and
+    /// honours none of the endpoint's own words it does not take, beside the words it does; a partition it does not serve is refused
+    /// still.</summary>
     [Fact]
-    public async Task A_page_reached_with_words_it_does_not_take_is_sent_on_without_them()
+    public async Task A_declared_read_ignores_the_words_it_does_not_take()
     {
         var board = Board();
-        var tagged = $"/api/pins/by-label?on={board}&after=a%2Bb%2Fc&size=1&size=2&fbclid=IwAR0x&utm_source=elsewhere";
-        foreach (var method in new[] { HttpMethod.Get, HttpMethod.Head })
-            foreach (var accept in new[] { "text/html", "*/*" })
-            {
-                var answer = await Ask(method, tagged, accept);
-                answer.StatusCode.Should().Be(HttpStatusCode.Found, $"{method} {accept}");
-                answer.Headers.Location!.OriginalString.Should().Be($"/api/pins/by-label?on={board}&after=a%2Bb%2Fc&size=1&size=2", $"{method} {accept}");
-                answer.Headers.CacheControl.Should().BeNull("a word an address takes may change, so nothing says how long this holds");
-            }
+        await Pins(board, ("a", 0), ("b", 0), ("c", 0));
+        var plain = Labels(await List($"/api/pins/by-label?on={board}"));
+        plain.Should().Equal("a", "b");
 
-        var id = await Create("Shared card");
-        var card = await Ask(HttpMethod.Get, $"/api/cards/by/{id}?utm_source=elsewhere", "text/html");
-        card.StatusCode.Should().Be(HttpStatusCode.Found);
-        card.Headers.Location!.OriginalString.Should().Be($"/api/cards/by/{id}");
+        foreach (var accept in new[] { "text/html", "*/*", "application/json" })
+        {
+            var tagged = await Ask(HttpMethod.Get, $"/api/pins/by-label?on={board}&fbclid=IwAR0x&utm_source=elsewhere", accept);
+            tagged.StatusCode.Should().Be(HttpStatusCode.OK, accept);
+            Labels(await tagged.Content.ReadFromJsonAsync<JsonElement>(Ct)).Should().Equal(plain, accept);
+        }
 
+        foreach (var word in new[] { "filter=%7B%22Label%22%3A%22c%22%7D", "sort=-Label", "with=all" })
+            Labels(await List($"/api/pins/by-label?on={board}&{word}")).Should().Equal(plain, $"'{word}' is not this list's to honour");
+
+        var first = await List($"/api/pins/by-label?on={board}&size=1&fbclid=IwAR0x");
+        Labels(first).Should().Equal("a");
+        Labels(await List($"/api/pins/by-label?on={board}&utm_source=elsewhere&after={Uri.EscapeDataString(Next(first)!)}"))
+            .Should().Equal(["b", "c"], "a word it takes is read beside one it ignores");
+
+        var id = await Create("Partitioned read");
         var partitioned = await Ask(HttpMethod.Get, $"/api/cards/by/{id}?set=audit&fbclid=IwAR0x", "text/html");
         partitioned.StatusCode.Should().Be(HttpStatusCode.BadRequest);
         (await Problem(partitioned)).GetProperty("errors").GetProperty("set")[0].GetString().Should().Be("This address serves no partition 'audit'.");
@@ -359,9 +368,7 @@ public abstract class DeclaredControllerSpecsBase<TFactory> : IClassFixture<TFac
         answer.Headers.Select(header => header.Key).Should().NotContain(["X-Total-Count", "X-Total-Pages", "X-Page", "X-Page-Size", "Link"]);
         Labels(await answer.Content.ReadFromJsonAsync<JsonElement>(Ct)).Should().Equal(["a", "b", "c"], "a page holds at most its bound");
 
-        var paged = await Ask(HttpMethod.Get, $"/api/pins/by-label?on={board}&page=2", "application/json");
-        paged.StatusCode.Should().Be(HttpStatusCode.BadRequest);
-        (await Problem(paged)).GetProperty("errors").TryGetProperty("page", out _).Should().BeTrue();
+        Labels(await List($"/api/pins/by-label?on={board}&page=2")).Should().Equal(["a", "b"], "a declared list pages by nothing but its cursor, so 'page' is ignored");
         var sized = await Client.GetAsync($"/api/pins/by-label?on={board}&size=many", Ct);
         sized.StatusCode.Should().Be(HttpStatusCode.BadRequest);
         (await Problem(sized)).GetProperty("errors").TryGetProperty("size", out _).Should().BeTrue();
@@ -532,61 +539,30 @@ public abstract class DeclaredControllerSpecsBase<TFactory> : IClassFixture<TFac
         Told(await Client.DeleteAsync($"/api/told-cards/{id}", Ct)).Should().Be("delete:Delete emit:Delete");
     }
 
-    /// <summary>WEB-0089: a refused form reads the page its controller hands for the operation it was sent to, with the refusal's status
-    /// and what it sent, never cached, whether the write refused it in its hold or its gate refused it before anything was bound.</summary>
+    /// <summary>WEB-0089: a refused form reads the page its action hands through <c>Kept</c>, with the refusal's status and what it sent,
+    /// never cached; a JSON sender reads the problem, and where the action composes no page the refusal answers as it is.</summary>
     [Fact]
-    public async Task A_refused_form_reads_the_page_its_controller_gives()
+    public async Task A_refused_form_reads_the_page_its_action_hands()
     {
         var held = await Form("/api/paged-cards", ("title", PagedCardsController.Held));
         held.StatusCode.Should().Be(HttpStatusCode.Conflict, await held.Content.ReadAsStringAsync(Ct));
         held.Headers.CacheControl!.NoStore.Should().BeTrue();
         var page = await held.Content.ReadFromJsonAsync<JsonElement>(Ct);
-        page.GetProperty("operation").GetString().Should().Be("Upsert");
+        page.TryGetProperty("kind", out _).Should().BeFalse("it is the action's page, not the problem");
         page.GetProperty("word").GetString().Should().Be("held");
         page.GetProperty("sent").GetProperty("title")[0].GetString().Should().Be(PagedCardsController.Held);
 
-        var id = await Create("Gated page");
-        var gated = await Form($"/api/paged-cards/{id}", ("_method", "PATCH"), ("title", "Changed by nobody"));
-        gated.StatusCode.Should().Be(HttpStatusCode.Unauthorized, await gated.Content.ReadAsStringAsync(Ct));
-        gated.Headers.CacheControl!.NoStore.Should().BeTrue();
-        var refused = await gated.Content.ReadFromJsonAsync<JsonElement>(Ct);
-        refused.GetProperty("operation").GetString().Should().Be("Patch");
-        refused.GetProperty("word").GetString().Should().Be("gated");
-        refused.GetProperty("sent").GetProperty("title")[0].GetString().Should().Be("Changed by nobody");
-        (await Read($"/api/cards/by/{id}")).GetProperty("title").GetString().Should().Be("Gated page");
-    }
-
-    /// <summary>WEB-0089: a form whose binding failed, where the action never ran, reads its page with the operation it was sent to.</summary>
-    [Fact]
-    public async Task A_form_whose_binding_failed_reads_its_page_with_the_operation_it_was_sent_to()
-    {
-        var unbound = await Form("/api/paged-cards", ("title", "Wild page"), ("suit", "clubs"));
-
-        unbound.StatusCode.Should().Be(HttpStatusCode.BadRequest, await unbound.Content.ReadAsStringAsync(Ct));
-        var page = await unbound.Content.ReadFromJsonAsync<JsonElement>(Ct);
-        page.GetProperty("operation").GetString().Should().Be("Upsert");
-        page.GetProperty("word").GetString().Should().Be("invalid");
-        page.GetProperty("sent").GetProperty("suit")[0].GetString().Should().Be("clubs");
-        (await Client.GetAsync("/api/cards/by/wild-page", Ct)).StatusCode.Should().Be(HttpStatusCode.NotFound);
-    }
-
-    /// <summary>WEB-0089: a refused JSON write reads the problem though its controller hands pages, and so does a form whose page its
-    /// controller declines.</summary>
-    [Fact]
-    public async Task A_refused_json_write_and_a_page_the_controller_declines_answer_the_problem()
-    {
         var json = await Client.PostAsJsonAsync("/api/paged-cards", new { title = PagedCardsController.Held }, Ct);
         json.StatusCode.Should().Be(HttpStatusCode.Conflict);
         json.Content.Headers.ContentType?.MediaType.Should().Be("application/problem+json");
-        var problem = await Problem(json);
-        problem.GetProperty("word").GetString().Should().Be("held");
-        problem.TryGetProperty("operation", out _).Should().BeFalse();
+        (await Problem(json)).GetProperty("word").GetString().Should().Be("held");
 
-        var id = await Create("Kept page");
-        var declined = await Form($"/api/paged-cards/{id}", ("_method", "DELETE"));
-        declined.StatusCode.Should().Be(HttpStatusCode.Conflict, await declined.Content.ReadAsStringAsync(Ct));
-        declined.Content.Headers.ContentType?.MediaType.Should().Be("application/problem+json");
-        (await Problem(declined)).GetProperty("word").GetString().Should().Be("kept");
+        var unpaged = await Form("/api/paged-cards", ("title", PagedCardsController.Unpaged));
+        unpaged.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        unpaged.Content.Headers.ContentType?.MediaType.Should().Be("application/problem+json");
+        var refused = await Problem(unpaged);
+        refused.GetProperty("kind").GetString().Should().Be("conflict");
+        refused.GetProperty("sent").GetProperty("title")[0].GetString().Should().Be(PagedCardsController.Unpaged);
     }
 
     /// <summary>The operations a request's hooks were told, each as its step and its operation, in the order they ran.</summary>

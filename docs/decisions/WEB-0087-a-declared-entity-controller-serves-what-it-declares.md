@@ -21,11 +21,11 @@ amended_by: DATA-0170, WEB-0089, WEB-0090
 > **Amended by [DATA-0170](DATA-0170-a-list-continues-from-one-sealed-keyset-cursor.md) (2026-11-07): a declared collection is keyset-only,**
 > continuing from a sealed `after`, a page of `size` rows, in its `[Pagination]`'s order; declaring `Page` does not open numbered paging there.
 >
-> **Amended by [WEB-0089](WEB-0089-a-hook-knows-its-operation-and-a-refused-form-reads-its-page-again.md) (2026-11-10): a hook reads which operation it serves from `HookContext<T>.Operation`,**
+> **Amended by [WEB-0089](WEB-0089-a-hook-knows-which-operation-it-serves.md) (2026-11-10): a hook reads which operation it serves from `HookContext<T>.Operation`,**
 > so §11's field handed from an override no longer carries that; it carries only what an override prepared beyond it.
 >
-> **Amended by [WEB-0090](WEB-0090-a-page-reached-with-words-it-does-not-take-is-sent-on-without-them.md) (2026-11-10): a read whose sender names no JSON is sent on without a query word its operation does not take,**
-> rather than refused naming it as §6 has it; a sender that names JSON is still refused.
+> **Amended by [WEB-0090](WEB-0090-a-declared-read-ignores-the-words-it-does-not-take.md) (2026-11-10): a `GET` or `HEAD` drops a query word its operation does not take, for every sender,**
+> rather than refusing it as §6 has it; a write still refuses one, naming it.
 
 ## Context
 

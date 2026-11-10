@@ -134,7 +134,7 @@ Do not hand-roll a deleted flag, a restore endpoint, or a copy script when the o
 
 | Outcome | Package | Also needs | Recipe |
 |---|---|---|---|
-| HTTP conventions and `EntityController<T>` | `Sylin.Koan.Web` | — | [Reference](https://github.com/sylin-org/koan-framework/blob/main/docs/reference/web/index.md) |
+| HTTP conventions and `EntityController<T>`, every read answering `HEAD` | `Sylin.Koan.Web` | — | [Reference](https://github.com/sylin-org/koan-framework/blob/main/docs/reference/web/index.md) |
 | An entity write and what its hooks write commit as one, and a hook's refusal answers as a command's | `Sylin.Koan.Web` | a store that declares held transactions (SQLite) for the one commit | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Koan.Web/README.md#an-entity-write-commits-as-one) |
 | Serve only the entity operations a controller overrides, each writing the members and taking the input it declares, with its own hooks, each told the operation it serves | `Sylin.Koan.Web` | `Sylin.Koan.Mcp` for the overrides as tools | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Koan.Web/README.md#a-declared-entity-controller) |
 | Write an entity from a page's form and answer every committed write once: post, redirect, get for a page, `201` or `200` for JSON; a refused form reads its controller's page again | `Sylin.Koan.Web` | a `[Declared]` entity controller for form writes | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Koan.Web/README.md#a-form-writes-and-every-write-answers-once) |

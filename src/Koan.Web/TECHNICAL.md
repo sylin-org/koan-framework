@@ -309,15 +309,13 @@ runs before the hold and its refusals are mapped there.
 `EntityOperation.Of(action, controller)` compiles, once per action, what an operation of an `EntityController` serves and takes:
 whether the controller is `[Declared]`, the `[Writes]` members, the `[Input<T>]` type and members, the `[Partitions]` it serves, the
 `[Pagination]` it pages by, for a declared collection its `Keyset<TEntity>` from that `[Pagination]`'s `DefaultSort` (DATA-0170), the
-`EntityEndpointOperationKind` of the endpoint entry it calls (`Kind`, a `PUT` being `Upsert`), and whether its controller overrides
-`RefusedPage` (WEB-0089). Each entry point of `EntityEndpointService` sets its own kind on `EntityRequestContext.Operation`, which
+`EntityEndpointOperationKind` of the endpoint entry it calls (`Kind`, a `PUT` being `Upsert`, WEB-0089). Each entry point of `EntityEndpointService` sets its own kind on `EntityRequestContext.Operation`, which
 `HookContext.Operation` reads, before its first hook.
 `EntityController.GetPaginationPolicy` and `RouteTools` both bound it through `PaginationPolicy.Of` under the host's
 `PaginationSafetyBounds`, so the `size` a tool states is the one REST clamps to.
 The controller admits every request by it before anything else is read (the partition, then on a declared controller each query word,
-then the input), where a `GET` or `HEAD` from a sender `Answers.NamesJson` does not name naming a word not taken is sent on, `302`, by
-`Answers.Without` to `PathBase` and `Path` with the taken words rebuilt by `QueryString.Create`, through the same safe-path test and
-carriage as `Answers.Written` (WEB-0090), checks a write body's member names against the write set, and hands the endpoint `Insert` and `Writes`, which turn a
+then the input), where a `GET` or `HEAD` sets `Request.QueryString` to the taken words alone, by `QueryString.Create`, before anything
+reads the query (WEB-0090), checks a write body's member names against the write set, and hands the endpoint `Insert` and `Writes`, which turn a
 create into an insert and record access's replacement demand into a per-member one. `RouteTools` draws a declared operation's schema
 from the same plan, and `PartitionsAttribute.Refusal` is the one partition rule the controller and the entity tools of an
 `EntityController` both ask. `[Declared]` is its own controller model convention: it removes inherited entity operations, keeps an
@@ -327,7 +325,9 @@ purpose, bounds `size` by the policy, and hands the endpoint a `KeysetRead`; the
 `EntityRequestContext.Next` (`HookContext.Next`) before the emit, and answers `{ items, next }` unless an emit hook replaced it, with
 no count or paging header. `RouteTools` adds `after` and `size` to its schema.
 `EntityHooksAreNotActions` removes a controller's hook methods from its actions, and `HookRunner` adds `EntityRequestContext.Owner`
-after the registered hooks of each kind, before the access floor. `[Writes]` and `[Input]` refuse, when the routes are composed, anywhere but a declared
+after the registered hooks of each kind, before the access floor. `GetAnswersHead`, registered beside it, adds `HEAD` to each selector
+whose `HttpMethodActionConstraint` takes `GET` and not `HEAD`, there and in its `HttpMethodMetadata`, unless a selector anywhere takes
+`HEAD` at the same route template with its controller's route before it (WEB-0091); the health alias answers `HEAD` as `GET`. `[Writes]` and `[Input]` refuse, when the routes are composed, anywhere but a declared
 controller's operation.
 
 ## Form writes and the write answer
@@ -344,10 +344,9 @@ input's member it names, and of a body that is not one JSON object: `SentForm`, 
 `RefusedWrite` all ask it. `[Declared]` adds the form media types to `Patch`'s `[Consumes]` and puts `RefusedWrite`, an always-run
 result filter, on its writes: the model-state refusal of a body that could not bind becomes `Answers.Refused` of what `Unfit` says
 of the buffered JSON body, or `Answers.Unbound` for a form, which answers `413` where the body is past the route's limit (ASP.NET's
-form provider reports that as a model error), as it does for `ToolFilter`; a refused form's `Problem` answers with `Sent`; and for a sender
-that reads pages, where `EntityOperation.HandsRefusedPage` says the controller overrides `RefusedPage`, it asks the action's controller, or
-one made by `IControllerFactory` and released after where the gate refused before one was made, for the page of `EntityOperation.Kind`,
-answered as an `ObjectResult` at the problem's status with `no-store` (WEB-0089). `FormMethod` runs
+form provider reports that as a model error), as it does for `ToolFilter`; and a refused form's `Problem` answers with `Sent`. `Answers.Kept` answers, where an action asks it, the page its function
+composes from that problem, with `Sent` read by `SentForm.Fields`, as an `ObjectResult` at the problem's status with `no-store`, which
+`RefusedWrite` then leaves as it is (WEB-0089). `FormMethod` runs
 before routing, after the cross-site check, only where the host maps a declared controller. It compiles, once per set of endpoints,
 the route templates of every declared change or delete and every endpoint taking a `POST`; a urlencoded `POST` whose path matches no
 declared change or delete is left unread. One that matches is read within the least `IRequestSizeLimitMetadata` and the least

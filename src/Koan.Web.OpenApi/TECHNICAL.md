@@ -10,7 +10,8 @@ bootstrap, option model, startup filter, or public `Add`/`Use` path.
 
 The module binds `KoanOpenApiOptions` from `Koan:OpenApi`. `KoanOpenApiStartupFilter` resolves the options once per host,
 adds the optional Swagger UI middleware, lets the application/Koan web pipeline compose, and maps the OpenAPI document
-through ASP.NET endpoint routing.
+through ASP.NET endpoint routing. Its `ShouldInclude` leaves out every `HEAD` description, since every read answers `HEAD` as its
+`GET` (WEB-0091), so the document lists each read once.
 
 The document defaults enabled because the package reference declares projection intent. The UI defaults enabled only
 when `IHostEnvironment.IsDevelopment()` is true. Explicit document disablement dominates UI enablement.

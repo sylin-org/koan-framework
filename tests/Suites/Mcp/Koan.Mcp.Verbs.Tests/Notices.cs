@@ -3,7 +3,6 @@ using Koan.Data.Abstractions.Filtering;
 using Koan.Data.Core.Model;
 using Koan.Web.Attributes;
 using Koan.Web.Controllers;
-using Koan.Web.Endpoints;
 using Koan.Web.Hooks;
 using Microsoft.AspNetCore.Mvc;
 
@@ -25,8 +24,6 @@ public sealed class Notice : Entity<Notice>
     public string Told { get; set; } = "";
 }
 
-/// <summary>The page a refused form of a notice reads again (WEB-0089).</summary>
-public sealed record NoticeFormPage(string Operation, string Word);
 
 /// <summary>What posting a notice takes beside it.</summary>
 public sealed record Posting([property: Description("The board it goes on; left out, the general board.")] string? Where = null);
@@ -34,7 +31,7 @@ public sealed record Posting([property: Description("The board it goes on; left 
 /// <summary>Which board a list of notices reads.</summary>
 public sealed record Listing([property: Description("The board to read.")] string? On = null);
 
-/// <summary>Lists, reads, posts and edits notices, and nothing else, on both doors, and hands a refused form its page.</summary>
+/// <summary>Lists, reads, posts and edits notices, and nothing else, on both doors.</summary>
 [Route("/boards/notices")]
 [Declared]
 public sealed class NoticesController : EntityController<Notice>, IModelHook<Notice>, IRequestOptionsHook<Notice>
@@ -79,7 +76,4 @@ public sealed class NoticesController : EntityController<Notice>, IModelHook<Not
         model.Author = Forum.PersonId(ctx.User) ?? "";
         return Task.CompletedTask;
     }
-
-    protected override ValueTask<object?> RefusedPage(EntityEndpointOperationKind operation, Problem refused, CancellationToken ct)
-        => ValueTask.FromResult<object?>(new NoticeFormPage(operation.ToString(), refused.Word));
 }

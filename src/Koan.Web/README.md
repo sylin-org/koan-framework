@@ -8,7 +8,8 @@ Turn Koan entities into controller-first ASP.NET Core APIs, with shared policy, 
 ## What it adds
 
 - `EntityController<TEntity, TKey>` and the string-key `EntityController<TEntity>` convenience surface
-- attribute-routed ASP.NET Core MVC integration
+- attribute-routed ASP.NET Core MVC integration, where every action that answers `GET` answers `HEAD` with its status and headers and
+  no body, unless it declares its own `HEAD` ([WEB-0091](https://github.com/sylin-org/koan-framework/blob/main/docs/decisions/WEB-0091-wherever-an-action-answers-get-it-answers-head.md))
 - `[Tool]` on a controller or action, which makes a route also a tool where `Koan.Mcp` is present, and `this.Answer(outcome, done)` or `this.Refused(reason)`, a route's one answer to a command (ARCH-0141): a `Problem` as `application/problem+json`, carrying the reason's `word` and its field (ARCH-0145); an application that renders pages registers an ordinary `text/html` output formatter that writes `Problem` and sets `RespectBrowserAcceptHeader`, and a browser reads its page (ARCH-0143)
 - middleware an application adds in `Program` runs for a route, after authorization and before the endpoint; a default CORS policy runs before authentication with no call of yours; a fallback belongs on `app.MapFallback`, because a terminal `app.Run` answers every route (ARCH-0142)
 - health and optional OpenAPI wiring
@@ -284,9 +285,9 @@ public sealed class NoticesController : EntityController<Notice>, IModelHook<Not
 - **What it takes:** `[Writes]` names the members a write writes; a body naming another is refused 400 with that field, an omitted
   member keeps its value on `PATCH` and its default or stamped value on `POST`, and record access admits the members named.
   `[Input<T>]` declares values that are not the entity's, from the query and the same body, read by hooks with `ctx.Input<T>()`. Any
-  query word an operation does not take, `filter`, `page` or `with` among them, is refused with its name, except on a read from a sender
-  that names no JSON: a link another site tagged with `fbclid` or `utm_source` is sent on, `302`, to the address with only the words it
-  takes ([WEB-0090](https://github.com/sylin-org/koan-framework/blob/main/docs/decisions/WEB-0090-a-page-reached-with-words-it-does-not-take-is-sent-on-without-them.md)).
+  query word a write does not take, `filter`, `page` or `with` among them, is refused with its name; a read ignores the words it does
+  not take, so a link another site tagged with `fbclid` or `utm_source` opens the page
+  ([WEB-0090](https://github.com/sylin-org/koan-framework/blob/main/docs/decisions/WEB-0090-a-declared-read-ignores-the-words-it-does-not-take.md)).
 - **Partitions:** every `EntityController` refuses `set`, in the query or a query's body, unless it declares `[Partitions("archive")]`
   or `[Partitions(Any = true)]`; its entity tools follow the same rule.
 - **Hooks:** a controller that implements `IModelHook<T>`, `IRequestOptionsHook<T>`, `ICollectionHook<T>` or `IEmitHook<T>` runs as
@@ -335,13 +336,12 @@ public async Task<IActionResult> Pin(string notice, CancellationToken ct)
   `return`, a path under the base, or else to the row's address, `AddressOf(row)`; a delete goes to the address its row was listed under.
   A sender that reads JSON (`Answers.WantsJson`) reads the row, `201` for a create and `200` otherwise, with `Location`. An address
   you hand `Written` is a path under the base, as `AddressOf` is; the base is put before it for you.
-- **A refusal:** a refused form answers its problem with `sent`, each field it sent. Override `RefusedPage(operation, refused, ct)` to
-  hand the page that form reads again, which your formatter draws at the refusal's status, never cached; it is asked for a refusal by
-  the gate, by binding and by the write alike, and only of a sender that reads pages, so a tool call reads the problem. On a gate's
-  refusal the action never ran and the gate found nothing, so read what the gate would have found without assuming it, and hand null
-  where it is absent: the refusal then answers as it is. See
+- **A refusal:** a refused form answers its problem with `sent`, each field it sent. To show it its page again, answer
+  `await this.Kept(await base.Upsert(model, ct), refused => ...)` with the page composed from the problem, which carries `Sent`: a form
+  from a sender that reads pages reads that page at the refusal's status, never cached, and everyone else, or a page you compose as
+  null, reads the refusal. See
   [WEB-0088](https://github.com/sylin-org/koan-framework/blob/main/docs/decisions/WEB-0088-a-declared-entity-write-takes-a-form-and-answers-once.md)
-  and [WEB-0089](https://github.com/sylin-org/koan-framework/blob/main/docs/decisions/WEB-0089-a-hook-knows-its-operation-and-a-refused-form-reads-its-page-again.md).
+  and [WEB-0089](https://github.com/sylin-org/koan-framework/blob/main/docs/decisions/WEB-0089-a-hook-knows-which-operation-it-serves.md).
 
 ## A request answered in process
 

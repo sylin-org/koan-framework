@@ -116,12 +116,12 @@ internal sealed class KoanWebStartupFilter(IOptions<KoanWebOptions> options, IOp
                     app.UseDefaultFiles();
                     app.UseStaticFiles();
                 }
-                // Lightweight health alias: if configured, respond to GET {HealthPath} with { status: "ok" }
+                // Lightweight health alias: if configured, respond to GET or HEAD {HealthPath} with { status: "ok" } (WEB-0091)
                 if (!string.IsNullOrWhiteSpace(opts.HealthPath))
                 {
                     app.Use(async (ctx, next) =>
                     {
-                        if (HttpMethods.IsGet(ctx.Request.Method)
+                        if ((HttpMethods.IsGet(ctx.Request.Method) || HttpMethods.IsHead(ctx.Request.Method))
                             && string.Equals(ctx.Request.Path.Value, opts.HealthPath, StringComparison.OrdinalIgnoreCase))
                         {
                             ctx.Response.Headers[KoanWebConstants.Headers.XContentTypeOptions] = KoanWebConstants.Policies.NoSniff;

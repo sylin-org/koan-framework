@@ -33,6 +33,9 @@ public sealed class OpenApiModule : KoanModule
         services.AddOpenApi(options =>
         {
             options.OpenApiVersion = OpenApiSpecVersion.OpenApi3_1;
+            // WEB-0091: every read answers HEAD as it answers GET, so the document lists each read once, as its GET.
+            var included = options.ShouldInclude;
+            options.ShouldInclude = description => !Microsoft.AspNetCore.Http.HttpMethods.IsHead(description.HttpMethod ?? "") && included(description);
             options.AddDocumentTransformer<ApplicationIdentityDocumentTransformer>();
             options.AddOperationTransformer<PaginationOperationTransformer>();
             options.AddOperationTransformer<KoanHeadersOperationTransformer>();

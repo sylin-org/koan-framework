@@ -40,7 +40,7 @@ namespace Koan.Web.Controllers;
 /// the operations it overrides; a request naming a partition it does not serve (<see cref="PartitionsAttribute"/>) is refused.
 /// </summary>
 [ApiController]
-public abstract class EntityController<TEntity, TKey> : ControllerBase, IRefusedPage
+public abstract class EntityController<TEntity, TKey> : ControllerBase
     where TEntity : class, IEntity<TKey>
     where TKey : notnull
 {
@@ -120,9 +120,9 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase, IRefused
 
     /// <summary>
     /// What a request is refused with before anything else is read (WEB-0087), or null where it is admitted: a partition this controller does
-    /// not serve; on a declared controller, a query word, or a word of a body that is all words, the operation does not take, where a read
-    /// from a sender that names no JSON is sent on to its address without it (WEB-0090); and a value of the declared input that cannot be
-    /// one. What it admits of the input is what this request's hooks read.
+    /// not serve; on a declared controller, a query word a write does not take, or a word of a body that is all words, while a read ignores
+    /// the words it does not take (WEB-0090); and a value of the declared input that cannot be one. What it admits of the input is what this
+    /// request's hooks read.
     /// </summary>
     private IActionResult? Admit(JObject? body = null, bool bodyIsWords = false)
     {
@@ -137,15 +137,17 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase, IRefused
         var operation = Operation;
         if (operation.Declared)
         {
-            // WEB-0090: a page reached with words it does not take, a link another site tagged among them, is sent on without them; a
-            // sender that names JSON, every tool call among them, is told which word it sent.
             var request = HttpContext.Request;
-            if ((HttpMethods.IsGet(request.Method) || HttpMethods.IsHead(request.Method)) && !Answers.NamesJson(request)
-                && query.Keys.Any(word => !operation.Takes(word))
-                && Answers.Without(HttpContext, query.Where(word => operation.Takes(word.Key))) is { } onward)
-                return onward;
-            foreach (var word in query.Keys)
-                if (!operation.Takes(word)) return this.Refused(EntityOperation.NotTaken(word));
+            if (HttpMethods.IsGet(request.Method) || HttpMethods.IsHead(request.Method))
+            {
+                // WEB-0090: a read ignores the words it does not take, a link another site tagged among them: they leave the request here,
+                // before anything reads its query.
+                if (query.Keys.Any(word => !operation.Takes(word)))
+                    request.QueryString = QueryString.Create(query.Where(word => operation.Takes(word.Key)));
+            }
+            else
+                foreach (var word in query.Keys)
+                    if (!operation.Takes(word)) return this.Refused(EntityOperation.NotTaken(word));
             if (bodyIsWords && body is not null)
                 foreach (var word in body.Properties())
                     if (!operation.Takes(word.Name)) return this.Refused(EntityOperation.NotTaken(word.Name));
@@ -216,20 +218,6 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase, IRefused
         var created = Operation.Kind == EntityEndpointOperationKind.Upsert && !HttpMethods.IsPut(HttpContext.Request.Method);
         return created ? sent.TrimEnd('/') + "/" + Uri.EscapeDataString(Convert.ToString(row.Id, CultureInfo.InvariantCulture) ?? "") : sent;
     }
-
-    /// <summary>
-    /// The page a refused form reads again (WEB-0089): asked when a declared <c>Upsert</c>, <c>Patch</c> or <c>Delete</c> that came as a page's
-    /// form is refused, by its gate, by binding or by the write, and its sender reads pages, with the <paramref name="operation"/> the form was
-    /// sent to and the
-    /// <paramref name="refused"/> problem, which carries what the form sent as <see cref="Problem.Sent"/>. What it answers is answered with
-    /// the refusal's status, never cached, for the application's formatter to draw, so a form is shown again as it was filled with its
-    /// reason beside it; left alone it answers null, and the refusal answers as it is. Koan draws no page: it hands this one on. A sender that
-    /// reads JSON, a tool call among them, is answered the refusal.
-    /// </summary>
-    protected virtual ValueTask<object?> RefusedPage(EntityEndpointOperationKind operation, Problem refused, CancellationToken ct)
-        => ValueTask.FromResult<object?>(null);
-
-    ValueTask<object?> IRefusedPage.RefusedPage(EntityEndpointOperationKind operation, Problem refused, CancellationToken ct) => RefusedPage(operation, refused, ct);
 
     /// <summary>What a single write answers once it committed: on a declared controller through <see cref="Answers.Written"/> (WEB-0088), at
     /// the written row's address, or for a delete at the address the row was listed under.</summary>

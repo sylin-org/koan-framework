@@ -13,7 +13,7 @@ namespace Koan.Web.WellKnown.Tests;
 /// <summary>
 /// WEB-0088 under WEB-0078's base address: <c>Answers.Written</c> takes the address written as a path under the application's base and
 /// puts the base before it, for an entity write's row and a verb's address alike, and a form's <c>return</c> is a path under the base
-/// that never climbs out of it. WEB-0090: a page sent on without the words it does not take stays under the base.
+/// that never climbs out of it.
 /// </summary>
 public sealed class FormWriteUnderBaseSpec
 {
@@ -61,27 +61,6 @@ public sealed class FormWriteUnderBaseSpec
         answer.Headers.Location!.OriginalString.Should().Be("/forum/based-notes/kept");
     }
 
-    /// <summary>WEB-0090: a page reached with words it does not take is sent on to its own address under the base, without them.</summary>
-    [Fact]
-    public async Task A_page_sent_on_without_the_words_it_does_not_take_stays_under_the_base()
-    {
-        await using var host = await BaseUrlPathBaseSpec.BaseUrlHost.Start(new Dictionary<string, string?>
-        {
-            ["Koan:Web:ApplicationUrl"] = "https://www.example.com/forum",
-        });
-        using var client = host.Client;
-        var made = await client.PostAsJsonAsync("/forum/based-notes", new { text = "Shared" }, Ct);
-        made.StatusCode.Should().Be(HttpStatusCode.Created, await made.Content.ReadAsStringAsync(Ct));
-        var id = (await made.Content.ReadFromJsonAsync<JsonElement>(Ct)).GetProperty("id").GetString();
-
-        using var tagged = new HttpRequestMessage(HttpMethod.Get, $"/forum/based-notes/{id}?fbclid=IwAR0x");
-        tagged.Headers.TryAddWithoutValidation("Accept", "text/html");
-        var answer = await client.SendAsync(tagged, Ct);
-
-        answer.StatusCode.Should().Be(HttpStatusCode.Found);
-        answer.Headers.Location!.OriginalString.Should().Be($"/forum/based-notes/{id}");
-    }
-
     private static Task<HttpResponseMessage> Form(HttpClient client, string path, params (string Name, string Value)[] fields)
     {
         var request = new HttpRequestMessage(HttpMethod.Post, path)
@@ -102,9 +81,6 @@ public sealed class BasedNote : Entity<BasedNote>
 [Declared]
 public sealed class BasedNotesController : EntityController<BasedNote>
 {
-    [HttpGet("{note}")]
-    public override Task<IActionResult> GetById(string note, CancellationToken ct) => base.GetById(note, ct);
-
     [Writes(nameof(BasedNote.Id), nameof(BasedNote.Text))]
     public override Task<IActionResult> Upsert(BasedNote model, CancellationToken ct) => base.Upsert(model, ct);
 }
