@@ -86,6 +86,11 @@ public static class Constants
         // MaxPageSize (that cap was removed); request-time output-layer policy is the right boundary.
         public const int UnboundedLoopPageSize = 1000;
     }
+    public static class Lifecycle
+    {
+        /// <summary>DATA-0171: the word of a save that changes a state member by a transition its entity does not declare.</summary>
+        public const string Transition = "transition";
+    }
     public static class Configuration
     {
         public const string SourceIntegration = "Koan:Data:SourceIntegration";

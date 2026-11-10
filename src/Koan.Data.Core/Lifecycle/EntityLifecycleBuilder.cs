@@ -1,4 +1,7 @@
+using System.Linq.Expressions;
 using Koan.Core.Composition;
+using Koan.Data.Core.Commands;
+using Koan.Data.Core.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Koan.Data.Core.Lifecycle;
@@ -48,6 +51,32 @@ public sealed class EntityLifecycleBuilder<TEntity, TKey>
     {
         ArgumentNullException.ThrowIfNull(handler);
         return BeforeUpsert(ctx => new ValueTask<EntityLifecycleResult>(handler(ctx)));
+    }
+
+    /// <summary>
+    /// Declares the transitions <paramref name="member"/> takes, each a value it goes from and the value it goes to (DATA-0171), as one
+    /// before-upsert rule: a save whose row stood at one value and would stand at another that no pair names is refused with a
+    /// <see cref="Refusal"/>, a conflict whose word is <c>transition</c>, in a sentence naming the member, the value it stands at and the
+    /// values it goes to from there. A save that leaves the member as it stands passes, and so does one with no row as it stood.
+    /// <code>Order.Lifecycle.Transitions(order => order.Status, (Status.Open, Status.Shipped), (Status.Open, Status.Cancelled));</code>
+    /// </summary>
+    public EntityLifecycleBuilder<TEntity, TKey> Transitions<TState>(
+        Expression<Func<TEntity, TState>> member, params (TState From, TState To)[] transitions)
+    {
+        ArgumentNullException.ThrowIfNull(transitions);
+        if (member?.Body is not MemberExpression { Member.Name: var name })
+            throw new ArgumentException($"Name the member of {typeof(TEntity).Name} whose transitions these are, as entity => entity.Status.", nameof(member));
+        var read = member.Compile();
+        var table = transitions.ToArray();
+        return BeforeUpsert(context =>
+        {
+            if (context.Prior is null) return context.Proceed();
+            var (from, to) = (read(context.Prior), read(context.Current));
+            if (EqualityComparer<TState>.Default.Equals(from, to) || table.Contains((from, to))) return context.Proceed();
+            var next = table.Where(pair => EqualityComparer<TState>.Default.Equals(pair.From, from)).Select(pair => $"{pair.To}").ToArray();
+            throw new Refusal(Reason.Conflict(Constants.Lifecycle.Transition, $"{name} does not go from {from} to {to}; " +
+                (next.Length == 0 ? $"nothing follows {from}." : $"from {from} it goes to {string.Join(" or ", next)}.")));
+        });
     }
 
     public EntityLifecycleBuilder<TEntity, TKey> AfterUpsert(Func<EntityLifecycleContext<TEntity>, ValueTask> handler)

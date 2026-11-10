@@ -62,6 +62,9 @@ The same Lifecycle boundary governs Entity/Data calls and generated REST/MCP ent
 `/docs/reference/data/entity-lifecycle.md` for phases, bulk/transaction semantics, and deliberate
 bypasses.
 
+A state member that changes only along a table declares it with `Item.Lifecycle.Transitions(item => item.Status, (from, to), …)`:
+any save that changes it otherwise is refused as a conflict whose word is `transition` (DATA-0171).
+
 Use a named source when the application needs to inspect or query an external system without adopting Entity
 persistence. The connector supplies the final native binding leaf; the application declares the business name,
 parameters, lane, and bounds once:

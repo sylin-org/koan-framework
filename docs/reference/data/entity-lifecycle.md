@@ -70,6 +70,23 @@ generated REST controllers, and generated MCP entity tools therefore have the sa
 meaning. Caches, provider decorators, transforms, isolation predicates, and adapters remain internal
 to that boundary.
 
+## Declared transitions
+
+A state member that changes only along a table declares it once, and the lifecycle judges every save by it (DATA-0171):
+
+```csharp
+builder.Services.AddKoan(() =>
+    Order.Lifecycle.Transitions(order => order.Status,
+        (OrderStatus.Open, OrderStatus.Shipped),
+        (OrderStatus.Open, OrderStatus.Cancelled)));
+```
+
+It is one `BeforeUpsert` rule. A save whose row stood at one value and would stand at another that no pair names throws `Refusal`,
+a conflict whose word is `transition` and whose sentence names the member, the value it stands at and where it goes from there; a
+command answers `Outcome.Refused`, and a declared endpoint 409. A save that leaves the member as it stands passes, and so does one
+with no row as it stood: a first save, and an `Insert`. An exact transfer skips the lifecycle and is not judged; under a deferred
+transaction the refusal surfaces at `Commit`.
+
 ## Bulk and transaction semantics
 
 `UpsertMany` evaluates every `BeforeUpsert` handler before the first write. A rejection therefore does

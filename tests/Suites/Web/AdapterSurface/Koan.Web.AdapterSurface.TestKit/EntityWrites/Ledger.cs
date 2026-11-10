@@ -17,6 +17,9 @@ public sealed class Ledger : Entity<Ledger>
 
     /// <summary>Stamped on create by <see cref="LedgerAccess"/>, which makes a create an insert; it also says who may read and change it.</summary>
     public string Desk { get; set; } = "";
+
+    /// <summary>Open until it is closed, and never open again (<see cref="LedgerRules"/>).</summary>
+    public string State { get; set; } = LedgerNotes.Open;
 }
 
 /// <summary>What the ledger hook writes beside each ledger it saves.</summary>
@@ -44,14 +47,19 @@ public static class LedgerNotes
     public const string HiddenRace = "race-hidden";
     public const string CancelCode = "ledger.cancelled";
     public const string AfterWord = "ledger-closed";
+    public const string Open = "open";
+    public const string Closed = "closed";
 }
 
-/// <summary>Declares the ledger's one lifecycle rule, which cancels a ledger noted <see cref="LedgerNotes.Cancel"/>.</summary>
+/// <summary>Declares the ledger's lifecycle: a rule that cancels a ledger noted <see cref="LedgerNotes.Cancel"/>, and its one transition,
+/// from open to closed (DATA-0171).</summary>
 public static class LedgerRules
 {
-    public static void Declare() => Ledger.Lifecycle.BeforeUpsert(context => context.Current.Note == LedgerNotes.Cancel
-        ? context.Cancel("This ledger cannot be kept.", LedgerNotes.CancelCode)
-        : context.Proceed());
+    public static void Declare() => Ledger.Lifecycle
+        .BeforeUpsert(context => context.Current.Note == LedgerNotes.Cancel
+            ? context.Cancel("This ledger cannot be kept.", LedgerNotes.CancelCode)
+            : context.Proceed())
+        .Transitions(ledger => ledger.State, (LedgerNotes.Open, LedgerNotes.Closed));
 }
 
 /// <summary>

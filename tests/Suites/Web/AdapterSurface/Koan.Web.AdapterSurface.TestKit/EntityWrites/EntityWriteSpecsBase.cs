@@ -84,6 +84,24 @@ public abstract class EntityWriteSpecsBase<TFactory> : IClassFixture<TFactory>
     }
 
     [Fact]
+    public async Task A_declared_transition_writes_and_a_change_outside_the_table_answers_a_conflict_whose_word_is_transition()
+    {
+        // DATA-0171: the table is the entity's, so the declared endpoint refuses what any other save would.
+        var id = NewId();
+        (await Post(id, "opened")).StatusCode.Should().Be(HttpStatusCode.OK);
+        (await Put(id, "closed", LedgerNotes.Closed)).StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var answer = await Put(id, "reopened", LedgerNotes.Open);
+
+        answer.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        var problem = await Problem(answer);
+        problem.GetProperty("word").GetString().Should().Be("transition");
+        problem.GetProperty("detail").GetString().Should().Be("State does not go from closed to open; nothing follows closed.");
+        using var scope = AppHost.PushScope(Factory.Services);
+        (await Ledger.Get(id))!.Note.Should().Be("closed");
+    }
+
+    [Fact]
     public async Task A_replay_stopped_with_the_stored_row_answers_as_the_first_write_did()
     {
         var id = NewId();
@@ -124,6 +142,9 @@ public abstract class EntityWriteSpecsBase<TFactory> : IClassFixture<TFactory>
 
     private Task<HttpResponseMessage> Post(string id, string note)
         => Factory.Client.PostAsJsonAsync("/api/ledgers", new { id, note }, TestContext.Current.CancellationToken);
+
+    private Task<HttpResponseMessage> Put(string id, string note, string state)
+        => Factory.Client.PutAsJsonAsync($"/api/ledgers/{id}", new { id, note, state, desk = LedgerAccess.Front }, TestContext.Current.CancellationToken);
 
     private static async Task<JsonElement> Problem(HttpResponseMessage answer)
     {

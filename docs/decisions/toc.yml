@@ -466,6 +466,8 @@
       href: DATA-0169-a-sequence-has-a-committed-head-and-a-hold-runs-by-one-clock.md
     - name: DATA-0170 A list continues from one sealed keyset cursor over a declared order
       href: DATA-0170-a-list-continues-from-one-sealed-keyset-cursor.md
+    - name: DATA-0171 An entity declares the transitions a state member takes, and the lifecycle refuses any other change
+      href: DATA-0171-an-entity-declares-the-transitions-a-state-member-takes.md
 - name: Web (WEB)
   items:
     - name: WEB-0010 Separate AI web surface
