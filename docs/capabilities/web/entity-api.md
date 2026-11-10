@@ -53,7 +53,10 @@ offers one (SQLite), so a hook's rows commit with the row or neither does, and a
 A controller marked `[Declared]` serves only the operations it overrides, each at its own route, with `POST` that only creates;
 `[Writes(...)]` names the members a write writes, `[Input<T>]` what it takes beside them, `KeyOf` maps an address to a row, and a
 controller that implements a hook runs as that hook for its own requests, each hook reading the operation it serves as `ctx.Operation`
-([WEB-0089](../../decisions/WEB-0089-a-hook-knows-its-operation-and-a-refused-form-reads-its-page-again.md)). Every controller refuses a caller-chosen `?set=` partition
+([WEB-0089](../../decisions/WEB-0089-a-hook-knows-its-operation-and-a-refused-form-reads-its-page-again.md)). A query word an
+operation does not take is refused naming it, except that a page read by a sender that names no JSON, a link another site tagged, is
+sent on (`302`) without it
+([WEB-0090](../../decisions/WEB-0090-a-page-reached-with-words-it-does-not-take-is-sent-on-without-them.md)). Every controller refuses a caller-chosen `?set=` partition
 unless it declares `[Partitions(...)]`
 ([WEB-0087](../../decisions/WEB-0087-a-declared-entity-controller-serves-what-it-declares.md)). A declared collection continues from a
 sealed `after`, a page of `size` rows, in the order its `[Pagination]` declares, and counts nothing

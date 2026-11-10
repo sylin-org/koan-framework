@@ -15,7 +15,7 @@ namespace Koan.Web.AdapterSurface.TestKit.Declared;
 /// other controller's; and a partition no controller declares is refused on every controller. WEB-0088: its writes take a page's form,
 /// which names the method it cannot send, and answer through <c>Answers.Written</c>: a form is sent on, JSON reads the row created or
 /// changed, and a refused form keeps what it sent. WEB-0089: each hook is told the operation it serves, and a refused form reads the page its
-/// controller hands.
+/// controller hands. WEB-0090: a page reached with words it does not take is sent on without them.
 /// </summary>
 public abstract class DeclaredControllerSpecsBase<TFactory> : IClassFixture<TFactory>
     where TFactory : class, IAdapterTestFactory
@@ -246,11 +246,38 @@ public abstract class DeclaredControllerSpecsBase<TFactory> : IClassFixture<TFac
     {
         var id = await Create("Unasked words");
 
-        var answer = await Client.GetAsync($"/api/cards/by/{id}?with=all", Ct);
+        var answer = await Ask(HttpMethod.Get, $"/api/cards/by/{id}?with=all", "application/json");
 
         answer.StatusCode.Should().Be(HttpStatusCode.BadRequest);
         (await Problem(answer)).GetProperty("errors").GetProperty("with")[0].GetString().Should().Be("This address takes no 'with'.");
         (await Client.GetAsync($"/api/plain-cards/{id}?with=all", Ct)).StatusCode.Should().Be(HttpStatusCode.OK, "an undeclared controller takes what it always took");
+    }
+
+    /// <summary>WEB-0090: a page reached with words its operation does not take, a link another site tagged, is sent on to its own address
+    /// without them, keeping each word it takes as it was sent, a repeated one and an escaped one among them; a partition it does not serve
+    /// is refused still.</summary>
+    [Fact]
+    public async Task A_page_reached_with_words_it_does_not_take_is_sent_on_without_them()
+    {
+        var board = Board();
+        var tagged = $"/api/pins/by-label?on={board}&after=a%2Bb%2Fc&size=1&size=2&fbclid=IwAR0x&utm_source=elsewhere";
+        foreach (var method in new[] { HttpMethod.Get, HttpMethod.Head })
+            foreach (var accept in new[] { "text/html", "*/*" })
+            {
+                var answer = await Ask(method, tagged, accept);
+                answer.StatusCode.Should().Be(HttpStatusCode.Found, $"{method} {accept}");
+                answer.Headers.Location!.OriginalString.Should().Be($"/api/pins/by-label?on={board}&after=a%2Bb%2Fc&size=1&size=2", $"{method} {accept}");
+                answer.Headers.CacheControl.Should().BeNull("a word an address takes may change, so nothing says how long this holds");
+            }
+
+        var id = await Create("Shared card");
+        var card = await Ask(HttpMethod.Get, $"/api/cards/by/{id}?utm_source=elsewhere", "text/html");
+        card.StatusCode.Should().Be(HttpStatusCode.Found);
+        card.Headers.Location!.OriginalString.Should().Be($"/api/cards/by/{id}");
+
+        var partitioned = await Ask(HttpMethod.Get, $"/api/cards/by/{id}?set=audit&fbclid=IwAR0x", "text/html");
+        partitioned.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await Problem(partitioned)).GetProperty("errors").GetProperty("set")[0].GetString().Should().Be("This address serves no partition 'audit'.");
     }
 
     /// <summary>DATA-0170: a (text, id) order returns every row present for the whole reading once, a row inserted ahead of the cursor
@@ -332,7 +359,7 @@ public abstract class DeclaredControllerSpecsBase<TFactory> : IClassFixture<TFac
         answer.Headers.Select(header => header.Key).Should().NotContain(["X-Total-Count", "X-Total-Pages", "X-Page", "X-Page-Size", "Link"]);
         Labels(await answer.Content.ReadFromJsonAsync<JsonElement>(Ct)).Should().Equal(["a", "b", "c"], "a page holds at most its bound");
 
-        var paged = await Client.GetAsync($"/api/pins/by-label?on={board}&page=2", Ct);
+        var paged = await Ask(HttpMethod.Get, $"/api/pins/by-label?on={board}&page=2", "application/json");
         paged.StatusCode.Should().Be(HttpStatusCode.BadRequest);
         (await Problem(paged)).GetProperty("errors").TryGetProperty("page", out _).Should().BeTrue();
         var sized = await Client.GetAsync($"/api/pins/by-label?on={board}&size=many", Ct);
@@ -603,6 +630,14 @@ public abstract class DeclaredControllerSpecsBase<TFactory> : IClassFixture<TFac
         {
             Content = new FormUrlEncodedContent(fields.Select(field => new KeyValuePair<string, string>(field.Name, field.Value)))
         };
+        request.Headers.TryAddWithoutValidation("Accept", accept);
+        return Client.SendAsync(request, Ct);
+    }
+
+    /// <summary>A request with no body, asking for <paramref name="accept"/>.</summary>
+    private Task<HttpResponseMessage> Ask(HttpMethod method, string path, string accept)
+    {
+        var request = new HttpRequestMessage(method, path);
         request.Headers.TryAddWithoutValidation("Accept", accept);
         return Client.SendAsync(request, Ct);
     }

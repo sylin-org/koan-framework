@@ -13,7 +13,7 @@ related:
   - WEB-0086
   - SEC-0004
   - WEB-0073
-amended_by: DATA-0170, WEB-0089
+amended_by: DATA-0170, WEB-0089, WEB-0090
 ---
 
 # WEB-0087: A declared entity controller serves what it declares, and each operation declares what it writes, takes and hooks
@@ -23,6 +23,9 @@ amended_by: DATA-0170, WEB-0089
 >
 > **Amended by [WEB-0089](WEB-0089-a-hook-knows-its-operation-and-a-refused-form-reads-its-page-again.md) (2026-11-10): a hook reads which operation it serves from `HookContext<T>.Operation`,**
 > so §11's field handed from an override no longer carries that; it carries only what an override prepared beyond it.
+>
+> **Amended by [WEB-0090](WEB-0090-a-page-reached-with-words-it-does-not-take-is-sent-on-without-them.md) (2026-11-10): a read whose sender names no JSON is sent on without a query word its operation does not take,**
+> rather than refused naming it as §6 has it; a sender that names JSON is still refused.
 
 ## Context
 

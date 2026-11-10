@@ -12,6 +12,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Primitives;
 
 namespace Koan.Web.Controllers;
 
@@ -73,15 +74,41 @@ public static class Answers
     {
         ArgumentNullException.ThrowIfNull(request);
         if (request.HasJsonContentType()) return true;
-        var accept = request.GetTypedHeaders().Accept;
-        var json = accept.Any(type => type.MediaType.Equals(KoanWebConstants.ContentTypes.ApplicationJson, StringComparison.OrdinalIgnoreCase)
-                                      || type.Suffix.Equals("json", StringComparison.OrdinalIgnoreCase));
-        var html = accept.Any(type => type.MediaType.Equals(Html, StringComparison.OrdinalIgnoreCase));
+        var (json, html) = Asks(request);
         if (json && !html) return true;
         return !html && !request.HasFormContentType;
     }
 
+    /// <summary>Whether the sender's <c>Accept</c> names JSON and not HTML: a client of the API, every tool call among them, as against a
+    /// browser, a link preview or a client that names no format.</summary>
+    internal static bool NamesJson(HttpRequest request)
+    {
+        var (json, html) = Asks(request);
+        return json && !html;
+    }
+
+    /// <summary>Whether the sender's <c>Accept</c> names JSON, and whether it names HTML.</summary>
+    private static (bool Json, bool Html) Asks(HttpRequest request)
+    {
+        var accept = request.GetTypedHeaders().Accept;
+        return (accept.Any(type => type.MediaType.Equals(KoanWebConstants.ContentTypes.ApplicationJson, StringComparison.OrdinalIgnoreCase)
+                                   || type.Suffix.Equals("json", StringComparison.OrdinalIgnoreCase)),
+                accept.Any(type => type.MediaType.Equals(Html, StringComparison.OrdinalIgnoreCase)));
+    }
+
     private const string Html = "text/html";
+
+    /// <summary>
+    /// A read sent on to its own address with only the words its operation takes (WEB-0090), as <paramref name="taken"/> holds them, each
+    /// value and each repeat as it was sent: <c>302</c>, never <c>301</c>, and nothing said of how long it holds, since the words an address
+    /// takes may change. The address is the request's own under the base, as a header carries it; null where that path is not a path here,
+    /// so a read is never sent on to another host's address.
+    /// </summary>
+    internal static IActionResult? Without(HttpContext http, IEnumerable<KeyValuePair<string, StringValues>> taken)
+    {
+        var path = http.Request.PathBase.ToUriComponent() + http.Request.Path.ToUriComponent();
+        return Safe(path) ? new RedirectResult(Carried(path) + QueryString.Create(taken).ToUriComponent(), permanent: false) : null;
+    }
 
     /// <summary>A form sent on: to the path its <c>return</c> field names under the application's base, where it is one — a single slash
     /// and a path, never another host's (<c>//</c>), a backslash, a control character or a <c>.</c> or <c>..</c> segment, which would
@@ -100,15 +127,17 @@ public static class Answers
             context.HttpContext.Response.Headers.Location = onward;
             context.HttpContext.Response.StatusCode = StatusCodes.Status303SeeOther;
         }
+    }
 
-        private static bool Safe(string path)
-        {
-            if (path[0] != '/' || path.StartsWith("//", StringComparison.Ordinal) || path.Contains('\\') || path.Any(char.IsControl)) return false;
-            var end = path.IndexOfAny(['?', '#']);
-            foreach (var segment in (end < 0 ? path : path[..end]).Split('/'))
-                if (segment.Replace("%2e", ".", StringComparison.OrdinalIgnoreCase) is "." or "..") return false;
-            return true;
-        }
+    /// <summary>Whether <paramref name="path"/> is a path here: a single slash and a path, never another host's (<c>//</c>), a backslash, a
+    /// control character or a <c>.</c> or <c>..</c> segment, escaped or not, which would climb out of the base.</summary>
+    private static bool Safe(string path)
+    {
+        if (path.Length == 0 || path[0] != '/' || path.StartsWith("//", StringComparison.Ordinal) || path.Contains('\\') || path.Any(char.IsControl)) return false;
+        var end = path.IndexOfAny(['?', '#']);
+        foreach (var segment in (end < 0 ? path : path[..end]).Split('/'))
+            if (segment.Replace("%2e", ".", StringComparison.OrdinalIgnoreCase) is "." or "..") return false;
+        return true;
     }
 
     /// <summary>A path as a header carries it: each character outside printable ASCII as the percent-escapes of its UTF-8 bytes, and every

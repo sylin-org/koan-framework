@@ -120,8 +120,9 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase, IRefused
 
     /// <summary>
     /// What a request is refused with before anything else is read (WEB-0087), or null where it is admitted: a partition this controller does
-    /// not serve; on a declared controller, a query word, or a word of a body that is all words, the operation does not take; and a value of
-    /// the declared input that cannot be one. What it admits of the input is what this request's hooks read.
+    /// not serve; on a declared controller, a query word, or a word of a body that is all words, the operation does not take, where a read
+    /// from a sender that names no JSON is sent on to its address without it (WEB-0090); and a value of the declared input that cannot be
+    /// one. What it admits of the input is what this request's hooks read.
     /// </summary>
     private IActionResult? Admit(JObject? body = null, bool bodyIsWords = false)
     {
@@ -136,6 +137,13 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase, IRefused
         var operation = Operation;
         if (operation.Declared)
         {
+            // WEB-0090: a page reached with words it does not take, a link another site tagged among them, is sent on without them; a
+            // sender that names JSON, every tool call among them, is told which word it sent.
+            var request = HttpContext.Request;
+            if ((HttpMethods.IsGet(request.Method) || HttpMethods.IsHead(request.Method)) && !Answers.NamesJson(request)
+                && query.Keys.Any(word => !operation.Takes(word))
+                && Answers.Without(HttpContext, query.Where(word => operation.Takes(word.Key))) is { } onward)
+                return onward;
             foreach (var word in query.Keys)
                 if (!operation.Takes(word)) return this.Refused(EntityOperation.NotTaken(word));
             if (bodyIsWords && body is not null)

@@ -284,7 +284,9 @@ public sealed class NoticesController : EntityController<Notice>, IModelHook<Not
 - **What it takes:** `[Writes]` names the members a write writes; a body naming another is refused 400 with that field, an omitted
   member keeps its value on `PATCH` and its default or stamped value on `POST`, and record access admits the members named.
   `[Input<T>]` declares values that are not the entity's, from the query and the same body, read by hooks with `ctx.Input<T>()`. Any
-  query word an operation does not take, `filter`, `page` or `with` among them, is refused with its name.
+  query word an operation does not take, `filter`, `page` or `with` among them, is refused with its name, except on a read from a sender
+  that names no JSON: a link another site tagged with `fbclid` or `utm_source` is sent on, `302`, to the address with only the words it
+  takes ([WEB-0090](https://github.com/sylin-org/koan-framework/blob/main/docs/decisions/WEB-0090-a-page-reached-with-words-it-does-not-take-is-sent-on-without-them.md)).
 - **Partitions:** every `EntityController` refuses `set`, in the query or a query's body, unless it declares `[Partitions("archive")]`
   or `[Partitions(Any = true)]`; its entity tools follow the same rule.
 - **Hooks:** a controller that implements `IModelHook<T>`, `IRequestOptionsHook<T>`, `ICollectionHook<T>` or `IEmitHook<T>` runs as

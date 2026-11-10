@@ -314,7 +314,9 @@ entry point of `EntityEndpointService` sets `EntityRequestContext.Operation`, wh
 `EntityController.GetPaginationPolicy` and `RouteTools` both bound it through `PaginationPolicy.Of` under the host's
 `PaginationSafetyBounds`, so the `size` a tool states is the one REST clamps to.
 The controller admits every request by it before anything else is read (the partition, then on a declared controller each query word,
-then the input), checks a write body's member names against the write set, and hands the endpoint `Insert` and `Writes`, which turn a
+then the input), where a `GET` or `HEAD` from a sender `Answers.NamesJson` does not name naming a word not taken is sent on, `302`, by
+`Answers.Without` to `PathBase` and `Path` with the taken words rebuilt by `QueryString.Create`, through the same safe-path test and
+carriage as `Answers.Written` (WEB-0090), checks a write body's member names against the write set, and hands the endpoint `Insert` and `Writes`, which turn a
 create into an insert and record access's replacement demand into a per-member one. `RouteTools` draws a declared operation's schema
 from the same plan, and `PartitionsAttribute.Refusal` is the one partition rule the controller and the entity tools of an
 `EntityController` both ask. `[Declared]` is its own controller model convention: it removes inherited entity operations, keeps an

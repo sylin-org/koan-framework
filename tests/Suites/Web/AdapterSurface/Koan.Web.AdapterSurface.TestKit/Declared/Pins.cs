@@ -24,12 +24,13 @@ public sealed class Pin : Entity<Pin>
 /// <summary>Which board a list reads.</summary>
 public sealed record PinBoard([property: Description("The board to list.")] string? On = null);
 
-/// <summary>Lists one board's pins by label, two to a page and three at most.</summary>
+/// <summary>Lists one board's pins by label, two to a page and three at most, and answers a <c>HEAD</c> of the list as its <c>GET</c>.</summary>
 [Route("api/pins/by-label")]
 [Declared]
 public sealed class PinsByLabelController : EntityController<Pin>, IRequestOptionsHook<Pin>
 {
     [HttpGet("")]
+    [HttpHead("")]
     [Pagination(DefaultSize = 2, MaxSize = 3, DefaultSort = nameof(Pin.Label))]
     [Input<PinBoard>]
     public override Task<IActionResult> GetCollection(CancellationToken ct) => base.GetCollection(ct);
