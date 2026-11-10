@@ -82,10 +82,13 @@ builder.Services.AddKoan(() =>
 ```
 
 It is one `BeforeUpsert` rule. A save whose row stood at one value and would stand at another that no pair names throws `Refusal`,
-a conflict whose word is `transition` and whose sentence names the member, the value it stands at and where it goes from there; a
-command answers `Outcome.Refused`, and a declared endpoint 409. A save that leaves the member as it stands passes, and so does one
-with no row as it stood: a first save, and an `Insert`. An exact transfer skips the lifecycle and is not judged; under a deferred
-transaction the refusal surfaces at `Commit`.
+a conflict whose word is `transition` and whose sentence names the member, the value it stands at, the one asked for and where it
+goes from there; a command answers `Outcome.Refused`, and a declared endpoint 409. Each value is worded as itself, or by the function
+`Transitions(member, word, …)` takes, as a client sends it, and a null as `none`. A save that leaves the member as it stands passes,
+and so does one with no row as it stood: a first save, and an `Insert`. The rule judges the member as it stands when it runs, so
+declare it after any rule that sets the member. Outside a hold a save is judged against the row as it was read before the write. An
+exact transfer skips the lifecycle and is not judged; under a deferred transaction a save is judged at `Commit`, against the instance
+as it stands then, and the refusal is the inner exception of the `TransactionException` it throws.
 
 ## Bulk and transaction semantics
 

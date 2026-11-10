@@ -61,6 +61,27 @@ public sealed class EntityTransitionsSpec
     }
 
     [Fact]
+    public async Task A_word_the_entity_gives_words_every_value_of_the_sentence_and_a_null_reads_as_none()
+    {
+        await using var runtime = await DataCoreRuntimeFixture.CreateAsync(configureServices: _ =>
+        {
+            Ticket.Lifecycle.Transitions(ticket => ticket.Stage, stage => stage.ToString().ToLowerInvariant(), (Stage.Draft, Stage.Open));
+            Ticket.Lifecycle.Transitions(ticket => ticket.Review, (null, Stage.Open));
+        });
+        using var partition = runtime.UsePartition(NewPartition());
+
+        var ticket = await new Ticket { Stage = Stage.Open }.Save();
+        ticket.Stage = Stage.Closed;
+        var worded = await ((Func<Task>)(() => ticket.Save())).Should().ThrowAsync<Refusal>();
+        worded.Which.Reason.Text.Should().Be("Stage does not go from open to closed; nothing follows open.");
+
+        ticket.Stage = Stage.Open;
+        ticket.Review = Stage.Closed;
+        var unset = await ((Func<Task>)(() => ticket.Save())).Should().ThrowAsync<Refusal>();
+        unset.Which.Reason.Text.Should().Be("Review does not go from none to Closed; from none it goes to Open.");
+    }
+
+    [Fact]
     public async Task A_command_that_saves_a_change_outside_the_table_is_refused_and_leaves_nothing()
     {
         await using var runtime = await DataCoreRuntimeFixture.CreateAsync(
@@ -75,15 +96,17 @@ public sealed class EntityTransitionsSpec
         outcome.Should().BeOfType<Outcome<Ticket>.Refused>().Which.Reason.Word.Should().Be(DataConstants.Lifecycle.Transition);
         var stored = await Ticket.Get(ticket.Id);
         (stored!.Stage, stored.Title).Should().Be((Stage.Draft, "draft"));
+        (await TodoEntity.Query(todo => todo.Title == "moved")).Should().BeEmpty("the hold rolls back what the command wrote before the refused save");
         (await new MoveTicket(ticket.Id, Stage.Open, "opened").Send().WaitAsync(TimeSpan.FromSeconds(30)))
             .Should().BeOfType<Outcome<Ticket>.Done>();
     }
 
-    /// <summary>Moves a ticket to a stage, renaming it in the same save.</summary>
+    /// <summary>Notes the move in a row of its own, then moves a ticket to a stage, renaming it in the same save.</summary>
     private sealed record MoveTicket(string Id, Stage To, string Title) : ICommand<Ticket>
     {
         public async Task<Outcome<Ticket>> Run(CancellationToken ct)
         {
+            await new TodoEntity { Title = Title }.Save(ct);
             var ticket = (await Ticket.Get(Id, ct))!;
             ticket.Stage = To;
             ticket.Title = Title;
@@ -99,5 +122,6 @@ public sealed class EntityTransitionsSpec
         public override string Id { get; set; } = default!;
         public string Title { get; set; } = "";
         public Stage Stage { get; set; }
+        public Stage? Review { get; set; }
     }
 }
