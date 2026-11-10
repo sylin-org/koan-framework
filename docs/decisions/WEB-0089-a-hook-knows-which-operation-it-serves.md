@@ -45,17 +45,17 @@ public override async Task<IActionResult> Upsert(Notice model, CancellationToken
    and nothing changes it after, so every hook of one request, its options, fetch, save, delete and emit steps, registered or the
    controller's own, a related type's during `?with=` among them, reads the same answer, on REST and on MCP; it is `None` only where no
    entity operation runs. `Upsert` says what the route is, on a declared controller where it only creates and on an undeclared one where
-   it creates or changes; whether a row stood is `Prior`'s to say. `EntityOperation` compiles the kind once per action, and what Koan
-   asked of an action's name, a created row's address and whether a body that cannot bind is an upsert's or a patch's, reads it.
+   it creates or changes; whether a row stood is `Prior`'s to say.
 2. **A controller hands a refused form its page through `this.Kept(answer, page)`:** where a write's answer, or a verb's, is a
    `Problem`, the request came as a form and its sender reads pages, it answers the page `page` composes from that problem, which
-   carries what the form sent as `Sent`, at the refusal's status and never cached; anywhere else, or where `page` composes none, the
-   answer stands.
+   carries what the form sent as `Sent`, at the refusal's status and never cached; anywhere else, an absent answer among them, or where
+   `page` composes none, the answer stands.
 
 ## What this overturns
 
 - WEB-0087 §11's "an override hands its hooks what it prepared in a field" for which operation runs: a hook reads that from its context.
-- WEB-0088 §6's formatter drawing the form again from `sent` alone: the action hands the page through `Kept`, and the formatter draws it.
+- Nothing of WEB-0088 §6: a refused form still answers its `Problem` with what it sent. Where an action hands a page through `Kept`, the
+  formatter draws that page, and §6 stands everywhere else.
 - ARCH-0144 §7's "a refused form's page drawn again", a GET of that page in process as the same reader: no request is made for it.
 
 ## Consequences
@@ -73,10 +73,8 @@ page; a registered hook branches on the same word, and so does an MCP tool.
 
 - **One list:** the operation a hook is told is the endpoint's own kind, the one `DefaultEntityEndpointDescriptorProvider` gives each of
   its operations and Koan.Mcp names its tools and gate actions from; no second list of operations exists. Each entry point of
-  `EntityEndpointService` sets its own value, one for one, with no mapping. `EntityOperation.Kind` names, per action, the entry point it
-  calls; nothing in Koan held that table, since the descriptor provider lists the operations keyed by nothing an action carries.
-- **Deleted:** Koan's two readings of an action's name to tell a create; the in-process redraw ARCH-0144 §7 reserved, with its
-  `InProcessSpec` case.
+  `EntityEndpointService` sets its own value, one for one, with no mapping.
+- **Deleted:** the in-process redraw ARCH-0144 §7 reserved, with its `InProcessSpec` case.
 - **Not built:** a flag for a replayed write; an onward address a hook says; a typed slot for what a hook worked out; a hook that draws a
   refused form's page where no action ran, since a gate that refused found nothing a page would read.
 

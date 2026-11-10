@@ -210,15 +210,20 @@ public sealed class PagedCardsController : EntityController<Card>, IModelHook<Ca
     /// <summary>A title a create refuses in its hold, for which the action composes no page.</summary>
     public const string Unpaged = "Unpaged card";
 
+    /// <summary>A title a create refuses as absent, whose answer says nothing a page could add to.</summary>
+    public const string Hidden = "Hidden card";
+
     [Writes(nameof(Card.Id), nameof(Card.Title))]
     public override async Task<IActionResult> Upsert(Card model, CancellationToken ct)
         => await this.Kept(await base.Upsert(model, ct),
             refused => Task.FromResult<object?>(model.Title == Unpaged ? null : new CardFormPage(refused.Word, refused.Sent)));
 
-    public Task OnBeforeSave(HookContext<Card> ctx, Card model)
-        => model.Title is Held or Unpaged
-            ? throw new Koan.Data.Core.Commands.Refusal(Koan.Data.Core.Commands.Reason.Conflict("held", "This title is held."))
-            : Task.CompletedTask;
+    public Task OnBeforeSave(HookContext<Card> ctx, Card model) => model.Title switch
+    {
+        Held or Unpaged => throw new Koan.Data.Core.Commands.Refusal(Koan.Data.Core.Commands.Reason.Conflict("held", "This title is held.")),
+        Hidden => throw new Koan.Data.Core.Commands.Refusal(Koan.Data.Core.Commands.Reason.Absent("No such shelf.")),
+        _ => Task.CompletedTask,
+    };
 }
 
 /// <summary>The page <see cref="PagedCardsController"/> hands a refused form: why it was refused, and what it sent, for the form to be

@@ -60,7 +60,7 @@ public sealed class KoanWebOptions
     /// </summary>
     public string? KeyRingApplicationName { get; set; }
 
-    // When set, a very light in-pipeline handler responds to GET {HealthPath} with { status: "ok" }.
+    // When set, a very light in-pipeline handler responds to GET or HEAD {HealthPath} with { status: "ok" }.
     public string HealthPath { get; set; } = Infrastructure.KoanWebConstants.Routes.ApiHealth;
 
     // Opt-in static files wiring. If true, UseDefaultFiles()+UseStaticFiles() will be applied.

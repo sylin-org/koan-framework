@@ -214,8 +214,7 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
     protected virtual string AddressOf(TEntity row)
     {
         var sent = HttpContext.Request.Path.ToUriComponent();
-        // A PUT writes through the upsert, but its own address names the row it writes.
-        var created = Operation.Kind == EntityEndpointOperationKind.Upsert && !HttpMethods.IsPut(HttpContext.Request.Method);
+        var created = (ControllerContext?.ActionDescriptor as ControllerActionDescriptor)?.MethodInfo.GetBaseDefinition().Name == nameof(Upsert);
         return created ? sent.TrimEnd('/') + "/" + Uri.EscapeDataString(Convert.ToString(row.Id, CultureInfo.InvariantCulture) ?? "") : sent;
     }
 
@@ -504,18 +503,6 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
     [Produces(MediaTypeNames.Application.Json)]
     public virtual async Task<IActionResult> Query([FromBody] object body, CancellationToken ct)
     {
-
-        QueryOptions options;
-        try
-        {
-            options = BuildOptions();
-        }
-        catch (Koan.Data.Abstractions.Sorting.InvalidSortFieldException ex)
-        {
-            return BadRequest(new { error = ex.Message, field = ex.Field });
-        }
-        var context = CreateRequestContext(options, ct);
-
         string? filterJson = null;
         string? set = null;
         bool ignoreCase = false;
@@ -540,6 +527,16 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
         }
 
         if (Admit(jobj, bodyIsWords: true) is { } refused) return refused;
+        QueryOptions options;
+        try
+        {
+            options = BuildOptions();
+        }
+        catch (Koan.Data.Abstractions.Sorting.InvalidSortFieldException ex)
+        {
+            return BadRequest(new { error = ex.Message, field = ex.Field });
+        }
+        var context = CreateRequestContext(options, ct);
         if (jobj.TryGetValue("filter", out var f)) filterJson = f.ToString(Formatting.None);
         if (jobj.TryGetValue("page", out var pageToken) && TryCoerceQueryInt(pageToken, out var pageValue))
         {

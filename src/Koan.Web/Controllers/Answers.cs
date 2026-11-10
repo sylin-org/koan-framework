@@ -69,12 +69,14 @@ public static class Answers
     /// A refused form's page (WEB-0089): where <paramref name="answer"/>, a write's answer or a verb's, is a <see cref="Problem"/>, the request
     /// came as a page's form and its sender reads pages, the page <paramref name="page"/> composes from that problem, which carries what the
     /// form sent as <see cref="Problem.Sent"/>, answered with the refusal's status and never cached, for the application's formatter to draw.
-    /// Anywhere else, or where it composes none, the answer stands.
+    /// Anywhere else, an absent answer among them, which says nothing that tells a hidden thing from a missing one, or where it composes
+    /// none, the answer stands.
     /// </summary>
     public static async Task<IActionResult> Kept(this ControllerBase controller, IActionResult answer, Func<Problem, Task<object?>> page)
     {
         var request = controller.Request;
-        if (answer is not ObjectResult { Value: Problem refused } || !request.HasFormContentType || WantsJson(request)) return answer;
+        if (answer is not ObjectResult { Value: Problem refused } || refused.Status == StatusCodes.Status404NotFound
+            || !request.HasFormContentType || WantsJson(request)) return answer;
         var form = await request.ReadFormAsync(controller.HttpContext.RequestAborted);
         if (await page(refused with { Sent = SentForm.Fields(form) }) is not { } drawn) return answer;
         controller.Response.Headers.CacheControl = "no-store";

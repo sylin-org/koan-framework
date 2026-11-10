@@ -26,7 +26,8 @@ Nothing is declared: every read does it.
 1. **A route that takes `GET` and not `HEAD` takes `HEAD` too,** in its method constraint and its endpoint metadata, so the read runs as
    it does for `GET`, with the method still `HEAD`, and the server sends its status and headers and no body. Koan.Web's
    `GetAnswersHead` convention does it once, where the application's actions are composed.
-2. **An action that declares `HEAD` at a route itself keeps it,** and the `GET` at that route takes none, so no request matches twice.
+2. **An action that declares `HEAD` at a route itself keeps it,** and the `GET` at that route takes none, where the two templates are
+   spelled alike, parameter names and constraints included; for that case, and no further, no request matches twice.
 3. **The health alias answers `HEAD` as it answers `GET`.**
 4. **The OpenAPI document lists each read once, as its `GET`:** Koan.Web.OpenApi includes no `HEAD` description.
 

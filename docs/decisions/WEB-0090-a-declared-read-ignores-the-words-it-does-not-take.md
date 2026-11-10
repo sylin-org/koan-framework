@@ -44,8 +44,9 @@ Nothing is declared: a declared read does it.
 ## Coalescence
 
 - **Owner:** `EntityController.Admit`, the one judgement of what a request names, after the partition's refusal. Every action of
-  `EntityController` admits before it reads the query, `GetCollection` before the keyset read it hands to.
-- **Deleted:** the redirect of a tagged read and its onward address.
+  `EntityController` admits before its own code reads the query, `GetCollection` before the keyset read it hands to and `Query` before
+  its options; `DeleteByQuery`'s `q` alone is bound from the query before it runs, and a delete refuses a word it does not take.
+- **Takes over:** what an application did by hand for a link another site marked, a redirect to the address without the word.
 - **Not built:** dropping a word a write does not take.
 
 ## Evidence

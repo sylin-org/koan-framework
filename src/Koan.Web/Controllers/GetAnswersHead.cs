@@ -9,8 +9,8 @@ namespace Koan.Web.Controllers;
 
 /// <summary>Wherever an action answers <c>GET</c> it answers <c>HEAD</c> (WEB-0091): a route that takes <c>GET</c> and not <c>HEAD</c> takes
 /// <c>HEAD</c> too, in its method constraint and in its endpoint metadata, so the read runs as it does for <c>GET</c> and the server sends no
-/// body. Where an action declares <c>HEAD</c> at that route itself, its own answer stands and the <c>GET</c> takes none, so no request
-/// matches twice.</summary>
+/// body. Where an action declares <c>HEAD</c> at that route itself, its template spelled as the <c>GET</c>'s is, parameter names and
+/// constraints included, its own answer stands and the <c>GET</c> takes none, so for that case no request matches twice.</summary>
 internal sealed class GetAnswersHead : IApplicationModelConvention, IConfigureOptions<MvcOptions>
 {
     public void Configure(MvcOptions options) => options.Conventions.Add(this);

@@ -1,5 +1,4 @@
 using Koan.Web.Controllers;
-using Koan.Web.Endpoints;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Controllers;
@@ -57,7 +56,7 @@ internal sealed class RefusedWrite : IAsyncAlwaysRunResultFilter
         var request = http.Request;
         // A create and a change take their members as one JSON object; a JSON Patch is a list of operations, and a delete takes no body.
         if (context.ActionDescriptor is ControllerActionDescriptor action && request.HasJsonContentType() && request.Body.CanSeek
-            && EntityOperation.Of(action.MethodInfo, action.ControllerTypeInfo) is { Kind: EntityEndpointOperationKind.Upsert or EntityEndpointOperationKind.Patch } operation
+            && action.MethodInfo.GetBaseDefinition().Name is nameof(EntityController<,>.Upsert) or nameof(EntityController<,>.Patch)
             && !string.Equals(request.ContentType?.Split(';', 2)[0].Trim(), Infrastructure.KoanWebConstants.ContentTypes.ApplicationJsonPatch, StringComparison.OrdinalIgnoreCase))
         {
             request.Body.Position = 0;
@@ -75,7 +74,7 @@ internal sealed class RefusedWrite : IAsyncAlwaysRunResultFilter
             }
 
             var serializer = JsonSerializer.Create(http.RequestServices.GetRequiredService<IOptions<MvcNewtonsoftJsonOptions>>().Value.SerializerSettings);
-            if (operation.Unfit(body, serializer) is { } reason)
+            if (EntityOperation.Of(action.MethodInfo, action.ControllerTypeInfo).Unfit(body, serializer) is { } reason)
                 return (Answers.Refused(http, reason) as ObjectResult)?.Value as Problem;
         }
 

@@ -3,7 +3,6 @@ using System.ComponentModel;
 using System.Reflection;
 using Koan.Data.Core.Commands;
 using Koan.Web.Attributes;
-using Koan.Web.Endpoints;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
@@ -12,8 +11,7 @@ namespace Koan.Web.Controllers;
 /// <summary>
 /// What one action of an <see cref="EntityController{TEntity,TKey}"/> serves and takes (WEB-0087), compiled once per action and read by
 /// every door: whether its controller is <see cref="DeclaredAttribute">declared</see>, the members it writes (<see cref="WritesAttribute"/>),
-/// the input it takes beside them (<see cref="InputAttribute{TInput}"/>), the order a declared collection continues through (DATA-0170), which
-/// operation it serves (WEB-0089), and the partitions its controller serves
+/// the input it takes beside them (<see cref="InputAttribute{TInput}"/>), the order a declared collection continues through (DATA-0170), and the partitions its controller serves
 /// (<see cref="PartitionsAttribute"/>). REST admits a request by it and the route tool's schema is drawn from it, so the two cannot differ.
 /// </summary>
 [EditorBrowsable(EditorBrowsableState.Never)]
@@ -26,7 +24,6 @@ public sealed class EntityOperation
         Declared = IsDeclared(controller);
         Partitions = controller.GetCustomAttribute<PartitionsAttribute>(inherit: true);
         Pagination = action?.GetCustomAttribute<PaginationAttribute>(inherit: true) ?? controller.GetCustomAttribute<PaginationAttribute>(inherit: true);
-        Kind = action is not null && IsEntityOperation(action) ? KindOf(action.GetBaseDefinition().Name) : EntityEndpointOperationKind.None;
         var entity = EntityOf(controller);
         if (action is null || entity is null) return;
         _members = entity.GetProperties(BindingFlags.Public | BindingFlags.Instance).Where(member => member.GetIndexParameters().Length == 0).ToArray();
@@ -59,33 +56,11 @@ public sealed class EntityOperation
         }
     }
 
-    /// <summary>The endpoint operation an action of <see cref="EntityController{TEntity,TKey}"/> runs, the entry point it calls: each action
-    /// its own, and a <c>PUT</c> the upsert it writes through.</summary>
-    private static EntityEndpointOperationKind KindOf(string action) => action switch
-    {
-        nameof(EntityController<,>.GetCollection) => EntityEndpointOperationKind.Collection,
-        nameof(EntityController<,>.Query) => EntityEndpointOperationKind.Query,
-        nameof(EntityController<,>.GetNew) => EntityEndpointOperationKind.GetNew,
-        nameof(EntityController<,>.GetById) => EntityEndpointOperationKind.GetById,
-        nameof(EntityController<,>.Upsert) or nameof(EntityController<,>.Put) => EntityEndpointOperationKind.Upsert,
-        nameof(EntityController<,>.UpsertMany) => EntityEndpointOperationKind.UpsertMany,
-        nameof(EntityController<,>.Patch) => EntityEndpointOperationKind.Patch,
-        nameof(EntityController<,>.Delete) => EntityEndpointOperationKind.Delete,
-        nameof(EntityController<,>.DeleteMany) => EntityEndpointOperationKind.DeleteMany,
-        nameof(EntityController<,>.DeleteByQuery) => EntityEndpointOperationKind.DeleteByQuery,
-        nameof(EntityController<,>.DeleteAll) => EntityEndpointOperationKind.DeleteAll,
-        _ => EntityEndpointOperationKind.None,
-    };
-
     /// <summary>The words a declared collection pages by (DATA-0170), which an input of it cannot take.</summary>
     private static readonly string[] PagingWords = [Infrastructure.KoanWebConstants.Query.After, Infrastructure.KoanWebConstants.Query.Size, "page", "pageSize", "all"];
 
     /// <summary>Whether the controller serves only what it overrides (<see cref="DeclaredAttribute"/>).</summary>
     public bool Declared { get; }
-
-    /// <summary>The endpoint operation this action runs (WEB-0089), as that endpoint tells its hooks;
-    /// <see cref="EntityEndpointOperationKind.None"/> for an action that is no entity operation.</summary>
-    internal EntityEndpointOperationKind Kind { get; }
 
     /// <summary>The members this operation writes, or null where it writes the whole entity.</summary>
     public IReadOnlyList<PropertyInfo>? Writes { get; }

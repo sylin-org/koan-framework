@@ -308,9 +308,9 @@ runs before the hold and its refusals are mapped there.
 
 `EntityOperation.Of(action, controller)` compiles, once per action, what an operation of an `EntityController` serves and takes:
 whether the controller is `[Declared]`, the `[Writes]` members, the `[Input<T>]` type and members, the `[Partitions]` it serves, the
-`[Pagination]` it pages by, for a declared collection its `Keyset<TEntity>` from that `[Pagination]`'s `DefaultSort` (DATA-0170), the
-`EntityEndpointOperationKind` of the endpoint entry it calls (`Kind`, a `PUT` being `Upsert`, WEB-0089). Each entry point of `EntityEndpointService` sets its own kind on `EntityRequestContext.Operation`, which
-`HookContext.Operation` reads, before its first hook.
+`[Pagination]` it pages by, and for a declared collection its `Keyset<TEntity>` from that `[Pagination]`'s `DefaultSort` (DATA-0170).
+Each entry point of `EntityEndpointService` sets its own `EntityEndpointOperationKind` on `EntityRequestContext.Operation`, which
+`HookContext.Operation` reads, before its first hook (WEB-0089).
 `EntityController.GetPaginationPolicy` and `RouteTools` both bound it through `PaginationPolicy.Of` under the host's
 `PaginationSafetyBounds`, so the `size` a tool states is the one REST clamps to.
 The controller admits every request by it before anything else is read (the partition, then on a declared controller each query word,

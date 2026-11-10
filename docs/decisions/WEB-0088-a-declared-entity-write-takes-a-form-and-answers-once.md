@@ -16,8 +16,8 @@ amended_by: WEB-0089
 
 # WEB-0088: A declared entity write takes a page's form, and every write answers once
 
-> **Amended by [WEB-0089](WEB-0089-a-hook-knows-which-operation-it-serves.md) (2026-11-10): an action hands a refused form its page through `this.Kept(answer, page)`,**
-> answered with the refusal's status for the application's formatter to draw, so §6's formatter draws that page rather than the form from `sent` alone.
+> **Amended by [WEB-0089](WEB-0089-a-hook-knows-which-operation-it-serves.md) (2026-11-10): an action may hand a refused form its page through `this.Kept(answer, page)`,**
+> which the formatter draws at the refusal's status; §6 stands everywhere else, a refused form answering its problem with what it sent.
 
 ## Context
 

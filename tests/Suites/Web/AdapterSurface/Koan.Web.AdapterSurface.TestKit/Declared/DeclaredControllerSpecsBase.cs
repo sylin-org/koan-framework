@@ -540,7 +540,8 @@ public abstract class DeclaredControllerSpecsBase<TFactory> : IClassFixture<TFac
     }
 
     /// <summary>WEB-0089: a refused form reads the page its action hands through <c>Kept</c>, with the refusal's status and what it sent,
-    /// never cached; a JSON sender reads the problem, and where the action composes no page the refusal answers as it is.</summary>
+    /// never cached; a JSON sender reads the problem, and where the action composes no page, or the answer is absent, the refusal answers
+    /// as it is.</summary>
     [Fact]
     public async Task A_refused_form_reads_the_page_its_action_hands()
     {
@@ -563,6 +564,10 @@ public abstract class DeclaredControllerSpecsBase<TFactory> : IClassFixture<TFac
         var refused = await Problem(unpaged);
         refused.GetProperty("kind").GetString().Should().Be("conflict");
         refused.GetProperty("sent").GetProperty("title")[0].GetString().Should().Be(PagedCardsController.Unpaged);
+
+        var hidden = await Form("/api/paged-cards", ("title", PagedCardsController.Hidden));
+        hidden.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        (await Problem(hidden)).GetProperty("kind").GetString().Should().Be("absent", "an absent answer is never a page that could tell hidden from missing");
     }
 
     /// <summary>The operations a request's hooks were told, each as its step and its operation, in the order they ran.</summary>
