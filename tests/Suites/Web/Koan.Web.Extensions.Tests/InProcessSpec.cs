@@ -141,23 +141,6 @@ public sealed class InProcessSpec(InProcessHost host) : IClassFixture<InProcessH
     }
 
     [Fact]
-    public async Task A_refused_forms_page_is_drawn_again_as_the_same_reader_without_running_the_write_again()
-    {
-        var writes = host.Services.GetRequiredService<Writes>();
-        var before = writes.Count;
-        using var post = new HttpRequestMessage(HttpMethod.Post, "/in-process/form") { Content = new FormUrlEncodedContent([new("words", "")]) };
-        post.Headers.TryAddWithoutValidation(HeaderNames.Authorization, "Who mara");
-        post.Headers.TryAddWithoutValidation(HeaderNames.Accept, "text/html");
-
-        using var answer = await host.Client.SendAsync(post, Ct);
-
-        answer.StatusCode.Should().Be(HttpStatusCode.BadRequest);
-        answer.Content.Headers.ContentType!.MediaType.Should().Be("text/html");
-        (await answer.Content.ReadAsStringAsync(Ct)).Should().Be("<p>the form for mara</p><i>Say something.</i>");
-        (writes.Count - before).Should().Be(1, "drawing the page again is a GET, which never runs the write");
-    }
-
-    [Fact]
     public async Task Many_gets_as_nobody_answer_their_bytes_and_content_type()
     {
         foreach (var name in new[] { "north", "south", "east" })
@@ -223,16 +206,6 @@ public sealed record Page(string Text);
 
 /// <summary>A value handed to a request in process.</summary>
 public sealed record Handed(string Value);
-
-/// <summary>How many times the form's write ran.</summary>
-public sealed class Writes
-{
-    private int _count;
-
-    public int Count => Volatile.Read(ref _count);
-
-    public void Ran() => Interlocked.Increment(ref _count);
-}
 
 /// <summary>Who a request is: <c>Authorization: Who name</c>, or an application's own header, <c>X-Who: name</c>; none is a visitor.</summary>
 public sealed class WhoScheme(IOptionsMonitor<AuthenticationSchemeOptions> options, ILoggerFactory logger, UrlEncoder encoder)
@@ -322,21 +295,6 @@ public sealed class InProcessController(KoanWebPipeline pipeline) : ControllerBa
 
     [HttpGet("throws")]
     public IActionResult Throws() => throw new InvalidOperationException("it broke");
-
-    [HttpGet("form")]
-    public IActionResult Form() => Ok(new Page($"the form for {User.Identity?.Name ?? "a visitor"}"));
-
-    [HttpPost("form")]
-    public async Task<IActionResult> Write([FromForm] string? words, [FromServices] Writes writes, CancellationToken ct)
-    {
-        writes.Ran();
-        if (!string.IsNullOrWhiteSpace(words)) return NoContent();
-        var again = new InProcessRequest(HttpMethods.Get, "/in-process/form");
-        again.Headers.Accept = Request.Headers.Accept;
-        again.Features.Set(new Handed("Say something."));
-        var page = await pipeline.Send(again, ct);
-        return new ContentResult { StatusCode = StatusCodes.Status400BadRequest, ContentType = page.Headers.ContentType, Content = Encoding.UTF8.GetString(page.Body.Span) };
-    }
 }
 
 /// <summary>An application of its own for <see cref="InProcessSpec"/>: a scheme reading <c>Authorization</c> or an application's header, a
@@ -369,7 +327,6 @@ public sealed class InProcessHost : IAsyncLifetime
         });
         builder.Services.AddKoan();
         builder.Services.AddKoanControllersFrom<InProcessController>();
-        builder.Services.AddSingleton<Writes>();
         builder.Services.Configure<OriginOptions>(origin => origin.InternalNetworks.Add("10.0.0.0/8"));
         builder.Services.AddAuthentication(WhoScheme.Name).AddScheme<AuthenticationSchemeOptions, WhoScheme>(WhoScheme.Name, _ => { });
         builder.Services.PostConfigure<AuthenticationOptions>(options => options.DefaultScheme = options.DefaultAuthenticateScheme = options.DefaultChallengeScheme = WhoScheme.Name);

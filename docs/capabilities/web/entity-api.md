@@ -52,7 +52,8 @@ offers one (SQLite), so a hook's rows commit with the row or neither does, and a
 
 A controller marked `[Declared]` serves only the operations it overrides, each at its own route, with `POST` that only creates;
 `[Writes(...)]` names the members a write writes, `[Input<T>]` what it takes beside them, `KeyOf` maps an address to a row, and a
-controller that implements a hook runs as that hook for its own requests. Every controller refuses a caller-chosen `?set=` partition
+controller that implements a hook runs as that hook for its own requests, each hook reading the operation it serves as `ctx.Operation`
+([WEB-0089](../../decisions/WEB-0089-a-hook-knows-its-operation-and-a-refused-form-reads-its-page-again.md)). Every controller refuses a caller-chosen `?set=` partition
 unless it declares `[Partitions(...)]`
 ([WEB-0087](../../decisions/WEB-0087-a-declared-entity-controller-serves-what-it-declares.md)). A declared collection continues from a
 sealed `after`, a page of `size` rows, in the order its `[Pagination]` declares, and counts nothing
@@ -60,7 +61,8 @@ sealed `after`, a page of `size` rows, in the order its `[Pagination]` declares,
 
 A declared controller's writes also take a page's form, which names `PATCH` or `DELETE` in a `_method` field, and answer through
 `Answers.Written`: a form is sent on (`303`) to its safe `return` path or the row's address (`AddressOf`), JSON reads the row with `201`
-or `200` and its `Location`, and a refused form answers its problem with what it `sent`. A form is read within the limits of the
+or `200` and its `Location`, and a refused form answers its problem with what it `sent`, or the page its controller hands from
+`RefusedPage`, at the refusal's status. A form is read within the limits of the
 routes at its address, and a body that cannot bind is refused naming its field. A verb beside the entity answers the same way
 with `this.Written(...)`
 ([WEB-0088](../../decisions/WEB-0088-a-declared-entity-write-takes-a-form-and-answers-once.md)).

@@ -368,6 +368,7 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
     public async Task<EntityCollectionResult<TEntity>> GetCollection(EntityCollectionRequest request)
     {
         var context = request.Context;
+        context.Operation = EntityOperationKind.Collection;
         context.Options.Shape = request.Shape ?? context.Options.Shape;
         if (request.With is not null)
             context.Options.IncludeRelationships = request.With.Contains("all", StringComparison.OrdinalIgnoreCase);
@@ -578,6 +579,7 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
     public async Task<EntityCollectionResult<TEntity>> Query(EntityQueryRequest request)
     {
         var context = request.Context;
+        context.Operation = EntityOperationKind.Collection;
         if (await Gate(context, EntityAuthorizeActions.Read).ConfigureAwait(false) is { } denied) return CollectionDenied(context, denied);
         if (await AdmitFields(context, fields => AdmitCallerQuery(fields, request.FilterJson, context.Options)) is { } fieldDenied)
             return new EntityCollectionResult<TEntity>(context, [], 0, null, fieldDenied);
@@ -708,6 +710,7 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
     public async Task<EntityModelResult<TEntity>> GetNew(EntityGetNewRequest request)
     {
         var context = request.Context;
+        context.Operation = EntityOperationKind.New;
         if (await Gate(context, EntityAuthorizeActions.Read).ConfigureAwait(false) is { } denied) return ModelDenied(context, denied);
         await AnnotateAccess(context).ConfigureAwait(false);
         var repo = _dataService.GetRepository<TEntity, TKey>();
@@ -741,6 +744,7 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
     public async Task<EntityModelResult<TEntity>> GetById(EntityGetByIdRequest<TKey> request)
     {
         var context = request.Context;
+        context.Operation = EntityOperationKind.Read;
         if (request.With is not null)
             context.Options.IncludeRelationships = request.With.Contains("all", StringComparison.OrdinalIgnoreCase);
         if (await Gate(context, EntityAuthorizeActions.Read).ConfigureAwait(false) is { } denied) return ModelDenied(context, denied);
@@ -855,6 +859,7 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
     public async Task<EntityModelResult<TEntity>> Upsert(EntityUpsertRequest<TEntity, TKey> request)
     {
         var context = request.Context;
+        context.Operation = EntityOperationKind.Create;
         if (await Gate(context, EntityAuthorizeActions.Write).ConfigureAwait(false) is { } denied) return ModelDenied(context, denied);
         if (await AdmitFields(context, fields => Admit(fields, request.Writes)) is { } fieldDenied)
             return new EntityModelResult<TEntity>(context, null, null, fieldDenied);
@@ -952,6 +957,7 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
     public async Task<EntityEndpointResult> UpsertMany(EntityUpsertManyRequest<TEntity> request)
     {
         var context = request.Context;
+        context.Operation = EntityOperationKind.Create;
         if (await Gate(context, EntityAuthorizeActions.Write).ConfigureAwait(false) is { } denied) return Denied(context, denied);
         if (await AdmitFields(context, fields => fields.DemandReplacement()) is { } fieldDenied)
             return new EntityEndpointResult(context, null, fieldDenied);
@@ -1044,6 +1050,7 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
     public async Task<EntityModelResult<TEntity>> Delete(EntityDeleteRequest<TKey> request)
     {
         var context = request.Context;
+        context.Operation = EntityOperationKind.Delete;
         if (await Gate(context, EntityAuthorizeActions.Remove).ConfigureAwait(false) is { } denied) return ModelDenied(context, denied);
         await AnnotateAccess(context).ConfigureAwait(false);
         var repo = _dataService.GetRepository<TEntity, TKey>();
@@ -1087,6 +1094,7 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
     public async Task<EntityEndpointResult> DeleteMany(EntityDeleteManyRequest<TKey> request)
     {
         var context = request.Context;
+        context.Operation = EntityOperationKind.Delete;
         if (await Gate(context, EntityAuthorizeActions.Remove).ConfigureAwait(false) is { } denied) return Denied(context, denied);
         await AnnotateAccess(context).ConfigureAwait(false);
         var repo = _dataService.GetRepository<TEntity, TKey>();
@@ -1132,6 +1140,7 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
 
     public async Task<EntityEndpointResult> DeleteByQuery(EntityDeleteByQueryRequest request)
     {
+        request.Context.Operation = EntityOperationKind.Delete;
         if (await Gate(request.Context, EntityAuthorizeActions.Remove).ConfigureAwait(false) is { } denied) return Denied(request.Context, denied);
         await AnnotateAccess(request.Context).ConfigureAwait(false);
         if (string.IsNullOrWhiteSpace(request.Query))
@@ -1195,6 +1204,7 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
 
     public async Task<EntityEndpointResult> DeleteAll(EntityDeleteAllRequest request)
     {
+        request.Context.Operation = EntityOperationKind.Delete;
         if (await Gate(request.Context, EntityAuthorizeActions.Remove).ConfigureAwait(false) is { } denied) return Denied(request.Context, denied);
         await AnnotateAccess(request.Context).ConfigureAwait(false);
         using var _ = EntityContext.With(partition: string.IsNullOrWhiteSpace(request.Set) ? null : request.Set);
@@ -1246,6 +1256,7 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
     public async Task<EntityModelResult<TEntity>> Patch(EntityPatchRequest<TEntity, TKey> request)
     {
         var context = request.Context;
+        context.Operation = EntityOperationKind.Change;
         if (await Gate(context, EntityAuthorizeActions.Write).ConfigureAwait(false) is { } denied) return ModelDenied(context, denied);
         if (await AdmitFields(context, fields =>
         {

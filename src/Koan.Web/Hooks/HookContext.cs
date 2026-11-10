@@ -35,6 +35,10 @@ public sealed class HookContext<TEntity>
 
     public CancellationToken Ct => Request.CancellationToken;
 
+    /// <summary>The operation this request serves (WEB-0089), the same for every hook of it, so a controller that serves two writes tells
+    /// them apart here rather than in a field of its own. Whether a row stood before a write is <see cref="Prior"/>'s to say.</summary>
+    public EntityOperationKind Operation => Request.Operation;
+
     /// <summary>The row as it stood before this write, read where the write's hold opens, or null for a row that did not exist; set before
     /// <c>OnBeforeSave</c> or <c>OnBeforeDelete</c> of a single write, and null on a read or a batch.</summary>
     public TEntity? Prior => Request.Items.TryGetValue(EntityMutationProbe.BeforeKey, out var prior) && prior is TEntity row ? row : default;

@@ -3,6 +3,7 @@ using System.ComponentModel;
 using System.Reflection;
 using Koan.Data.Core.Commands;
 using Koan.Web.Attributes;
+using Koan.Web.Hooks;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
@@ -11,7 +12,8 @@ namespace Koan.Web.Controllers;
 /// <summary>
 /// What one action of an <see cref="EntityController{TEntity,TKey}"/> serves and takes (WEB-0087), compiled once per action and read by
 /// every door: whether its controller is <see cref="DeclaredAttribute">declared</see>, the members it writes (<see cref="WritesAttribute"/>),
-/// the input it takes beside them (<see cref="InputAttribute{TInput}"/>), the order a declared collection continues through (DATA-0170), and the partitions its controller serves
+/// the input it takes beside them (<see cref="InputAttribute{TInput}"/>), the order a declared collection continues through (DATA-0170), which
+/// operation it serves (WEB-0089), and the partitions its controller serves
 /// (<see cref="PartitionsAttribute"/>). REST admits a request by it and the route tool's schema is drawn from it, so the two cannot differ.
 /// </summary>
 [EditorBrowsable(EditorBrowsableState.Never)]
@@ -24,6 +26,9 @@ public sealed class EntityOperation
         Declared = IsDeclared(controller);
         Partitions = controller.GetCustomAttribute<PartitionsAttribute>(inherit: true);
         Pagination = action?.GetCustomAttribute<PaginationAttribute>(inherit: true) ?? controller.GetCustomAttribute<PaginationAttribute>(inherit: true);
+        Kind = action is not null && IsEntityOperation(action) ? KindOf(action.GetBaseDefinition().Name) : null;
+        HandsRefusedPage = controller.GetMethod(nameof(IRefusedPage.RefusedPage), BindingFlags.Instance | BindingFlags.NonPublic,
+            [typeof(EntityOperationKind), typeof(Problem), typeof(CancellationToken)]) is { } page && !IsEntityController(page.DeclaringType);
         var entity = EntityOf(controller);
         if (action is null || entity is null) return;
         _members = entity.GetProperties(BindingFlags.Public | BindingFlags.Instance).Where(member => member.GetIndexParameters().Length == 0).ToArray();
@@ -56,11 +61,32 @@ public sealed class EntityOperation
         }
     }
 
+    /// <summary>The operation an action of <see cref="EntityController{TEntity,TKey}"/> serves, by the endpoint entry it calls: a <c>PUT</c>
+    /// writes through the create's, as a bulk create does.</summary>
+    private static EntityOperationKind? KindOf(string action) => action switch
+    {
+        nameof(EntityController<,>.GetCollection) or nameof(EntityController<,>.Query) => EntityOperationKind.Collection,
+        nameof(EntityController<,>.GetNew) => EntityOperationKind.New,
+        nameof(EntityController<,>.GetById) => EntityOperationKind.Read,
+        nameof(EntityController<,>.Upsert) or nameof(EntityController<,>.UpsertMany) or nameof(EntityController<,>.Put) => EntityOperationKind.Create,
+        nameof(EntityController<,>.Patch) => EntityOperationKind.Change,
+        nameof(EntityController<,>.Delete) or nameof(EntityController<,>.DeleteMany) or nameof(EntityController<,>.DeleteByQuery)
+            or nameof(EntityController<,>.DeleteAll) => EntityOperationKind.Delete,
+        _ => null,
+    };
+
     /// <summary>The words a declared collection pages by (DATA-0170), which an input of it cannot take.</summary>
     private static readonly string[] PagingWords = [Infrastructure.KoanWebConstants.Query.After, Infrastructure.KoanWebConstants.Query.Size, "page", "pageSize", "all"];
 
     /// <summary>Whether the controller serves only what it overrides (<see cref="DeclaredAttribute"/>).</summary>
     public bool Declared { get; }
+
+    /// <summary>Which operation this action serves (WEB-0089), as the endpoint it calls tells its hooks; null for an action that is no entity
+    /// operation.</summary>
+    internal EntityOperationKind? Kind { get; }
+
+    /// <summary>Whether the controller hands the page a refused form reads again (WEB-0089), by overriding <c>RefusedPage</c>.</summary>
+    internal bool HandsRefusedPage { get; }
 
     /// <summary>The members this operation writes, or null where it writes the whole entity.</summary>
     public IReadOnlyList<PropertyInfo>? Writes { get; }

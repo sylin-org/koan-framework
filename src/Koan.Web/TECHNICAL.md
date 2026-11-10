@@ -339,7 +339,10 @@ input's member it names, and of a body that is not one JSON object: `SentForm`, 
 `RefusedWrite` all ask it. `[Declared]` adds the form media types to `Patch`'s `[Consumes]` and puts `RefusedWrite`, an always-run
 result filter, on its writes: the model-state refusal of a body that could not bind becomes `Answers.Refused` of what `Unfit` says
 of the buffered JSON body, or `Answers.Unbound` for a form, which answers `413` where the body is past the route's limit (ASP.NET's
-form provider reports that as a model error), as it does for `ToolFilter`; and a refused form's `Problem` answers with `Sent`. `FormMethod` runs
+form provider reports that as a model error), as it does for `ToolFilter`; a refused form's `Problem` answers with `Sent`; and for a sender
+that reads pages, where `EntityOperation.HandsRefusedPage` says the controller overrides `RefusedPage`, it asks the action's controller, or
+one made by `IControllerFactory` and released after where the gate refused before one was made, for the page of `EntityOperation.Kind`,
+answered as an `ObjectResult` at the problem's status with `no-store` (WEB-0089). `FormMethod` runs
 before routing, after the cross-site check, only where the host maps a declared controller. It compiles, once per set of endpoints,
 the route templates of every declared change or delete and every endpoint taking a `POST`; a urlencoded `POST` whose path matches no
 declared change or delete is left unread. One that matches is read within the least `IRequestSizeLimitMetadata` and the least

@@ -78,6 +78,9 @@ public sealed class EntityRequestContext
     /// <summary>What the operation took beside the entity's members, bound from the request (WEB-0087), or null where it declares nothing.</summary>
     internal object? Input { get; set; }
 
+    /// <summary>The operation this request serves (WEB-0089), set by the endpoint's entry point before its first hook and never after.</summary>
+    internal EntityOperationKind Operation { get; set; }
+
     /// <summary>The sealed key a declared collection's next page continues from (DATA-0170), or null on its last page or any other read.</summary>
     internal string? Next { get; set; }
 

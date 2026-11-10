@@ -145,6 +145,95 @@ public sealed class CardVerbsController : ControllerBase
     public IActionResult Flag(string card) => this.Written("/api/cards/by/" + card, new { card, flagged = true }, created: false);
 }
 
+/// <summary>WEB-0089: serves all six operations of a card, each of its hooks writing the operation it is told into <see cref="Told"/>.</summary>
+[Route("api/told-cards")]
+[Declared]
+public sealed class ToldCardsController : EntityController<Card>, IRequestOptionsHook<Card>, IModelHook<Card>, IEmitHook<Card>
+{
+    /// <summary>The header each hook adds its step and its operation to.</summary>
+    public const string Told = "Told";
+
+    [HttpGet("")]
+    [Pagination(DefaultSize = 1, MaxSize = 1, DefaultSort = nameof(Card.Title))]
+    public override Task<IActionResult> GetCollection(CancellationToken ct) => base.GetCollection(ct);
+
+    [HttpGet("new")]
+    public override Task<IActionResult> GetNew(CancellationToken ct) => base.GetNew(ct);
+
+    [HttpGet("{card}")]
+    public override Task<IActionResult> GetById(string card, CancellationToken ct) => base.GetById(card, ct);
+
+    [Writes(nameof(Card.Id), nameof(Card.Title))]
+    public override Task<IActionResult> Upsert(Card model, CancellationToken ct) => base.Upsert(model, ct);
+
+    [HttpPatch("{card}")]
+    [Writes(nameof(Card.Title))]
+    public override Task<IActionResult> Patch(string card, CancellationToken ct) => base.Patch(card, ct);
+
+    [HttpDelete("{card}")]
+    public override Task<IActionResult> Delete(string card, CancellationToken ct) => base.Delete(card, ct);
+
+    public Task OnBuildingOptions(HookContext<Card> ctx, QueryOptions opts) => Tell(ctx, "options");
+
+    public Task OnBeforeSave(HookContext<Card> ctx, Card model) => Tell(ctx, "save");
+
+    public Task OnBeforeDelete(HookContext<Card> ctx, Card model) => Tell(ctx, "delete");
+
+    public async Task<EmitDecision> OnEmitCollection(HookContext<Card> ctx, object payload)
+    {
+        await Tell(ctx, "emit");
+        return EmitDecision.Next();
+    }
+
+    public async Task<EmitDecision> OnEmitModel(HookContext<Card> ctx, object payload)
+    {
+        await Tell(ctx, "emit");
+        return EmitDecision.Next();
+    }
+
+    private static Task Tell(HookContext<Card> ctx, string step)
+    {
+        ctx.ResponseHeaders[Told] = (ctx.ResponseHeaders.TryGetValue(Told, out var told) ? told + " " : "") + step + ":" + ctx.Operation;
+        return Task.CompletedTask;
+    }
+}
+
+/// <summary>WEB-0089: hands the page a refused form reads again for a create and a change, whose gate lets only someone signed in send
+/// one, and hands none for a delete, which it always refuses.</summary>
+[Route("api/paged-cards")]
+[Declared]
+public sealed class PagedCardsController : EntityController<Card>, IModelHook<Card>
+{
+    /// <summary>A title a create refuses in its hold.</summary>
+    public const string Held = "Held card";
+
+    [Writes(nameof(Card.Id), nameof(Card.Title), nameof(Card.Suit))]
+    public override Task<IActionResult> Upsert(Card model, CancellationToken ct) => base.Upsert(model, ct);
+
+    [HttpPatch("{card}")]
+    [Writes(nameof(Card.Title))]
+    [Access(write: "authenticated")]
+    public override Task<IActionResult> Patch(string card, CancellationToken ct) => base.Patch(card, ct);
+
+    [HttpDelete("{card}")]
+    public override Task<IActionResult> Delete(string card, CancellationToken ct) => base.Delete(card, ct);
+
+    public Task OnBeforeSave(HookContext<Card> ctx, Card model)
+        => model.Title == Held
+            ? throw new Koan.Data.Core.Commands.Refusal(Koan.Data.Core.Commands.Reason.Conflict("held", "This title is held."))
+            : Task.CompletedTask;
+
+    public Task OnBeforeDelete(HookContext<Card> ctx, Card model)
+        => throw new Koan.Data.Core.Commands.Refusal(Koan.Data.Core.Commands.Reason.Conflict("kept", "This card is kept."));
+
+    protected override ValueTask<object?> RefusedPage(EntityOperationKind operation, Problem refused, CancellationToken ct)
+        => ValueTask.FromResult<object?>(operation == EntityOperationKind.Delete ? null : new CardFormPage(operation.ToString(), refused.Word, refused.Sent));
+}
+
+/// <summary>The page <see cref="PagedCardsController"/> hands a refused form: which operation it was sent to, why it was refused, and what
+/// it sent, for the form to be shown again as it was filled.</summary>
+public sealed record CardFormPage(string Operation, string Word, IReadOnlyDictionary<string, string[]>? Sent);
+
 /// <summary>The whole surface over the same row, with no hook of its own.</summary>
 [Route("api/plain-cards")]
 public sealed class PlainCardsController : EntityController<Card>;

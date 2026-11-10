@@ -11,9 +11,13 @@ amends:
 related:
   - SEC-0039
   - ARCH-0143
+amended_by: WEB-0089
 ---
 
 # ARCH-0144: A request of the application is answered in process through its whole pipeline, which Koan.Web holds
+
+> **Amended by [WEB-0089](WEB-0089-a-hook-knows-its-operation-and-a-refused-form-reads-its-page-again.md) (2026-11-10): a refused form's page is handed by its controller, so §7's in-process GET drawing it again is not built;**
+> the record serves a tool call, a read by address and the static copy.
 
 ## Context
 

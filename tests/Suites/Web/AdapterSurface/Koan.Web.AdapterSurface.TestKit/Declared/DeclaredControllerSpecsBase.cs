@@ -14,7 +14,8 @@ namespace Koan.Web.AdapterSurface.TestKit.Declared;
 /// by another key, or be the one row of a singleton; a gate on an override is judged; the controller is a hook of its own requests and of no
 /// other controller's; and a partition no controller declares is refused on every controller. WEB-0088: its writes take a page's form,
 /// which names the method it cannot send, and answer through <c>Answers.Written</c>: a form is sent on, JSON reads the row created or
-/// changed, and a refused form keeps what it sent.
+/// changed, and a refused form keeps what it sent. WEB-0089: each hook is told the operation it serves, and a refused form reads the page its
+/// controller hands.
 /// </summary>
 public abstract class DeclaredControllerSpecsBase<TFactory> : IClassFixture<TFactory>
     where TFactory : class, IAdapterTestFactory
@@ -486,6 +487,86 @@ public abstract class DeclaredControllerSpecsBase<TFactory> : IClassFixture<TFac
 
         var json = await Post(new { title = "Forged Json", slug = "elsewhere" });
         (await Problem(json)).TryGetProperty("sent", out _).Should().BeFalse("only a form is answered with what it sent");
+    }
+
+    /// <summary>WEB-0089: every hook of a request is told the operation it serves, its options, save, delete and emit hooks alike, for each
+    /// of the six a declared controller serves.</summary>
+    [Fact]
+    public async Task Each_hook_is_told_the_operation_it_serves()
+    {
+        var made = await Client.PostAsJsonAsync("/api/told-cards", new { title = "Told card" }, Ct);
+        Told(made).Should().Be("save:Create emit:Create");
+        var id = (await made.Content.ReadFromJsonAsync<JsonElement>(Ct)).GetProperty("id").GetString()!;
+
+        Told(await Client.GetAsync("/api/told-cards", Ct)).Should().Be("options:Collection emit:Collection");
+        Told(await Client.GetAsync("/api/told-cards/new", Ct)).Should().Be("options:New emit:New");
+        Told(await Client.GetAsync($"/api/told-cards/{id}", Ct)).Should().Be("options:Read emit:Read");
+        Told(await Patch($"/api/told-cards/{id}", new { title = "Told again" })).Should().Be("save:Change emit:Change");
+        Told(await Client.DeleteAsync($"/api/told-cards/{id}", Ct)).Should().Be("delete:Delete emit:Delete");
+    }
+
+    /// <summary>WEB-0089: a refused form reads the page its controller hands for the operation it was sent to, with the refusal's status
+    /// and what it sent, never cached, whether the write refused it in its hold or its gate refused it before anything was bound.</summary>
+    [Fact]
+    public async Task A_refused_form_reads_the_page_its_controller_gives()
+    {
+        var held = await Form("/api/paged-cards", ("title", PagedCardsController.Held));
+        held.StatusCode.Should().Be(HttpStatusCode.Conflict, await held.Content.ReadAsStringAsync(Ct));
+        held.Headers.CacheControl!.NoStore.Should().BeTrue();
+        var page = await held.Content.ReadFromJsonAsync<JsonElement>(Ct);
+        page.GetProperty("operation").GetString().Should().Be("Create");
+        page.GetProperty("word").GetString().Should().Be("held");
+        page.GetProperty("sent").GetProperty("title")[0].GetString().Should().Be(PagedCardsController.Held);
+
+        var id = await Create("Gated page");
+        var gated = await Form($"/api/paged-cards/{id}", ("_method", "PATCH"), ("title", "Changed by nobody"));
+        gated.StatusCode.Should().Be(HttpStatusCode.Unauthorized, await gated.Content.ReadAsStringAsync(Ct));
+        gated.Headers.CacheControl!.NoStore.Should().BeTrue();
+        var refused = await gated.Content.ReadFromJsonAsync<JsonElement>(Ct);
+        refused.GetProperty("operation").GetString().Should().Be("Change");
+        refused.GetProperty("word").GetString().Should().Be("gated");
+        refused.GetProperty("sent").GetProperty("title")[0].GetString().Should().Be("Changed by nobody");
+        (await Read($"/api/cards/by/{id}")).GetProperty("title").GetString().Should().Be("Gated page");
+    }
+
+    /// <summary>WEB-0089: a form whose binding failed, where the action never ran, reads its page with the operation it was sent to.</summary>
+    [Fact]
+    public async Task A_form_whose_binding_failed_reads_its_page_with_the_operation_it_was_sent_to()
+    {
+        var unbound = await Form("/api/paged-cards", ("title", "Wild page"), ("suit", "clubs"));
+
+        unbound.StatusCode.Should().Be(HttpStatusCode.BadRequest, await unbound.Content.ReadAsStringAsync(Ct));
+        var page = await unbound.Content.ReadFromJsonAsync<JsonElement>(Ct);
+        page.GetProperty("operation").GetString().Should().Be("Create");
+        page.GetProperty("word").GetString().Should().Be("invalid");
+        page.GetProperty("sent").GetProperty("suit")[0].GetString().Should().Be("clubs");
+        (await Client.GetAsync("/api/cards/by/wild-page", Ct)).StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    /// <summary>WEB-0089: a refused JSON write reads the problem though its controller hands pages, and so does a form whose page its
+    /// controller declines.</summary>
+    [Fact]
+    public async Task A_refused_json_write_and_a_page_the_controller_declines_answer_the_problem()
+    {
+        var json = await Client.PostAsJsonAsync("/api/paged-cards", new { title = PagedCardsController.Held }, Ct);
+        json.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        json.Content.Headers.ContentType?.MediaType.Should().Be("application/problem+json");
+        var problem = await Problem(json);
+        problem.GetProperty("word").GetString().Should().Be("held");
+        problem.TryGetProperty("operation", out _).Should().BeFalse();
+
+        var id = await Create("Kept page");
+        var declined = await Form($"/api/paged-cards/{id}", ("_method", "DELETE"));
+        declined.StatusCode.Should().Be(HttpStatusCode.Conflict, await declined.Content.ReadAsStringAsync(Ct));
+        declined.Content.Headers.ContentType?.MediaType.Should().Be("application/problem+json");
+        (await Problem(declined)).GetProperty("word").GetString().Should().Be("kept");
+    }
+
+    /// <summary>The operations a request's hooks were told, each as its step and its operation, in the order they ran.</summary>
+    private static string Told(HttpResponseMessage answer)
+    {
+        answer.IsSuccessStatusCode.Should().BeTrue(answer.ToString());
+        return answer.Headers.TryGetValues(ToldCardsController.Told, out var told) ? string.Join(" ", told) : "";
     }
 
     [Fact]

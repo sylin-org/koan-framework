@@ -108,6 +108,36 @@ public sealed class DeclaredOperationsSpec(ForumFixture forum) : IClassFixture<F
         tool.Text.Should().Contain("This address does not write 'author'.");
     }
 
+    /// <summary>WEB-0089: a tool call tells its hooks the operation it serves, as its route does, and a refused one reads the problem: only
+    /// a page's form, from a sender that reads pages, reads the page its controller hands.</summary>
+    [Fact]
+    public async Task A_tool_call_tells_its_hooks_the_operation_and_reads_the_problem_never_a_page()
+    {
+        var posted = await forum.Tool("post_notice", new JObject { ["text"] = "told by a tool" }, Mara);
+        posted.Status.Should().Be(201, posted.ToString());
+        var made = JObject.Parse(posted.Text);
+        made["told"]!.Value<string>().Should().Be("Create");
+        var edited = await forum.Tool("edit_notice", new JObject { ["notice"] = made["id"]!.Value<string>(), ["text"] = "told again" }, Mara);
+        edited.Status.Should().Be(200, edited.ToString());
+        JObject.Parse(edited.Text)["told"]!.Value<string>().Should().Be("Change");
+
+        var tool = await forum.Tool("post_notice", new JObject { ["text"] = "forged", ["author"] = "sam" }, Mara);
+        tool.Status.Should().Be(400);
+        tool.Kind.Should().Be("invalid");
+        tool.Word.Should().Be("invalid");
+        tool.Text.Should().Contain("This address does not write 'author'.");
+
+        using var browser = new HttpClient { BaseAddress = new Uri(forum.BaseUrl), Timeout = TimeSpan.FromSeconds(60) };
+        browser.DefaultRequestHeaders.TryAddWithoutValidation("Authorization", "Test " + Mara);
+        browser.DefaultRequestHeaders.TryAddWithoutValidation("Accept", "text/html");
+        using var form = await browser.PostAsync("/boards/notices",
+            new FormUrlEncodedContent(new Dictionary<string, string> { ["text"] = "forged", ["author"] = "sam" }), TestContext.Current.CancellationToken);
+        form.StatusCode.Should().Be(System.Net.HttpStatusCode.BadRequest);
+        var page = JObject.Parse(await form.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+        page["operation"]!.Value<string>().Should().Be("Create");
+        page["word"]!.Value<string>().Should().Be("invalid");
+    }
+
     [Fact]
     public async Task A_change_keeps_what_it_leaves_out_on_both_doors()
     {

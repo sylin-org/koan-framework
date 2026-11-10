@@ -18,7 +18,7 @@ namespace Koan.Web.Hosting;
 
 /// <summary>
 /// The application's whole request pipeline as the host built it, every middleware of it, which answers a request made in process
-/// (ARCH-0144): a tool call, a read by address, a page drawn again, a static copy. The request has a DI scope, <c>Items</c>, features
+/// (ARCH-0144, WEB-0089): a tool call, a read by address, a static copy. The request has a DI scope, <c>Items</c>, features
 /// and an execution flow of its own, and is read as the caller of the request in hand or as nobody.
 /// </summary>
 /// <remarks>It holds the pipeline by decorating ASP.NET's <see cref="IApplicationBuilderFactory"/>: the first component of the host's

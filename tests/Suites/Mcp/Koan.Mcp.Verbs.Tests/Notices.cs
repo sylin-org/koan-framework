@@ -19,7 +19,13 @@ public sealed class Notice : Entity<Notice>
 
     /// <summary>Stamped on create: who posted it.</summary>
     public string Author { get; set; } = "";
+
+    /// <summary>Stamped on every write: the operation its hook was told it served (WEB-0089).</summary>
+    public string Told { get; set; } = "";
 }
+
+/// <summary>The page a refused form of a notice reads again (WEB-0089).</summary>
+public sealed record NoticeFormPage(string Operation, string Word);
 
 /// <summary>What posting a notice takes beside it.</summary>
 public sealed record Posting([property: Description("The board it goes on; left out, the general board.")] string? Where = null);
@@ -27,7 +33,7 @@ public sealed record Posting([property: Description("The board it goes on; left 
 /// <summary>Which board a list of notices reads.</summary>
 public sealed record Listing([property: Description("The board to read.")] string? On = null);
 
-/// <summary>Lists, reads, posts and edits notices, and nothing else, on both doors.</summary>
+/// <summary>Lists, reads, posts and edits notices, and nothing else, on both doors, and hands a refused form its page.</summary>
 [Route("/boards/notices")]
 [Declared]
 public sealed class NoticesController : EntityController<Notice>, IModelHook<Notice>, IRequestOptionsHook<Notice>
@@ -66,9 +72,13 @@ public sealed class NoticesController : EntityController<Notice>, IModelHook<Not
 
     public Task OnBeforeSave(HookContext<Notice> ctx, Notice model)
     {
+        model.Told = ctx.Operation.ToString();
         if (ctx.Prior is not null) return Task.CompletedTask;
         model.Board = ctx.Input<Posting>()?.Where ?? "general";
         model.Author = Forum.PersonId(ctx.User) ?? "";
         return Task.CompletedTask;
     }
+
+    protected override ValueTask<object?> RefusedPage(EntityOperationKind operation, Problem refused, CancellationToken ct)
+        => ValueTask.FromResult<object?>(new NoticeFormPage(operation.ToString(), refused.Word));
 }
