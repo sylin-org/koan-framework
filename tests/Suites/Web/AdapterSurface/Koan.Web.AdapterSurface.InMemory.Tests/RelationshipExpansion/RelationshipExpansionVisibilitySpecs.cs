@@ -158,6 +158,18 @@ public sealed class RelationshipExpansionVisibilitySpecs : IClassFixture<InMemor
             && fact.ReasonCode == Koan.Data.Core.Infrastructure.Constants.Diagnostics.Reasons.ResultLimit);
     }
 
+    // ---- WEB-0089: a related type's hooks read the operation the request runs -------------------
+
+    [Fact]
+    public async Task A_related_types_hook_is_told_the_operation_the_request_runs()
+    {
+        var response = await _factory.Client.GetAsync("/api/an-makers/m1?with=all");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        response.Headers.GetValues(WorkVisibilityHook.Told).SelectMany(told => told.Split(',')).Select(told => told.Trim())
+            .Should().NotBeEmpty().And.OnlyContain(told => told == "GetById", "the works expanded under a maker's read are read for that read");
+    }
+
     // ---- helpers --------------------------------------------------------------------------------
 
     private async Task<string> GetString(string url, params (string Key, string Value)[] headers)

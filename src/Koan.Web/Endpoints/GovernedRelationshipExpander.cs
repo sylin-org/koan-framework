@@ -219,6 +219,8 @@ internal static class GovernedRelationshipExpander
         var options = new QueryOptions();
         var relatedContext = new EntityRequestContext(
             services, options, ct, rootContext.HttpContext, rootContext.User);
+        // WEB-0089: every hook of one request, a related type's among them, reads the operation the request runs.
+        relatedContext.Operation = rootContext.Operation;
 
         var pipeline = services.GetRequiredService<IEntityHookPipeline<TRelated>>();
         var hookContext = pipeline.CreateContext(relatedContext);

@@ -337,7 +337,9 @@ public async Task<IActionResult> Pin(string notice, CancellationToken ct)
   you hand `Written` is a path under the base, as `AddressOf` is; the base is put before it for you.
 - **A refusal:** a refused form answers its problem with `sent`, each field it sent. Override `RefusedPage(operation, refused, ct)` to
   hand the page that form reads again, which your formatter draws at the refusal's status, never cached; it is asked for a refusal by
-  the gate, by binding and by the write alike, and only of a sender that reads pages, so a tool call reads the problem. See
+  the gate, by binding and by the write alike, and only of a sender that reads pages, so a tool call reads the problem. On a gate's
+  refusal the action never ran and the gate found nothing, so read what the gate would have found without assuming it, and hand null
+  where it is absent: the refusal then answers as it is. See
   [WEB-0088](https://github.com/sylin-org/koan-framework/blob/main/docs/decisions/WEB-0088-a-declared-entity-write-takes-a-form-and-answers-once.md)
   and [WEB-0089](https://github.com/sylin-org/koan-framework/blob/main/docs/decisions/WEB-0089-a-hook-knows-its-operation-and-a-refused-form-reads-its-page-again.md).
 

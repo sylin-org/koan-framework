@@ -88,7 +88,9 @@ public sealed class NoticesController : EntityController<Notice>, IModelHook<Not
 - A refused form's page is the controller's object, answered at the refusal's status; where the controller hands none, a formatter that
   draws `Problem` keeps drawing it.
 - A page handed for a gate's refusal comes from a controller made for it, whose action never ran: it reads the request, its route values
-  and `refused`, and nothing an action would have bound.
+  and `refused`, and nothing an action would have bound, nor anything the gate found, since a refusing gate puts nothing on the request.
+  An override reads what the gate would have found without assuming it, and hands null where it is absent, so the refusal answers as it
+  is; one that assumes it throws, and the refusal becomes a `500`.
 
 ## Ergonomics
 
@@ -123,5 +125,7 @@ own pages and addresses.
   `no-store`, for a refusal in the write's hold (`409`) and one by the gate before anything bound (`401`, the row unchanged); a form
   whose binding failed reads its page with the operation it was sent to; a refused JSON write reads the problem though its controller
   hands pages, and so does a form whose page its controller declines.
+- `RelationshipExpansionVisibilitySpecs` (AdapterSurface, in memory): the related type's options hook, run for a maker's read with
+  `?with=all`, is told `GetById`, the operation the request runs.
 - `DeclaredOperationsSpec` (Koan.Mcp.Verbs.Tests, real HTTP and real `tools/call`): a tool call tells its hooks `Upsert` and `Patch` as
   its route does, and a refused one reads the problem, while the same refusal sent as a page's form reads the controller's page.

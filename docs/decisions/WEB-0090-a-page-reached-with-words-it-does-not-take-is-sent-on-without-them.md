@@ -71,8 +71,9 @@ No new public concept: a declared read does it. Its cost to the reader is the on
 
 ## Evidence
 
-- `DeclaredControllerSpecsBase` (AdapterSurface, SQLite and in memory): a list and a row read with `fbclid` and `utm_source`, as
-  `text/html` and as `*/*`, by `GET` and by `HEAD`, are sent on, `302`, to the address with only the words they take, a repeated `size`
-  and an escaped `after` kept as sent, saying nothing of freshness; `set=audit` from a page reader is still `400` naming `set`; a word not
-  taken from a sender that names JSON is still refused naming it.
+- `DeclaredControllerSpecsBase` (AdapterSurface, SQLite and in memory): a list read with `fbclid` and `utm_source`, as `text/html` and
+  as `*/*`, by `GET` and by a `HEAD` its override declares, is sent on, `302`, to the address with only the words it takes, a repeated
+  `size` and an escaped `after` kept as sent, saying nothing of freshness; a row read by `GET` as `text/html` with `utm_source` is sent on
+  to its address; `set=audit` from a page reader is still `400` naming `set`; a word not taken from a sender that names JSON is still
+  refused naming it.
 - `FormWriteUnderBaseSpec` (Koan.Web.WellKnown.Tests, under `Koan:Web:ApplicationUrl` with a path): a read sent on stays under the base.

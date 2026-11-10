@@ -213,7 +213,7 @@ The surface is the pipeline's own small request instead.
   formatter answers when `Accept` asks for it; a value handed in process reaches the action and the formatter; an exception
   downstream answers as the application's handler answers; the outer request's `If-None-Match` does not reach the inner one, and
   the inner one's own tag still answers `304` to a conditional it is given; `Items` and features are the inner request's own and
-  the outer accessor is as it was; a refused form's page is drawn again without running the write again; many GETs as nobody
+  the outer accessor is as it was; many GETs as nobody
   answer bytes and a content type; nobody carries no connection address, so a route gated `origin:internal` admits the reader
   arriving from a declared network and refuses nobody; a pipeline the host never built answers `503` with its `Problem`; a credential
   among the given headers, an address that is not a path, a dot segment, plain or escaped, and a value handed in as
