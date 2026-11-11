@@ -111,7 +111,8 @@ JobSubmission streamed = await SendDigest.QueryStream(item => item.Ready).Submit
 Submit writes a new work item and never overwrites a stored one; when the handler returns, only the
 members it changed are written back, onto the item as it is stored then, so a write another writer made
 while the job ran survives. A member both changed is a conflict: nothing is written, and the attempt fails, so
-the job retries on the stored item (JOBS-0010).
+the job retries on the stored item (JOBS-0010). A handler that asks to run again later — `Reschedule` or
+`Backoff` — has what it changed written back the same way before its deferral, so its next run loads it (JOBS-0011).
 
 A collection submission reports confirmed ledger acceptance, not execution. It is ordered,
 sequentially backpressured, and not collection-atomic. Streaming bounds producer memory, not ledger
@@ -121,7 +122,8 @@ growth; model an explicit work window for very large sources.
 
 `JobContext` can report progress, reschedule, back off a shared resource, continue a chain, or stop a
 chain. Use at most one terminal control decision per execution. Throwing is a failed attempt; a normal
-return is success.
+return is success. A handler that reschedules or backs off keeps what it changed on its item, as a completed
+run does; one that throws `RescheduleException` keeps nothing, as after any throw.
 
 ```csharp
 if (await IsRateLimited(job.AccountId, ct))

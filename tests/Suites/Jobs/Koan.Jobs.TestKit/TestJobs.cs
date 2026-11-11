@@ -98,6 +98,42 @@ public sealed class RescheduleJob : Entity<RescheduleJob>, IKoanJob<RescheduleJo
     public static void Reset() { Executions = 0; RescheduleUntil = 2; }
 }
 
+/// <summary>Asks to run again later on its first run (JOBS-0011), by <c>Reschedule</c>, or by <c>Backoff</c> while
+/// <see cref="BacksOff"/>: it counts the run on the reference it was given, unless <see cref="Unchanged"/>, where another
+/// writer changes <see cref="Note"/> while it runs instead. <see cref="RunsSeen"/> holds what each run loaded.</summary>
+public sealed class KeepingJob : Entity<KeepingJob>, IKoanJob<KeepingJob>
+{
+    public const string WrittenMeanwhile = "written by another writer while the job ran";
+    public int Runs { get; set; }
+    public string Note { get; set; } = "";
+    public static bool BacksOff;
+    public static bool Unchanged;
+    public static readonly ConcurrentQueue<int> RunsSeen = new();
+
+    public static async Task Execute(KeepingJob job, JobContext ctx, CancellationToken ct)
+    {
+        RunsSeen.Enqueue(job.Runs);
+        if (ctx.State.Reschedules > 0) return;
+        if (Unchanged)
+        {
+            var other = await KeepingJob.Get(job.Id, ct);
+            other!.Note = WrittenMeanwhile;
+            await KeepingJob.Upsert(other, ct);
+        }
+        else job.Runs++;
+
+        if (BacksOff) ctx.Backoff(TimeSpan.FromMinutes(5));
+        else ctx.Reschedule(TimeSpan.FromMinutes(5));
+    }
+
+    public static void Reset()
+    {
+        BacksOff = false;
+        Unchanged = false;
+        RunsSeen.Clear();
+    }
+}
+
 /// <summary>Contends for a shared host gate; on the first run it "gets a 429" and backs the whole host off.</summary>
 [JobGate(nameof(Host))]
 public sealed class GatedJob : Entity<GatedJob>, IKoanJob<GatedJob>

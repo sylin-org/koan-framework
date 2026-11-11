@@ -471,6 +471,45 @@ public abstract class JobBehaviorSuite
         rec.Attempt.Should().Be(1);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task a_job_that_defers_itself_keeps_what_it_changed(bool backsOff)
+    {
+        // JOBS-0011: a handler that returned having asked to run again later has its changes written back first.
+        KeepingJob.Reset();
+        KeepingJob.BacksOff = backsOff;
+        await using var host = await CreateHostAsync();
+        var item = new KeepingJob();
+        await item.Job.Submit();
+        await host.Drain();
+
+        (await KeepingJob.Get(item.Id))!.Runs.Should().Be(1, "the deferred run's change is stored");
+        (await host.StatusOf<KeepingJob>(item.Id)).Should().Be(JobStatus.Queued);
+        host.Advance(TimeSpan.FromMinutes(5)); await host.Drain();
+        KeepingJob.RunsSeen.Should().Equal(new[] { 0, 1 }, "the next run loads the change");
+        var rec = await host.JobFor<KeepingJob>(item.Id);
+        rec!.Status.Should().Be(JobStatus.Completed);
+        (rec.Reschedules, rec.Attempt).Should().Be((1, 1), "a deferral still consumes no attempt");
+    }
+
+    [Fact]
+    public async Task a_job_that_defers_itself_having_changed_nothing_writes_nothing()
+    {
+        // JOBS-0011: the write-back before a deferral writes only what the handler changed, so another writer's change stands.
+        KeepingJob.Reset();
+        KeepingJob.Unchanged = true;
+        await using var host = await CreateHostAsync();
+        var item = new KeepingJob();
+        await item.Job.Submit();
+        await host.Drain();
+        host.Advance(TimeSpan.FromMinutes(5)); await host.Drain();
+
+        var stored = await KeepingJob.Get(item.Id);
+        (stored!.Note, stored.Runs).Should().Be((KeepingJob.WrittenMeanwhile, 0));
+        (await host.StatusOf<KeepingJob>(item.Id)).Should().Be(JobStatus.Completed);
+    }
+
     [Fact]
     public async Task max_reschedules_dead_letters()
     {
@@ -527,8 +566,8 @@ public abstract class JobBehaviorSuite
     {
         // The snapshot's GateKey is the key captured with THIS claim, not a re-resolution of the work item's
         // current routing: even after the TEST changes and persists the routing between attempts, both claims
-        // retain the gate recorded on the ledger row at submit. (Deferral performs no work-item auto-save; the
-        // routing change is written by the test, not the handler.)
+        // retain the gate recorded on the ledger row at submit. (The handler changes nothing on its item, so its
+        // deferral writes nothing; the routing change is written by the test, not the handler.)
         GatedJob.Reset();
         await using var host = await CreateHostAsync();
         var j = new GatedJob { Host = "api-a" };

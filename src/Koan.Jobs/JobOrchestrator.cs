@@ -436,17 +436,18 @@ internal sealed class JobOrchestrator
 
     private async Task SettleSuccessAsync(JobRecord rec, ClaimedRow run, object workItem, JobTypeBinding binding, ResolvedActionPolicy policy, JobContext ctx, WorkItemImage? loaded)
     {
+        // Write back only what the handler changed on the reference it was given, merged onto the stored row (JOBS-0010):
+        // a handler that worked on its own copy left this one clean, and a write another writer made while the job ran
+        // stands. A member both changed is a conflict, which fails this attempt: the job runs again on the stored item.
+        // A handler that asked to run again later keeps what it changed too (JOBS-0011).
+        await WorkItemWriter.Persist(binding, rec.WorkId, workItem, loaded, CancellationToken.None);
+
         if (ctx.Signal is JobSignal.Reschedule or JobSignal.Backoff)
         {
             var until = ctx.DeferUntil ?? _clock.GetUtcNow();
             await ApplyDeferralAsync(rec, run, policy, until, ctx.Signal == JobSignal.Backoff, ctx.GateKeyOverride, ctx.GateKeyOverrideSet, "cooperative-backoff");
             return;
         }
-
-        // Write back only what the handler changed on the reference it was given, merged onto the stored row (JOBS-0010):
-        // a handler that worked on its own copy left this one clean, and a write another writer made while the job ran
-        // stands. A member both changed is a conflict, which fails this attempt: the job runs again on the stored item.
-        await WorkItemWriter.Persist(binding, rec.WorkId, workItem, loaded, CancellationToken.None);
 
         var now = _clock.GetUtcNow();
         var next = ctx.Signal switch

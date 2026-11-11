@@ -139,7 +139,8 @@ Inspect `jobs:dispatch` alongside `jobs:ledger` through `/.well-known/Koan/facts
 - Submit never overwrites a stored work item; save your changes before you submit them. Settle writes back
   only the members the handler changed — every member Koan persists, non-public setters included — onto the
   item as stored then. A member another writer changed to a different value meanwhile is a conflict: nothing is
-  written and the attempt fails, so the job retries on the stored item (JOBS-0010).
+  written and the attempt fails, so the job retries on the stored item (JOBS-0010). A handler that reschedules or
+  backs off keeps what it changed the same way, so its next run loads it (JOBS-0011).
 - Coalescing never crosses work items: duplicate submissions of one item coalesce onto its queued job, concurrent ones
   and one waiting out a retry or a deferral included, while another item with the same properties gets its own job. A
   submission inside a transaction coalesces onto a committed job or one the same transaction made. It saves work

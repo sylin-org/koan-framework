@@ -688,6 +688,8 @@
       href: JOBS-0001-jobs-pillar-entity-first-task-management.md
     - name: JOBS-0010 The worker never waits on its own work, and Jobs never writes over a change it did not make
       href: JOBS-0010-jobs-never-starve-and-never-lose-an-update.md
+    - name: JOBS-0011 A job that defers itself keeps what it changed
+      href: JOBS-0011-a-job-that-defers-itself-keeps-what-it-changed.md
 - name: Security (DEC)
   items:
     - name: DEC-0053 Service-to-service authentication

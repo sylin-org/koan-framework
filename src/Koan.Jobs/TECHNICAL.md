@@ -52,7 +52,8 @@ Neither submit nor settle overwrites a write another writer made to the work ite
 - **Settle** captures the item as Koan Data stores it — its document, through the same serializer and
   contract persistence writes with, so state behind a non-public setter is included and members the contract
   ignores are not. When the handler returns, it reads the row and saves it with only the members the handler
-  changed on the reference it was given. A member both the handler and another writer changed to different
+  changed on the reference it was given — after a handler that asked to `Reschedule` or `Backoff` too, before its
+  deferral is applied (JOBS-0011). A member both the handler and another writer changed to different
   values is a conflict: nothing is written and the attempt fails with a message naming the member, so the job
   retries on the stored item under `MaxAttempts`. A removal while the job ran stands. An item that cannot be
   serialized as Koan stores it is written whole from the handler's copy. A write to another member that lands

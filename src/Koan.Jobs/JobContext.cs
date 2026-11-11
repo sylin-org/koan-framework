@@ -73,14 +73,16 @@ public sealed class JobContext
     /// <summary>Terminal after this step, despite a declared <c>[JobChain]</c>.</summary>
     public void StopChain() => SetSignal(JobSignal.StopChain);
 
-    /// <summary>Defer THIS job (same stage) by a relative delay. Does NOT consume a retry attempt.</summary>
+    /// <summary>Defer THIS job (same stage) by a relative delay. Does NOT consume a retry attempt. What the handler
+    /// changed on its work item is kept, written back as a completed run's is (JOBS-0011).</summary>
     public void Reschedule(TimeSpan after)
     {
         SetSignal(JobSignal.Reschedule);
         DeferUntil = _clock.GetUtcNow() + (after < TimeSpan.Zero ? TimeSpan.Zero : after);
     }
 
-    /// <summary>Defer THIS job to an absolute time (e.g. "tomorrow 09:00"). Does NOT consume a retry attempt.</summary>
+    /// <summary>Defer THIS job to an absolute time (e.g. "tomorrow 09:00"). Does NOT consume a retry attempt. What the
+    /// handler changed on its work item is kept, written back as a completed run's is (JOBS-0011).</summary>
     public void Reschedule(DateTimeOffset until)
     {
         SetSignal(JobSignal.Reschedule);
@@ -88,7 +90,8 @@ public sealed class JobContext
     }
 
     /// <summary>Set a shared resource gate (default = this job's gate key) until <c>now+after</c>, and reschedule
-    /// this job. Peer jobs for the same key defer at dispatch without running. Does NOT consume a retry attempt.</summary>
+    /// this job. Peer jobs for the same key defer at dispatch without running. Does NOT consume a retry attempt. What the
+    /// handler changed on its work item is kept, written back as a completed run's is (JOBS-0011).</summary>
     public void Backoff(TimeSpan after, string? key = null)
     {
         SetSignal(JobSignal.Backoff);

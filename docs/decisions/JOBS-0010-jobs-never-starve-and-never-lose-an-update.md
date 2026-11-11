@@ -7,6 +7,7 @@ date: 2026-10-30
 title: The worker never waits on its own work, and Jobs never writes over a change it did not make
 related:
   - JOBS-0005
+  - JOBS-0011
   - JOBS-0006
   - JOBS-0009
   - DATA-0131
@@ -18,6 +19,9 @@ Amends [JOBS-0005](JOBS-0005-job-orchestrator-rebuild.md) §6 (`@continuous`), �
 (conditional auto-save) and §19.3 (retention), [JOBS-0006](JOBS-0006-trailing-edge-coalesce-semantics.md) (what a
 submission coalesces onto) and [JOBS-0009](JOBS-0009-wake-stamp-and-lease-heartbeat.md) Decision A (the one-row wake
 stamp). The rest of those records stands.
+
+> **Amended by [JOBS-0011](JOBS-0011-a-job-that-defers-itself-keeps-what-it-changed.md) (2026-11-10):** settle writes
+> back what a handler changed when it returns having asked to `Reschedule` or `Backoff` too, before the deferral.
 
 ## Context
 
